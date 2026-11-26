@@ -41,21 +41,65 @@ maxshot-proto/
 
 ## 2. 安装与引用方式
 
-### Go 仓库引入（适用于任意 Go 服务端/客户端）
+### 方式一（推荐）：Git Submodule 挂载至 `./proto`（单仓自包含文档 + 免私库凭据构建）
+
+在业务仓库根目录使用**同 Org 相对路径**挂载本仓库并锁定语义化 Tag（自动继承主仓的 HTTPS/SSH/CI Token 鉴权，且 Docker Build 与 AI 开发环境可直接读取完整 `.proto`、架构总纲与测试向量）：
 
 ```bash
-go get github.com/MaxShotLab/maxshot-proto@v0.1.0
+git submodule add ../maxshot-proto.git proto
+git -C proto fetch --tags
+git -C proto checkout v0.1.1
+git add .gitmodules proto
 ```
 
-### TypeScript 仓库引入（适用于任意 Node.js/TS 服务端/客户端）
+- **Go 仓库绑定（`go.mod`）**：
 
-在 `package.json` 中通过 Git Tag 引入（拉取时会自动执行 `prepare` 编译 `dist/`）：
+```go
+require github.com/MaxShotLab/maxshot-proto v0.1.1
+
+replace github.com/MaxShotLab/maxshot-proto => ./proto
+```
+
+- **TypeScript 仓库绑定（`package.json`）**：
 
 ```json
 {
   "dependencies": {
     "@grpc/grpc-js": "^1.12.4",
-    "@maxshot/proto": "github:MaxShotLab/maxshot-proto#v0.1.0"
+    "@maxshot/proto": "file:./proto"
+  }
+}
+```
+
+- **克隆、CI 与 Makefile 防漏检规范**：
+  - 首次克隆使用 `git clone --recurse-submodules <repo-url>`（或后续补拉 `git submodule update --init --recursive`）；
+  - GitHub Actions `actions/checkout@v4` 配置 `submodules: recursive`（跨私有仓需提供 Org 读权限 PAT / Deploy Key）；
+  - 建议在业务仓 `Makefile` 构建入口添加防呆检查：`test -f proto/buf.yaml || git submodule update --init --recursive`。
+- **按语义化 Tag 升级契约版本（严禁直接在下游 `./proto` 内修改代码）**：
+
+```bash
+git -C proto fetch --tags
+git -C proto checkout v0.x.y
+git add proto && git commit -m "chore(proto): bump maxshot-proto to v0.x.y"
+```
+
+---
+
+### 方式二（备选）：包管理器按 Git Tag 远程直拉
+
+#### Go 仓库引入（配合 `GOPRIVATE=github.com/MaxShotLab/*`）
+
+```bash
+go get github.com/MaxShotLab/maxshot-proto@v0.1.1
+```
+
+#### TypeScript 仓库引入（拉取时会自动执行 `prepare` 编译 `dist/`）
+
+```json
+{
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.4",
+    "@maxshot/proto": "github:MaxShotLab/maxshot-proto#v0.1.1"
   }
 }
 ```
