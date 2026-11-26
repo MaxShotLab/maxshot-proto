@@ -1,0 +1,200 @@
+syntax = "proto3";
+
+package maxshot.provider_sync.v1;
+
+import "maxshot/common/v1/types.proto";
+
+option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/provider_sync/v1;providersyncv1";
+
+// ProviderSyncService defines cross-repo communication between Provider Backend and Gateway Backend
+// over the WireGuard overlay network using gRPC + TLS + HMAC.
+service ProviderSyncService {
+  // WatchCatalogSnapshot streams immutable catalog snapshot updates from Provider Backend to Gateway.
+  rpc WatchCatalogSnapshot(WatchCatalogSnapshotRequest) returns (stream WatchCatalogSnapshotResponse);
+
+  // GetCatalogSnapshot fetches a specific or latest immutable catalog snapshot (startup/reconciliation fallback).
+  rpc GetCatalogSnapshot(GetCatalogSnapshotRequest) returns (GetCatalogSnapshotResponse);
+
+  // SyncEncryptedCredentials fetches upstream provider credentials asymmetrically encrypted with Gateway's public key.
+  rpc SyncEncryptedCredentials(SyncEncryptedCredentialsRequest) returns (SyncEncryptedCredentialsResponse);
+
+  // ReportOfferingMetrics pushes aggregated 1-5m window Uptime, p50/p95 latency, error counts, and payable totals from Gateway to Provider Backend.
+  rpc ReportOfferingMetrics(ReportOfferingMetricsRequest) returns (ReportOfferingMetricsResponse);
+}
+
+enum RouteType {
+  ROUTE_TYPE_UNSPECIFIED = 0;
+  ROUTE_TYPE_DIRECT = 1;
+  ROUTE_TYPE_AGGREGATOR = 2;
+}
+
+enum AdmissionStatus {
+  ADMISSION_STATUS_UNSPECIFIED = 0;
+  ADMISSION_STATUS_PENDING = 1;
+  ADMISSION_STATUS_PASSED = 2;
+  ADMISSION_STATUS_FAILED = 3;
+}
+
+enum AvailabilityStatus {
+  AVAILABILITY_STATUS_UNSPECIFIED = 0;
+  AVAILABILITY_STATUS_AVAILABLE = 1;
+  AVAILABILITY_STATUS_PAUSED = 2;
+  AVAILABILITY_STATUS_UNHEALTHY = 3;
+}
+
+enum AutoTaskLabel {
+  AUTO_TASK_LABEL_UNSPECIFIED = 0;
+  AUTO_TASK_LABEL_ORDINARY_CHAT = 1;
+  AUTO_TASK_LABEL_CODING = 2;
+  AUTO_TASK_LABEL_COMPLEX_REASONING = 3;
+}
+
+message RateComponent {
+  string kind = 1;          // input_tokens | output_tokens | cache_read_tokens | output_image | output_video
+  int64 micro_usd_rate = 2; // integer micro-USD per unit (1 USD = 1,000,000 micro-USD)
+  string unit = 3;          // per_1m_tokens | per_image | per_megapixel | per_second
+  string condition = 4;     // optional resolution/mode condition, e.g. "1024px" or "1080p"
+}
+
+message RateCard {
+  string rate_card_version = 1;
+  int64 effective_at_unix_ms = 2;
+  repeated RateComponent components = 3;
+}
+
+message ProviderRecord {
+  string provider_id = 1;
+  string display_name = 2;
+  RouteType route_type = 3;
+  string summary = 4;
+  int64 daily_budget_micro_usd = 5;
+  int64 monthly_budget_micro_usd = 6;
+}
+
+message CatalogDefinition {
+  string catalog_id = 1; // e.g. text_standard, text_frontier, image, video
+  string display_name = 2;
+  maxshot.common.v1.Modality modality = 3;
+  bool enabled = 4;
+}
+
+message CustomerModelRecord {
+  string model_id = 1;
+  string display_name = 2;
+  string verified_version = 3;
+  maxshot.common.v1.Modality modality = 4;
+  string catalog_id = 5;
+  maxshot.common.v1.ModelTier tier = 6;
+  int64 default_max_output_tokens = 7;
+  repeated string offering_ids = 8;
+}
+
+message OfferingRecord {
+  string offering_id = 1;
+  string provider_id = 2;
+  string model_id = 3;
+  string protocol_adapter = 4; // openai-compat | anthropic-native | google-native | openrouter-pinned | media-async
+  string endpoint_url = 5;
+  string native_model_id = 6;
+  string credential_id = 7;
+  bool disable_upstream_fallback = 8;
+  string pinned_upstream_provider = 9;
+  AdmissionStatus admission_status = 10;
+  AvailabilityStatus availability_status = 11;
+  repeated string capabilities = 12;
+  repeated string allowed_regions = 13;
+  bool zero_retention = 14;
+  int64 context_tokens = 15;
+  int64 max_output_tokens = 16;
+  int64 ttft_timeout_ms = 17;
+  int64 max_job_duration_seconds = 18;
+  RateCard provider_cost_card = 19;
+  RateCard customer_rate_card = 20;
+}
+
+message AutoPoolEntry {
+  string offering_id = 1;
+  string model_id = 2;
+  repeated AutoTaskLabel task_labels = 3;
+  int32 priority_rank = 4;
+  int64 per_message_ceiling_micro_usd = 5;
+}
+
+message BudgetPolicy {
+  int64 platform_daily_budget_micro_usd = 1;
+  int64 business_chat_daily_budget_micro_usd = 2;
+  int64 business_studio_daily_budget_micro_usd = 3;
+}
+
+message CatalogSnapshot {
+  string catalog_version = 1;
+  int64 generated_at_unix_ms = 2;
+  repeated CatalogDefinition catalogs = 3;
+  repeated ProviderRecord providers = 4;
+  repeated CustomerModelRecord models = 5;
+  repeated OfferingRecord offerings = 6;
+  repeated AutoPoolEntry auto_pool = 7;
+  BudgetPolicy budget_policy = 8;
+}
+
+message WatchCatalogSnapshotRequest {
+  string gateway_node_id = 1;
+  string last_seen_catalog_version = 2;
+}
+
+message WatchCatalogSnapshotResponse {
+  CatalogSnapshot snapshot = 1;
+}
+
+message GetCatalogSnapshotRequest {
+  string catalog_version = 1; // empty means latest published snapshot
+}
+
+message GetCatalogSnapshotResponse {
+  CatalogSnapshot snapshot = 1;
+}
+
+message EncryptedCredentialItem {
+  string credential_id = 1;
+  string provider_id = 2;
+  string gateway_public_key_id = 3;
+  bytes encrypted_dek = 4;        // DEK encrypted with Gateway RSA-OAEP / X25519 public key
+  bytes nonce = 5;                // AES-256-GCM 12-byte nonce
+  bytes ciphertext = 6;           // AES-256-GCM encrypted upstream secret + auth tag
+  int64 updated_at_unix_ms = 7;
+}
+
+message SyncEncryptedCredentialsRequest {
+  string since_revision = 1;
+}
+
+message SyncEncryptedCredentialsResponse {
+  string current_revision = 1;
+  repeated EncryptedCredentialItem credentials = 2;
+}
+
+message OfferingWindowMetric {
+  string offering_id = 1;
+  int64 window_start_unix_ms = 2;
+  int64 window_end_unix_ms = 3;
+  int64 dispatched_attempts = 4;
+  int64 delivered_success_count = 5;
+  int64 http_429_count = 6;
+  int64 http_5xx_count = 7;
+  int64 timeout_count = 8;
+  int64 latency_sample_count = 9;
+  int64 p50_latency_ms = 10;
+  int64 p95_latency_ms = 11;
+  bool is_first_token_metric = 12;
+  int64 settled_provider_payable_micro_usd = 13;
+}
+
+message ReportOfferingMetricsRequest {
+  string batch_id = 1; // idempotency key for metric batch
+  string gateway_node_id = 2;
+  repeated OfferingWindowMetric metrics = 3;
+}
+
+message ReportOfferingMetricsResponse {
+  bool accepted = 1;
+}

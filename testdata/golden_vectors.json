@@ -1,0 +1,34 @@
+{
+  "version": "v1",
+  "vectors": [
+    {
+      "name": "unary_issue_ait_grants",
+      "full_method": "/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants",
+      "service_id": "contract-svc",
+      "key_id": "k1",
+      "secret": "ms_hmac_test_secret_0123456789abcdef",
+      "timestamp": "1795670000",
+      "nonce": "00112233445566778899aabbccddeeff",
+      "batch_id": "batch_01",
+      "term_id": "term_01",
+      "boundary_index": 1,
+      "payload_hex": "0a0862617463685f303112077465726d5f30311801",
+      "expected_payload_sha256": "e9f3fce67261cf3ae8f328addcba5b96aa072a08ce602a0edde24d2cca4dd665",
+      "expected_canonical": "v1\n/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants\ncontract-svc\nk1\n1795670000\n00112233445566778899aabbccddeeff\ne9f3fce67261cf3ae8f328addcba5b96aa072a08ce602a0edde24d2cca4dd665",
+      "expected_signature": "8f642cffbabce96f638d601f8650e92825df7698ce5a729e8dfd44e83804adef"
+    },
+    {
+      "name": "stream_watch_catalog_snapshot_empty_handshake",
+      "full_method": "/maxshot.provider_sync.v1.ProviderSyncService/WatchCatalogSnapshot",
+      "service_id": "gateway-dp",
+      "key_id": "k2",
+      "secret": "ms_hmac_rotate_secret_fedcba9876543210",
+      "timestamp": "1795670500",
+      "nonce": "ffeeddccbbaa99887766554433221100",
+      "payload_hex": "",
+      "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected_canonical": "v1\n/maxshot.provider_sync.v1.ProviderSyncService/WatchCatalogSnapshot\ngateway-dp\nk2\n1795670500\nffeeddccbbaa99887766554433221100\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected_signature": "1e37c8559d08419edc25cc3e76ce95edada64343a0b11f46a1350fa2ff369905"
+    }
+  ]
+}

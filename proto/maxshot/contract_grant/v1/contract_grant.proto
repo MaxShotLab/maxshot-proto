@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package maxshot.contract_grant.v1;
+
+import "maxshot/common/v1/types.proto";
+
+option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/contract_grant/v1;contractgrantv1";
+
+// WalletEligibilityService synchronizes 1:1 verified SIWE/ERC-1271 wallet bindings and
+// Funded Term acceptance timestamps between Gateway Backend and Contract Backend.
+service WalletEligibilityService {
+  // PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules.
+  rpc PushWalletEligibility(PushWalletEligibilityRequest) returns (PushWalletEligibilityResponse);
+
+  // PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor.
+  rpc PullWalletEligibilityUpdates(PullWalletEligibilityUpdatesRequest) returns (PullWalletEligibilityUpdatesResponse);
+}
+
+// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend at each 7-day boundary.
+service AitCreditGrantService {
+  // IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25).
+  rpc IssueAitCreditGrants(IssueAitCreditGrantsRequest) returns (IssueAitCreditGrantsResponse);
+}
+
+message TermAcceptance {
+  string term_id = 1;
+  string terms_version = 2;
+  int64 accepted_at_unix_sec = 3;
+}
+
+message WalletEligibilityRecord {
+  string account_id = 1;
+  string wallet_address = 2; // normalized lowercase 0x-prefixed Ethereum address
+  int64 linked_at_unix_sec = 3;
+  bool excluded_treasury_or_team = 4;
+  repeated TermAcceptance term_acceptances = 5;
+  int64 updated_sequence = 6;
+}
+
+message PushWalletEligibilityRequest {
+  string batch_id = 1;
+  repeated WalletEligibilityRecord records = 2;
+}
+
+message PushWalletEligibilityResponse {
+  bool accepted = 1;
+  int64 highest_sequence = 2;
+}
+
+message PullWalletEligibilityUpdatesRequest {
+  maxshot.common.v1.CursorPageRequest page = 1;
+}
+
+message PullWalletEligibilityUpdatesResponse {
+  repeated WalletEligibilityRecord records = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+
+enum GrantItemStatus {
+  GRANT_ITEM_STATUS_UNSPECIFIED = 0;
+  GRANT_ITEM_STATUS_CREDITED = 1;
+  GRANT_ITEM_STATUS_ALREADY_CREDITED = 2; // idempotent replay
+  GRANT_ITEM_STATUS_REJECTED_UNLINKED_WALLET = 3;
+  GRANT_ITEM_STATUS_REJECTED_TERMS_NOT_ACCEPTED = 4;
+  GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH = 5;
+  GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6;
+  GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7;
+}
+
+message AitGrantItem {
+  string grant_id = 1; // deterministic: "{term_id}:{boundary_index}:{account_id}"
+  string term_id = 2;
+  int32 boundary_index = 3;
+  string account_id = 4;
+  string wallet_address = 5;
+  // Exact 256-bit integer string: eligible staked AIT wei * eligible seconds from term start to boundary t.
+  string cumulative_eligible_ait_wei_seconds_dec = 6;
+  int64 previously_granted_credits = 7;
+  int64 grant_credits = 8;
+  uint64 finalized_block_number = 9;
+  int64 boundary_timestamp_unix_sec = 10;
+}
+
+message IssueAitCreditGrantsRequest {
+  string batch_id = 1;
+  string term_id = 2;
+  int32 boundary_index = 3;
+  repeated AitGrantItem items = 4;
+}
+
+message AitGrantItemResult {
+  string grant_id = 1;
+  GrantItemStatus status = 2;
+  string detail = 3;
+}
+
+message IssueAitCreditGrantsResponse {
+  repeated AitGrantItemResult results = 1;
+}

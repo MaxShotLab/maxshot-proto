@@ -1,0 +1,64 @@
+{
+  "name": "@maxshot/proto",
+  "version": "0.1.0",
+  "description": "Shared Protobuf contracts, gRPC stubs, and HMAC authentication interceptors for Maxshot services (Go & TypeScript)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./grpcauth": {
+      "types": "./dist/grpcauth/index.d.ts",
+      "import": "./dist/grpcauth/index.js"
+    },
+    "./common/v1": {
+      "types": "./dist/gen/ts/maxshot/common/v1/types.d.ts",
+      "import": "./dist/gen/ts/maxshot/common/v1/types.js"
+    },
+    "./provider_sync/v1": {
+      "types": "./dist/gen/ts/maxshot/provider_sync/v1/provider_sync.d.ts",
+      "import": "./dist/gen/ts/maxshot/provider_sync/v1/provider_sync.js"
+    },
+    "./contract_grant/v1": {
+      "types": "./dist/gen/ts/maxshot/contract_grant/v1/contract_grant.d.ts",
+      "import": "./dist/gen/ts/maxshot/contract_grant/v1/contract_grant.js"
+    },
+    "./gateway_internal/v1": {
+      "types": "./dist/gen/ts/maxshot/gateway_internal/v1/execution.d.ts",
+      "import": "./dist/gen/ts/maxshot/gateway_internal/v1/execution.js"
+    }
+  },
+  "files": [
+    "dist",
+    "gen/ts",
+    "ts",
+    "proto"
+  ],
+  "scripts": {
+    "proto:lint": "buf lint",
+    "proto:breaking": "buf breaking --against '.git#branch=main'",
+    "proto:gen": "PATH=\"$PWD/.bin:$PWD/node_modules/.bin:$PATH\" buf generate",
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "test:ts": "tsx --test ts/grpcauth/hmac.test.ts",
+    "test:go": "go test -v ./pkg/... ./gen/go/...",
+    "test": "pnpm test:go && pnpm test:ts",
+    "check": "pnpm proto:lint && pnpm build && pnpm test"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.2.2",
+    "@grpc/grpc-js": "^1.12.4",
+    "long": "^5.2.3",
+    "protobufjs": "^7.4.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.47.2",
+    "@types/node": "^22.10.2",
+    "ts-proto": "^2.6.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

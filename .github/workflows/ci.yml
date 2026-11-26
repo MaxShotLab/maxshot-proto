@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install Go protoc plugins
+        run: |
+          GOBIN="$PWD/.bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+          GOBIN="$PWD/.bin" go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Buf lint
+        run: pnpm proto:lint
+
+      - name: Buf breaking change check (PRs)
+        if: github.event_name == 'pull_request'
+        run: pnpm proto:breaking
+
+      - name: Regenerate & verify gen/ is clean
+        run: |
+          pnpm proto:gen
+          git diff --exit-code -- gen/
+
+      - name: Build TypeScript package & run Go + TS cross-language tests
+        run: |
+          pnpm build
+          pnpm test

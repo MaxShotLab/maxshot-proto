@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package maxshot.gateway_internal.v1;
+
+import "maxshot/common/v1/types.proto";
+
+option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1;gatewayinternalv1";
+
+// BillingExecutionService is the intra-Gateway synchronous gRPC contract between
+// Go Data Plane (gateway-dataplane) and TypeScript Billing Service (billing-account-service).
+service BillingExecutionService {
+  // AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold.
+  rpc AuthorizeAndHold(AuthorizeAndHoldRequest) returns (AuthorizeAndHoldResponse);
+
+  // MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
+  rpc MarkSending(MarkSendingRequest) returns (MarkSendingResponse);
+
+  // Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds.
+  rpc Settle(SettleRequest) returns (SettleResponse);
+}
+
+enum ExecutionChannel {
+  EXECUTION_CHANNEL_UNSPECIFIED = 0;
+  EXECUTION_CHANNEL_API = 1;
+  EXECUTION_CHANNEL_WEB_CHAT = 2;
+  EXECUTION_CHANNEL_STUDIO = 3;
+}
+
+enum SettlementOutcome {
+  SETTLEMENT_OUTCOME_UNSPECIFIED = 0;
+  SETTLEMENT_OUTCOME_DELIVERED = 1;
+  SETTLEMENT_OUTCOME_NOT_ACCEPTED = 2;
+  SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 3;
+  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 4;
+}
+
+message AuthorizeAndHoldRequest {
+  string trace_id = 1;
+  string idempotency_key = 2;
+  string request_body_sha256 = 3;
+  string api_key_sha256 = 4;          // populated when channel == EXECUTION_CHANNEL_API
+  string internal_account_id = 5;     // populated when channel == WEB_CHAT or STUDIO
+  ExecutionChannel channel = 6;
+  maxshot.common.v1.Modality modality = 7;
+  string model_id = 8;
+  string catalog_version = 9;
+  string primary_offering_id = 10;
+  string backup_offering_id = 11;
+  int64 input_tokens_upper = 12;
+  int64 effective_max_output_tokens = 13;
+  int64 caller_ceiling_micro_usd = 14;
+  bool dollar_confirmed = 15;
+}
+
+message AuthorizeAndHoldResponse {
+  bool admitted = 1;
+  maxshot.common.v1.RejectCode reject_code = 2;
+  string reject_message = 3;
+  string request_id = 4; // ULID, generated only when admitted == true (BIL-R24)
+  string hold_id = 5;
+  string lease_token = 6;
+  int64 computed_hard_max_micro_usd = 7;
+  bool basic_to_premium_used = 8; // reflects "Continue with Premium when Basic is not enough"
+}
+
+message MarkSendingRequest {
+  string request_id = 1;
+  string attempt_id = 2;
+  string offering_id = 3;
+  string dispatch_key = 4;
+  string lease_token = 5;
+}
+
+message MarkSendingResponse {
+  bool accepted = 1;
+}
+
+message AttemptCostRecord {
+  string attempt_id = 1;
+  string offering_id = 2;
+  string native_request_id = 3;
+  bool succeeded = 4;
+  int64 input_tokens = 5;
+  int64 output_tokens = 6;
+  int64 cache_read_tokens = 7;
+}
+
+message SettleRequest {
+  string request_id = 1;
+  string lease_token = 2;
+  SettlementOutcome outcome = 3;
+  string serving_offering_id = 4;
+  string native_request_id = 5;
+  int64 verified_input_tokens = 6;
+  int64 verified_output_tokens = 7;
+  int64 verified_cache_read_tokens = 8;
+  int64 estimated_streamed_output_tokens = 9; // audit evidence only when outcome == PENDING_RECONCILIATION
+  repeated AttemptCostRecord attempts = 10;
+}
+
+message SettleResponse {
+  bool settled = 1;
+  int64 final_customer_charge_micro_usd = 2;
+  int64 released_hold_micro_usd = 3;
+}

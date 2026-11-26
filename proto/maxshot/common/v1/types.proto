@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package maxshot.common.v1;
+
+option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1";
+
+// Modality enumerates supported inference modalities across Provider and Gateway.
+enum Modality {
+  MODALITY_UNSPECIFIED = 0;
+  MODALITY_TEXT = 1;
+  MODALITY_IMAGE = 2;
+  MODALITY_VIDEO = 3;
+  MODALITY_EMBEDDING = 4;
+}
+
+// ModelTier represents the subscription/funding tier label assigned by Maxshot.
+enum ModelTier {
+  MODEL_TIER_UNSPECIFIED = 0;
+  MODEL_TIER_BASIC = 1;
+  MODEL_TIER_PREMIUM = 2;
+  MODEL_TIER_FREE = 3;
+}
+
+// RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05).
+enum RejectCode {
+  REJECT_CODE_UNSPECIFIED = 0;
+  REJECT_CODE_KEY_INVALID = 1;
+  REJECT_CODE_KEY_REVOKED = 2;
+  REJECT_CODE_KEY_EXPIRED = 3;
+  REJECT_CODE_CATALOG_NOT_ALLOWED = 4;
+  REJECT_CODE_MODEL_NOT_ALLOWED = 5;
+  REJECT_CODE_MODEL_UNAVAILABLE = 6;
+  REJECT_CODE_PINNED_OFFERING_INELIGIBLE = 7;
+  REJECT_CODE_OVER_REQUEST_CEILING = 8;
+  REJECT_CODE_OVER_DAILY_BUDGET = 9;
+  REJECT_CODE_OVER_MONTHLY_BUDGET = 10;
+  REJECT_CODE_OVER_SUPPLIER_BUDGET = 11;
+  REJECT_CODE_OVER_PLATFORM_BUDGET = 12;
+  REJECT_CODE_OVER_BUSINESS_BUDGET = 13;
+  REJECT_CODE_INSUFFICIENT_FUNDING = 14;
+  REJECT_CODE_DOLLAR_NOT_AUTHORIZED = 15;
+  REJECT_CODE_JOB_LIMIT_EXCEEDED = 16;
+  REJECT_CODE_IDEMPOTENCY_MISMATCH = 17;
+}
+
+// CursorPageRequest provides cursor-based pagination for incremental cross-repo sync.
+message CursorPageRequest {
+  string cursor = 1;
+  int32 limit = 2;
+}
+
+// CursorPageResponse carries the continuation cursor for incremental sync.
+message CursorPageResponse {
+  string next_cursor = 1;
+  bool has_more = 2;
+}
