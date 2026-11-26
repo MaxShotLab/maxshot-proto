@@ -12,16 +12,21 @@ option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_
 // 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
 // 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 service BillingExecutionService {
-  // ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-  // so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+  // ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+  // so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
   rpc ResolvePrincipalScope(ResolvePrincipalScopeRequest) returns (ResolvePrincipalScopeResponse);
 
+  // EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+  // for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+  rpc EvaluateCatalogDiscovery(EvaluateCatalogDiscoveryRequest) returns (EvaluateCatalogDiscoveryResponse);
+
   // PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-  // F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+  // F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+  // and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
   rpc PreviewQuote(PreviewQuoteRequest) returns (PreviewQuoteResponse);
 
   // AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-  // and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+  // optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
   rpc AuthorizeAndHold(AuthorizeAndHoldRequest) returns (AuthorizeAndHoldResponse);
 
   // MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
@@ -94,6 +99,24 @@ enum UncertainResolutionAction {
   UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3;
 }
 
+// MediaPricingDimensions carries structured request/result dimensions so BillingExecutionService
+// can deterministically recompute nonlinear Studio pricing rules from CatalogSnapshot (decision 2A).
+message MediaPricingDimensions {
+  string resolution = 1;
+  string aspect_ratio = 2;
+  string size = 3;
+  int32 width_px = 4;
+  int32 height_px = 5;
+  int32 duration_seconds = 6;
+  int64 duration_ms = 7;
+  bool generate_audio = 8;
+  int32 reference_image_count = 9;
+  int32 reference_video_count = 10;
+  int64 reference_video_total_duration_ms = 11;
+  int32 upscale_factor = 12;
+  int32 requested_outputs = 13;
+}
+
 // UsageBound unifies multi-dimensional LLM token bounds/meters and Studio/API media generation units.
 message UsageBound {
   int64 input_tokens = 1;
@@ -116,6 +139,7 @@ message UsageBound {
   bool media_has_audio = 17;
   int64 media_character_count = 18;
   repeated maxshot.common.v1.KeyValueAttribute media_attributes = 19; // e.g. path=i2v, resolution=1080p, edit_tool=inpaint
+  MediaPricingDimensions media_dimensions = 20;
 }
 
 message QuoteComponentLine {
@@ -168,6 +192,31 @@ message LockedVersionSet {
   string fx_version = 5;
 }
 
+message BucketBalanceView {
+  maxshot.common.v1.FundingBucket bucket = 1;
+  int64 available_micro_usd = 2;
+  int64 held_micro_usd = 3;
+  int64 available_credits = 4;
+  int64 earliest_expires_at_unix_sec = 5;
+}
+
+message FundingWindowStatus {
+  string window_kind = 1; // "5h" | "7d"
+  int64 limit_micro_usd = 2;
+  int64 used_micro_usd = 3;
+  int64 held_micro_usd = 4;
+  int64 remaining_micro_usd = 5;
+  int64 resets_at_unix_sec = 6;
+  bool applies_to_request = 7;
+}
+
+message KeyGrossWindowStatus {
+  int64 daily_limit_micro_usd = 1;
+  int64 daily_used_micro_usd = 2;
+  int64 monthly_limit_micro_usd = 3;
+  int64 monthly_used_micro_usd = 4;
+}
+
 message ResolvePrincipalScopeRequest {
   string api_key_sha256 = 1;
   string internal_account_id = 2;
@@ -182,13 +231,49 @@ message ResolvePrincipalScopeResponse {
   string api_key_id = 5;
   maxshot.common.v1.KeyFundingStrategy key_funding_strategy = 6;
   bool allow_ait_earned_credit = 7; // independent key toggle (default true)
-  bool dollar_relay_enabled = 8;    // on SUBSCRIPTION_FIRST keys, false blocks Free + Referral + Dollar
+  bool dollar_relay_enabled = 8;    // when subscription active, false blocks Free + Referral + Dollar; #154 falls back when no active subscription
   bool allow_basic_to_premium = 9;  // account setting "Continue with Premium when Basic is not enough"
   repeated string allowed_catalog_ids = 10;
   repeated string model_allowlist = 11;
   string active_plan_id = 12;
   repeated string plan_basic_group_ids = 13;
   repeated string plan_premium_group_ids = 14;
+  int32 max_concurrent_streams = 15;
+  int32 rpm_limit = 16;
+  int64 tpm_limit = 17;
+  bool spending_locked = 18;
+  int64 key_expires_at_unix_ms = 19;
+  maxshot.common.v1.SearchPolicy search_policy = 20;
+  bool media_shares_subscription_windows = 21; // true under switched qualification policy (decision 5A)
+  repeated string ait_coverage_throttled_model_ids = 22;
+}
+
+message EvaluateCatalogDiscoveryRequest {
+  string account_id = 1;
+  string key_id = 2;
+  ExecutionChannel channel = 3;
+  repeated string customer_model_ids = 4; // empty evaluates all published models in current CatalogSnapshot
+}
+
+message ModelDiscoveryEvaluation {
+  string customer_model_id = 1;
+  bool key_scope_allowed = 2;
+  bool subscription_basic_eligible = 3;
+  bool subscription_premium_eligible = 4;
+  bool ait_earned_credit_eligible = 5;
+  bool ait_coverage_throttled = 6;
+  bool search_subscription_eligible = 7;
+  repeated maxshot.common.v1.FundingBucket spendable_buckets = 8;
+  maxshot.common.v1.RejectCode block_reason = 9;
+}
+
+message EvaluateCatalogDiscoveryResponse {
+  string catalog_version = 1;
+  string funding_scenario = 2;
+  repeated BucketBalanceView bucket_balances = 3;
+  repeated FundingWindowStatus windows = 4;
+  KeyGrossWindowStatus key_gross_window = 5;
+  repeated ModelDiscoveryEvaluation models = 6;
 }
 
 message PreviewQuoteRequest {
@@ -206,6 +291,9 @@ message PreviewQuoteRequest {
   int64 caller_ceiling_micro_usd = 12;
   bool zero_retention = 13;
   string client_region = 14;
+  bool issue_quote_lock = 15; // true issues a 5-minute TTL locked quote_id for two-step Studio submission (BIL-R22)
+  string request_hash = 16;   // normalized generation parameter digest bound to quote_id
+  string effective_channel = 17;
 }
 
 message PreviewQuoteResponse {
@@ -224,6 +312,16 @@ message PreviewQuoteResponse {
   repeated BucketAllocationLine projected_hold_buckets = 13;
   SpendingLimitDiagnostic budget_diagnostic = 14;
   CreditShortfallDiagnostic credit_diagnostic = 15;
+  string quote_id = 16;
+  int64 quote_expires_at_unix_ms = 17;
+  string catalog_version = 18;
+  string rate_card_version = 19;
+  int64 reserved_credits = 20;
+  string funding_scenario = 21;
+  repeated BucketBalanceView bucket_balances = 22;
+  repeated FundingWindowStatus windows = 23;
+  KeyGrossWindowStatus key_gross_window = 24;
+  bool media_shares_subscription_windows = 25;
 }
 
 message AuthorizeAndHoldRequest {
@@ -250,6 +348,10 @@ message AuthorizeAndHoldRequest {
   string client_region = 21;
   string studio_operation_id = 22;    // links Studio async job record (BIL-R41)
   int64 initial_lease_ttl_ms = 23;
+  string quote_id = 24;               // optional 5-minute locked quote from PreviewQuote
+  string request_hash = 25;           // verified against locked quote when quote_id is supplied
+  maxshot.common.v1.CustomerChargeMode customer_charge_mode_override = 26;
+  string effective_channel = 27;
 }
 
 message AuthorizeAndHoldResponse {
@@ -257,7 +359,7 @@ message AuthorizeAndHoldResponse {
   bool admitted = 2;
   maxshot.common.v1.RejectCode reject_code = 3;
   string reject_message = 4;
-  string request_id = 5; // ULID, generated only when admitted (BIL-R24)
+  string request_id = 5; // ULID, generated when admitted and returned on IDEMPOTENT_IN_PROGRESS/COMPLETED replays (BIL-R24, BIL-R36)
   string hold_id = 6;
   string lease_token = 7;
   int64 lease_expires_at_unix_ms = 8;
@@ -324,6 +426,9 @@ message AttemptCostRecord {
   int64 dispatched_at_unix_ms = 9;
   int64 first_token_at_unix_ms = 10;
   int64 completed_at_unix_ms = 11;
+  int32 attempt_number = 12;
+  string provider_generation_id = 13; // OpenRouter gen-... or Ark async task ID
+  int32 http_status = 14;
 }
 
 message SettleRequest {
@@ -340,6 +445,8 @@ message SettleRequest {
   int64 estimated_streamed_output_tokens = 11; // audit evidence only when PENDING_RECONCILIATION (never billed as invented usage)
   repeated MediaOutputSettlementItem media_outputs = 12;
   repeated AttemptCostRecord attempts = 13;
+  maxshot.common.v1.CustomerChargeMode customer_charge_mode = 14;
+  string provider_reported_customer_base_cost_usd_dec = 15; // base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies
 }
 
 message SettleResponse {
@@ -377,9 +484,12 @@ message ResolveUncertainRequest {
   string reason = 5;
   string serving_offering_id = 6;
   string native_request_id = 7;
-  UsageBound verified_usage = 8; // populated when action == UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED
+  UsageBound verified_usage = 8; // populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery
   repeated MediaOutputSettlementItem media_outputs = 9;
   string late_provider_cost_usd_dec = 10; // recorded into discrepancy ledger if already auto-released (BIL-R36)
+  string attempt_id = 11;
+  string provider_generation_id = 12;
+  string offering_id = 13;
 }
 
 message ResolveUncertainResponse {

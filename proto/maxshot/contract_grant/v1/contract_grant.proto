@@ -15,8 +15,11 @@ service ContractBackendService {
   // PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
   rpc PushWalletEligibility(PushWalletEligibilityRequest) returns (PushWalletEligibilityResponse);
 
-  // GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+  // GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11).
   rpc GetContractOperationalStatus(GetContractOperationalStatusRequest) returns (GetContractOperationalStatusResponse);
+
+  // GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21).
+  rpc GetAccountStakingSummary(GetAccountStakingSummaryRequest) returns (GetAccountStakingSummaryResponse);
 }
 
 // AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend
@@ -54,6 +57,16 @@ enum GrantItemStatus {
   GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH = 8;
 }
 
+// AitCoverageThrottlePolicy implements TD-64 prospective high-cost model throttling during coverage breach
+// without mutating FundedTermConfig.allowed_catalog_ids, credit rate, or duration.
+message AitCoverageThrottlePolicy {
+  bool throttle_active = 1;
+  repeated string restricted_customer_model_ids = 2;
+  string max_allowed_model_rate_usd_dec = 3;
+  string reason = 4;
+  int64 updated_at_unix_sec = 5;
+}
+
 // FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
 // and replicated to Contract Backend. The rational N/D rate converts USD face value to integer Credits
 // at grant issuance time only; spending uses the unified Gateway ledger Credit unit.
@@ -72,6 +85,7 @@ message FundedTermConfig {
   int64 max_total_grant_credits = 12;
   FundedTermStatus status = 13;
   int64 updated_at_unix_sec = 14;
+  AitCoverageThrottlePolicy coverage_throttle_policy = 15;
 }
 
 message PushFundedTermsRequest {
@@ -136,7 +150,7 @@ message DirectedBridgeRoutePause {
 
 message GetContractOperationalStatusRequest {}
 
-// GetContractOperationalStatusResponse feeds Gateway Admin read-only pause & finality monitoring (ADM-R22, TOK-R05).
+// GetContractOperationalStatusResponse feeds Gateway Admin read-only pause, finality, and token/staking monitoring (ADM-R22, ADM-R23, TOK-R05, XCT-R11).
 message GetContractOperationalStatusResponse {
   bool mint_paused = 1;
   bool burn_paused = 2;
@@ -149,6 +163,50 @@ message GetContractOperationalStatusResponse {
   int64 ethereum_finalized_timestamp_unix_sec = 9;
   string active_term_id = 10;
   int64 next_grant_boundary_unix_sec = 11;
+  string outstanding_ait_wei_dec = 12;
+  string high_water_mark_ait_wei_dec = 13;
+  string total_staked_ait_wei_dec = 14;
+  string total_locked_max_wei_dec = 15;
+  string total_pending_max_wei_dec = 16;
+  uint64 latest_finalized_block_number = 17;
+}
+
+message GetAccountStakingSummaryRequest {
+  string account_id = 1;
+  string wallet_address = 2;
+  string term_id = 3; // optional filter; empty returns active and recent terms
+}
+
+message AccountTermBoundaryRecord {
+  string term_id = 1;
+  int32 boundary_index = 2;
+  string eligible_ait_wei_seconds_dec = 3;
+  int64 cumulative_entitlement_credits = 4;
+  int64 cumulative_granted_credits = 5;
+  int64 boundary_grant_credits = 6;
+  string grant_id = 7;
+  int64 boundary_end_unix_sec = 8;
+}
+
+message GetAccountStakingSummaryResponse {
+  string account_id = 1;
+  repeated string bound_wallet_addresses = 2;
+  string active_staked_ait_wei_dec = 3;
+  string active_locked_max_wei_dec = 4;
+  string pending_unlock_max_wei_dec = 5;
+  repeated AccountTermBoundaryRecord boundary_records = 6;
+}
+
+message BoundaryBatchSummary {
+  int32 batch_sequence = 1; // 1-based batch index within (term_id, boundary_index)
+  int32 total_batches = 2;
+  int64 boundary_total_grant_credits = 3;
+  string boundary_total_eligible_ait_wei_seconds_dec = 4;
+  string onchain_total_staked_ait_wei_dec = 5; // feeds 7-day boundary read-only RPC invariant check (§3.3.4)
+  uint64 finalized_block_number = 6;
+  string finalized_block_hash = 7;
+  int64 boundary_start_unix_sec = 8;
+  int64 boundary_end_unix_sec = 9;
 }
 
 message AitGrantItem {
@@ -175,6 +233,7 @@ message IssueAitCreditGrantsRequest {
   string term_id = 2;
   int32 boundary_index = 3;
   repeated AitGrantItem items = 4;
+  BoundaryBatchSummary boundary_summary = 5;
 }
 
 message AitGrantItemResult {

@@ -34,7 +34,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
-// (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+// (Go gateway-dataplane, TS billing-account-service, TS studio-service/worker, and TS finance-worker)
+// over WireGuard + TLS + HMAC.
 // WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
 type ProviderSyncServiceClient interface {
 	// WatchSyncEvents streams lightweight catalog/credential version notifications and heartbeats.
@@ -166,7 +167,8 @@ func (c *providerSyncServiceClient) SyncProviderStatements(ctx context.Context, 
 // for forward compatibility.
 //
 // ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
-// (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+// (Go gateway-dataplane, TS billing-account-service, TS studio-service/worker, and TS finance-worker)
+// over WireGuard + TLS + HMAC.
 // WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
 type ProviderSyncServiceServer interface {
 	// WatchSyncEvents streams lightweight catalog/credential version notifications and heartbeats.
@@ -418,18 +420,22 @@ var ProviderSyncService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	GatewayReconciliationService_ListOfferingAttemptRecords_FullMethodName = "/maxshot.provider_sync.v1.GatewayReconciliationService/ListOfferingAttemptRecords"
+	GatewayReconciliationService_ListOfferingAttemptRecords_FullMethodName     = "/maxshot.provider_sync.v1.GatewayReconciliationService/ListOfferingAttemptRecords"
+	GatewayReconciliationService_ApplyProviderDisputeAdjustment_FullMethodName = "/maxshot.provider_sync.v1.GatewayReconciliationService/ApplyProviderDisputeAdjustment"
 )
 
 // GatewayReconciliationServiceClient is the client API for GatewayReconciliationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
-// during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+// GatewayReconciliationService is hosted by Gateway Billing / Finance and called on demand by Provider Backend
+// during invoice verification or dispute investigation/adjustment (PRV-R14 / ADM-R17 / ADM-R18) without duplicating raw attempt streams.
 type GatewayReconciliationServiceClient interface {
 	// ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID.
 	ListOfferingAttemptRecords(ctx context.Context, in *ListOfferingAttemptRecordsRequest, opts ...grpc.CallOption) (*ListOfferingAttemptRecordsResponse, error)
+	// ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+	// into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+	ApplyProviderDisputeAdjustment(ctx context.Context, in *ApplyProviderDisputeAdjustmentRequest, opts ...grpc.CallOption) (*ApplyProviderDisputeAdjustmentResponse, error)
 }
 
 type gatewayReconciliationServiceClient struct {
@@ -450,15 +456,28 @@ func (c *gatewayReconciliationServiceClient) ListOfferingAttemptRecords(ctx cont
 	return out, nil
 }
 
+func (c *gatewayReconciliationServiceClient) ApplyProviderDisputeAdjustment(ctx context.Context, in *ApplyProviderDisputeAdjustmentRequest, opts ...grpc.CallOption) (*ApplyProviderDisputeAdjustmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ApplyProviderDisputeAdjustmentResponse)
+	err := c.cc.Invoke(ctx, GatewayReconciliationService_ApplyProviderDisputeAdjustment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // GatewayReconciliationServiceServer is the server API for GatewayReconciliationService service.
 // All implementations must embed UnimplementedGatewayReconciliationServiceServer
 // for forward compatibility.
 //
-// GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
-// during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+// GatewayReconciliationService is hosted by Gateway Billing / Finance and called on demand by Provider Backend
+// during invoice verification or dispute investigation/adjustment (PRV-R14 / ADM-R17 / ADM-R18) without duplicating raw attempt streams.
 type GatewayReconciliationServiceServer interface {
 	// ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID.
 	ListOfferingAttemptRecords(context.Context, *ListOfferingAttemptRecordsRequest) (*ListOfferingAttemptRecordsResponse, error)
+	// ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+	// into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+	ApplyProviderDisputeAdjustment(context.Context, *ApplyProviderDisputeAdjustmentRequest) (*ApplyProviderDisputeAdjustmentResponse, error)
 	mustEmbedUnimplementedGatewayReconciliationServiceServer()
 }
 
@@ -471,6 +490,9 @@ type UnimplementedGatewayReconciliationServiceServer struct{}
 
 func (UnimplementedGatewayReconciliationServiceServer) ListOfferingAttemptRecords(context.Context, *ListOfferingAttemptRecordsRequest) (*ListOfferingAttemptRecordsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListOfferingAttemptRecords not implemented")
+}
+func (UnimplementedGatewayReconciliationServiceServer) ApplyProviderDisputeAdjustment(context.Context, *ApplyProviderDisputeAdjustmentRequest) (*ApplyProviderDisputeAdjustmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ApplyProviderDisputeAdjustment not implemented")
 }
 func (UnimplementedGatewayReconciliationServiceServer) mustEmbedUnimplementedGatewayReconciliationServiceServer() {
 }
@@ -512,6 +534,24 @@ func _GatewayReconciliationService_ListOfferingAttemptRecords_Handler(srv interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GatewayReconciliationService_ApplyProviderDisputeAdjustment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyProviderDisputeAdjustmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayReconciliationServiceServer).ApplyProviderDisputeAdjustment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayReconciliationService_ApplyProviderDisputeAdjustment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayReconciliationServiceServer).ApplyProviderDisputeAdjustment(ctx, req.(*ApplyProviderDisputeAdjustmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // GatewayReconciliationService_ServiceDesc is the grpc.ServiceDesc for GatewayReconciliationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -522,6 +562,10 @@ var GatewayReconciliationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListOfferingAttemptRecords",
 			Handler:    _GatewayReconciliationService_ListOfferingAttemptRecords_Handler,
+		},
+		{
+			MethodName: "ApplyProviderDisputeAdjustment",
+			Handler:    _GatewayReconciliationService_ApplyProviderDisputeAdjustment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -204,7 +204,9 @@ func (FundingBucket) EnumDescriptor() ([]byte, []int) {
 
 // KeyFundingStrategy defines how a scoped API key selects funding buckets.
 //   - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
-//     when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+//     when an active subscription exists on the account and dollar_relay_enabled=false, blocks all non-subscription
+//     PAYG buckets (Free, Referral, Dollar). When no active subscription exists (#154 fallback), runtime treats
+//     PAYG fallback as permitted so Free/Referral/Dollar keys remain usable unless explicitly locked.
 //   - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
 type KeyFundingStrategy int32
 
@@ -255,6 +257,110 @@ func (KeyFundingStrategy) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{3}
 }
 
+// SearchPolicy defines how web-search requests interact with active subscription pools (plan-qualification.ts).
+type SearchPolicy int32
+
+const (
+	SearchPolicy_SEARCH_POLICY_UNSPECIFIED     SearchPolicy = 0
+	SearchPolicy_SEARCH_POLICY_BASIC           SearchPolicy = 1 // Search requests may consume Basic or Premium subscription pools
+	SearchPolicy_SEARCH_POLICY_PREMIUM_ONLY    SearchPolicy = 2 // Search requests may consume Premium subscription pool only
+	SearchPolicy_SEARCH_POLICY_NO_SUBSCRIPTION SearchPolicy = 3 // Search requests cannot consume subscription pools (must use AIT/Free/Referral/Dollar)
+)
+
+// Enum value maps for SearchPolicy.
+var (
+	SearchPolicy_name = map[int32]string{
+		0: "SEARCH_POLICY_UNSPECIFIED",
+		1: "SEARCH_POLICY_BASIC",
+		2: "SEARCH_POLICY_PREMIUM_ONLY",
+		3: "SEARCH_POLICY_NO_SUBSCRIPTION",
+	}
+	SearchPolicy_value = map[string]int32{
+		"SEARCH_POLICY_UNSPECIFIED":     0,
+		"SEARCH_POLICY_BASIC":           1,
+		"SEARCH_POLICY_PREMIUM_ONLY":    2,
+		"SEARCH_POLICY_NO_SUBSCRIPTION": 3,
+	}
+)
+
+func (x SearchPolicy) Enum() *SearchPolicy {
+	p := new(SearchPolicy)
+	*p = x
+	return p
+}
+
+func (x SearchPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SearchPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_common_v1_types_proto_enumTypes[4].Descriptor()
+}
+
+func (SearchPolicy) Type() protoreflect.EnumType {
+	return &file_maxshot_common_v1_types_proto_enumTypes[4]
+}
+
+func (x SearchPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SearchPolicy.Descriptor instead.
+func (SearchPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{4}
+}
+
+// CustomerChargeMode governs whether customer billing uses published rate-card formulas
+// or verified provider-reported cost with optional markup (decision 4A).
+type CustomerChargeMode int32
+
+const (
+	CustomerChargeMode_CUSTOMER_CHARGE_MODE_UNSPECIFIED          CustomerChargeMode = 0
+	CustomerChargeMode_CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA    CustomerChargeMode = 1 // Default: deterministic verified_usage * CustomerRateCard
+	CustomerChargeMode_CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST CustomerChargeMode = 2 // Bills provider_reported_customer_base_cost * markup_multiplier_dec
+)
+
+// Enum value maps for CustomerChargeMode.
+var (
+	CustomerChargeMode_name = map[int32]string{
+		0: "CUSTOMER_CHARGE_MODE_UNSPECIFIED",
+		1: "CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA",
+		2: "CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST",
+	}
+	CustomerChargeMode_value = map[string]int32{
+		"CUSTOMER_CHARGE_MODE_UNSPECIFIED":          0,
+		"CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA":    1,
+		"CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST": 2,
+	}
+)
+
+func (x CustomerChargeMode) Enum() *CustomerChargeMode {
+	p := new(CustomerChargeMode)
+	*p = x
+	return p
+}
+
+func (x CustomerChargeMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CustomerChargeMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_common_v1_types_proto_enumTypes[5].Descriptor()
+}
+
+func (CustomerChargeMode) Type() protoreflect.EnumType {
+	return &file_maxshot_common_v1_types_proto_enumTypes[5]
+}
+
+func (x CustomerChargeMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CustomerChargeMode.Descriptor instead.
+func (CustomerChargeMode) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{5}
+}
+
 // BudgetPeriodKind enumerates spend-cap window types (matching scoped-configuration.ts).
 type BudgetPeriodKind int32
 
@@ -292,11 +398,11 @@ func (x BudgetPeriodKind) String() string {
 }
 
 func (BudgetPeriodKind) Descriptor() protoreflect.EnumDescriptor {
-	return file_maxshot_common_v1_types_proto_enumTypes[4].Descriptor()
+	return file_maxshot_common_v1_types_proto_enumTypes[6].Descriptor()
 }
 
 func (BudgetPeriodKind) Type() protoreflect.EnumType {
-	return &file_maxshot_common_v1_types_proto_enumTypes[4]
+	return &file_maxshot_common_v1_types_proto_enumTypes[6]
 }
 
 func (x BudgetPeriodKind) Number() protoreflect.EnumNumber {
@@ -305,40 +411,48 @@ func (x BudgetPeriodKind) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use BudgetPeriodKind.Descriptor instead.
 func (BudgetPeriodKind) EnumDescriptor() ([]byte, []int) {
-	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{4}
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{6}
 }
 
 // RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05 / server-core).
 type RejectCode int32
 
 const (
-	RejectCode_REJECT_CODE_UNSPECIFIED                  RejectCode = 0
-	RejectCode_REJECT_CODE_KEY_INVALID                  RejectCode = 1
-	RejectCode_REJECT_CODE_KEY_REVOKED                  RejectCode = 2
-	RejectCode_REJECT_CODE_KEY_EXPIRED                  RejectCode = 3
-	RejectCode_REJECT_CODE_CATALOG_NOT_ALLOWED          RejectCode = 4
-	RejectCode_REJECT_CODE_MODEL_NOT_ALLOWED            RejectCode = 5
-	RejectCode_REJECT_CODE_MODEL_UNAVAILABLE            RejectCode = 6
-	RejectCode_REJECT_CODE_PINNED_OFFERING_INELIGIBLE   RejectCode = 7
-	RejectCode_REJECT_CODE_OVER_REQUEST_CEILING         RejectCode = 8
-	RejectCode_REJECT_CODE_OVER_DAILY_BUDGET            RejectCode = 9
-	RejectCode_REJECT_CODE_OVER_MONTHLY_BUDGET          RejectCode = 10
-	RejectCode_REJECT_CODE_OVER_SUPPLIER_BUDGET         RejectCode = 11
-	RejectCode_REJECT_CODE_OVER_PLATFORM_BUDGET         RejectCode = 12
-	RejectCode_REJECT_CODE_OVER_BUSINESS_BUDGET         RejectCode = 13
-	RejectCode_REJECT_CODE_INSUFFICIENT_FUNDING         RejectCode = 14
-	RejectCode_REJECT_CODE_DOLLAR_NOT_AUTHORIZED        RejectCode = 15
-	RejectCode_REJECT_CODE_JOB_LIMIT_EXCEEDED           RejectCode = 16
-	RejectCode_REJECT_CODE_IDEMPOTENCY_MISMATCH         RejectCode = 17
-	RejectCode_REJECT_CODE_ACCOUNT_INACTIVE             RejectCode = 18
-	RejectCode_REJECT_CODE_SPENDING_LOCKED              RejectCode = 19
-	RejectCode_REJECT_CODE_POLICY_INELIGIBLE            RejectCode = 20
-	RejectCode_REJECT_CODE_UNSUPPORTED_CAPABILITY       RejectCode = 21
-	RejectCode_REJECT_CODE_CONTEXT_LIMIT_EXCEEDED       RejectCode = 22
-	RejectCode_REJECT_CODE_OUTPUT_LIMIT_EXCEEDED        RejectCode = 23
-	RejectCode_REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET    RejectCode = 24
-	RejectCode_REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET  RejectCode = 25
-	RejectCode_REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED RejectCode = 26
+	RejectCode_REJECT_CODE_UNSPECIFIED                      RejectCode = 0
+	RejectCode_REJECT_CODE_KEY_INVALID                      RejectCode = 1
+	RejectCode_REJECT_CODE_KEY_REVOKED                      RejectCode = 2
+	RejectCode_REJECT_CODE_KEY_EXPIRED                      RejectCode = 3
+	RejectCode_REJECT_CODE_CATALOG_NOT_ALLOWED              RejectCode = 4
+	RejectCode_REJECT_CODE_MODEL_NOT_ALLOWED                RejectCode = 5
+	RejectCode_REJECT_CODE_MODEL_UNAVAILABLE                RejectCode = 6
+	RejectCode_REJECT_CODE_PINNED_OFFERING_INELIGIBLE       RejectCode = 7
+	RejectCode_REJECT_CODE_OVER_REQUEST_CEILING             RejectCode = 8
+	RejectCode_REJECT_CODE_OVER_DAILY_BUDGET                RejectCode = 9
+	RejectCode_REJECT_CODE_OVER_MONTHLY_BUDGET              RejectCode = 10
+	RejectCode_REJECT_CODE_OVER_SUPPLIER_BUDGET             RejectCode = 11
+	RejectCode_REJECT_CODE_OVER_PLATFORM_BUDGET             RejectCode = 12
+	RejectCode_REJECT_CODE_OVER_BUSINESS_BUDGET             RejectCode = 13
+	RejectCode_REJECT_CODE_INSUFFICIENT_FUNDING             RejectCode = 14
+	RejectCode_REJECT_CODE_DOLLAR_NOT_AUTHORIZED            RejectCode = 15
+	RejectCode_REJECT_CODE_JOB_LIMIT_EXCEEDED               RejectCode = 16
+	RejectCode_REJECT_CODE_IDEMPOTENCY_MISMATCH             RejectCode = 17
+	RejectCode_REJECT_CODE_ACCOUNT_INACTIVE                 RejectCode = 18
+	RejectCode_REJECT_CODE_SPENDING_LOCKED                  RejectCode = 19
+	RejectCode_REJECT_CODE_POLICY_INELIGIBLE                RejectCode = 20
+	RejectCode_REJECT_CODE_UNSUPPORTED_CAPABILITY           RejectCode = 21
+	RejectCode_REJECT_CODE_CONTEXT_LIMIT_EXCEEDED           RejectCode = 22
+	RejectCode_REJECT_CODE_OUTPUT_LIMIT_EXCEEDED            RejectCode = 23
+	RejectCode_REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET        RejectCode = 24
+	RejectCode_REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET      RejectCode = 25
+	RejectCode_REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED     RejectCode = 26
+	RejectCode_REJECT_CODE_RATE_LIMIT_EXCEEDED              RejectCode = 27
+	RejectCode_REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED RejectCode = 28
+	RejectCode_REJECT_CODE_QUOTE_EXPIRED                    RejectCode = 29
+	RejectCode_REJECT_CODE_QUOTE_MISMATCH                   RejectCode = 30
+	RejectCode_REJECT_CODE_SAFETY_REJECTED                  RejectCode = 31
+	RejectCode_REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED       RejectCode = 32
+	RejectCode_REJECT_CODE_REFERENCE_MEDIA_INVALID          RejectCode = 33
+	RejectCode_REJECT_CODE_AIT_COVERAGE_THROTTLED           RejectCode = 34
 )
 
 // Enum value maps for RejectCode.
@@ -371,35 +485,51 @@ var (
 		24: "REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET",
 		25: "REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET",
 		26: "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED",
+		27: "REJECT_CODE_RATE_LIMIT_EXCEEDED",
+		28: "REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED",
+		29: "REJECT_CODE_QUOTE_EXPIRED",
+		30: "REJECT_CODE_QUOTE_MISMATCH",
+		31: "REJECT_CODE_SAFETY_REJECTED",
+		32: "REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED",
+		33: "REJECT_CODE_REFERENCE_MEDIA_INVALID",
+		34: "REJECT_CODE_AIT_COVERAGE_THROTTLED",
 	}
 	RejectCode_value = map[string]int32{
-		"REJECT_CODE_UNSPECIFIED":                  0,
-		"REJECT_CODE_KEY_INVALID":                  1,
-		"REJECT_CODE_KEY_REVOKED":                  2,
-		"REJECT_CODE_KEY_EXPIRED":                  3,
-		"REJECT_CODE_CATALOG_NOT_ALLOWED":          4,
-		"REJECT_CODE_MODEL_NOT_ALLOWED":            5,
-		"REJECT_CODE_MODEL_UNAVAILABLE":            6,
-		"REJECT_CODE_PINNED_OFFERING_INELIGIBLE":   7,
-		"REJECT_CODE_OVER_REQUEST_CEILING":         8,
-		"REJECT_CODE_OVER_DAILY_BUDGET":            9,
-		"REJECT_CODE_OVER_MONTHLY_BUDGET":          10,
-		"REJECT_CODE_OVER_SUPPLIER_BUDGET":         11,
-		"REJECT_CODE_OVER_PLATFORM_BUDGET":         12,
-		"REJECT_CODE_OVER_BUSINESS_BUDGET":         13,
-		"REJECT_CODE_INSUFFICIENT_FUNDING":         14,
-		"REJECT_CODE_DOLLAR_NOT_AUTHORIZED":        15,
-		"REJECT_CODE_JOB_LIMIT_EXCEEDED":           16,
-		"REJECT_CODE_IDEMPOTENCY_MISMATCH":         17,
-		"REJECT_CODE_ACCOUNT_INACTIVE":             18,
-		"REJECT_CODE_SPENDING_LOCKED":              19,
-		"REJECT_CODE_POLICY_INELIGIBLE":            20,
-		"REJECT_CODE_UNSUPPORTED_CAPABILITY":       21,
-		"REJECT_CODE_CONTEXT_LIMIT_EXCEEDED":       22,
-		"REJECT_CODE_OUTPUT_LIMIT_EXCEEDED":        23,
-		"REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET":    24,
-		"REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET":  25,
-		"REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED": 26,
+		"REJECT_CODE_UNSPECIFIED":                      0,
+		"REJECT_CODE_KEY_INVALID":                      1,
+		"REJECT_CODE_KEY_REVOKED":                      2,
+		"REJECT_CODE_KEY_EXPIRED":                      3,
+		"REJECT_CODE_CATALOG_NOT_ALLOWED":              4,
+		"REJECT_CODE_MODEL_NOT_ALLOWED":                5,
+		"REJECT_CODE_MODEL_UNAVAILABLE":                6,
+		"REJECT_CODE_PINNED_OFFERING_INELIGIBLE":       7,
+		"REJECT_CODE_OVER_REQUEST_CEILING":             8,
+		"REJECT_CODE_OVER_DAILY_BUDGET":                9,
+		"REJECT_CODE_OVER_MONTHLY_BUDGET":              10,
+		"REJECT_CODE_OVER_SUPPLIER_BUDGET":             11,
+		"REJECT_CODE_OVER_PLATFORM_BUDGET":             12,
+		"REJECT_CODE_OVER_BUSINESS_BUDGET":             13,
+		"REJECT_CODE_INSUFFICIENT_FUNDING":             14,
+		"REJECT_CODE_DOLLAR_NOT_AUTHORIZED":            15,
+		"REJECT_CODE_JOB_LIMIT_EXCEEDED":               16,
+		"REJECT_CODE_IDEMPOTENCY_MISMATCH":             17,
+		"REJECT_CODE_ACCOUNT_INACTIVE":                 18,
+		"REJECT_CODE_SPENDING_LOCKED":                  19,
+		"REJECT_CODE_POLICY_INELIGIBLE":                20,
+		"REJECT_CODE_UNSUPPORTED_CAPABILITY":           21,
+		"REJECT_CODE_CONTEXT_LIMIT_EXCEEDED":           22,
+		"REJECT_CODE_OUTPUT_LIMIT_EXCEEDED":            23,
+		"REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET":        24,
+		"REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET":      25,
+		"REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED":     26,
+		"REJECT_CODE_RATE_LIMIT_EXCEEDED":              27,
+		"REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED": 28,
+		"REJECT_CODE_QUOTE_EXPIRED":                    29,
+		"REJECT_CODE_QUOTE_MISMATCH":                   30,
+		"REJECT_CODE_SAFETY_REJECTED":                  31,
+		"REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED":       32,
+		"REJECT_CODE_REFERENCE_MEDIA_INVALID":          33,
+		"REJECT_CODE_AIT_COVERAGE_THROTTLED":           34,
 	}
 )
 
@@ -414,11 +544,11 @@ func (x RejectCode) String() string {
 }
 
 func (RejectCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_maxshot_common_v1_types_proto_enumTypes[5].Descriptor()
+	return file_maxshot_common_v1_types_proto_enumTypes[7].Descriptor()
 }
 
 func (RejectCode) Type() protoreflect.EnumType {
-	return &file_maxshot_common_v1_types_proto_enumTypes[5]
+	return &file_maxshot_common_v1_types_proto_enumTypes[7]
 }
 
 func (x RejectCode) Number() protoreflect.EnumNumber {
@@ -427,7 +557,7 @@ func (x RejectCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RejectCode.Descriptor instead.
 func (RejectCode) EnumDescriptor() ([]byte, []int) {
-	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{5}
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{7}
 }
 
 // KeyValueAttribute replaces protobuf map<string, string> so Go and TypeScript
@@ -714,12 +844,22 @@ const file_maxshot_common_v1_types_proto_rawDesc = "" +
 	"\x12KeyFundingStrategy\x12$\n" +
 	" KEY_FUNDING_STRATEGY_UNSPECIFIED\x10\x00\x12+\n" +
 	"'KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST\x10\x01\x12\x1d\n" +
-	"\x19KEY_FUNDING_STRATEGY_PAYG\x10\x02*\x8e\x01\n" +
+	"\x19KEY_FUNDING_STRATEGY_PAYG\x10\x02*\x89\x01\n" +
+	"\fSearchPolicy\x12\x1d\n" +
+	"\x19SEARCH_POLICY_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13SEARCH_POLICY_BASIC\x10\x01\x12\x1e\n" +
+	"\x1aSEARCH_POLICY_PREMIUM_ONLY\x10\x02\x12!\n" +
+	"\x1dSEARCH_POLICY_NO_SUBSCRIPTION\x10\x03*\x95\x01\n" +
+	"\x12CustomerChargeMode\x12$\n" +
+	" CUSTOMER_CHARGE_MODE_UNSPECIFIED\x10\x00\x12*\n" +
+	"&CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA\x10\x01\x12-\n" +
+	")CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST\x10\x02*\x8e\x01\n" +
 	"\x10BudgetPeriodKind\x12\"\n" +
 	"\x1eBUDGET_PERIOD_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16BUDGET_PERIOD_KIND_DAY\x10\x01\x12\x1c\n" +
 	"\x18BUDGET_PERIOD_KIND_MONTH\x10\x02\x12\x1c\n" +
-	"\x18BUDGET_PERIOD_KIND_FIXED\x10\x03*\xf1\a\n" +
+	"\x18BUDGET_PERIOD_KIND_FIXED\x10\x03*\xa5\n" +
+	"\n" +
 	"\n" +
 	"RejectCode\x12\x1b\n" +
 	"\x17REJECT_CODE_UNSPECIFIED\x10\x00\x12\x1b\n" +
@@ -749,7 +889,15 @@ const file_maxshot_common_v1_types_proto_rawDesc = "" +
 	"!REJECT_CODE_OUTPUT_LIMIT_EXCEEDED\x10\x17\x12)\n" +
 	"%REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET\x10\x18\x12+\n" +
 	"'REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET\x10\x19\x12,\n" +
-	"(REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED\x10\x1aBGZEgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1b\x06proto3"
+	"(REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED\x10\x1a\x12#\n" +
+	"\x1fREJECT_CODE_RATE_LIMIT_EXCEEDED\x10\x1b\x120\n" +
+	",REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED\x10\x1c\x12\x1d\n" +
+	"\x19REJECT_CODE_QUOTE_EXPIRED\x10\x1d\x12\x1e\n" +
+	"\x1aREJECT_CODE_QUOTE_MISMATCH\x10\x1e\x12\x1f\n" +
+	"\x1bREJECT_CODE_SAFETY_REJECTED\x10\x1f\x12*\n" +
+	"&REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED\x10 \x12'\n" +
+	"#REJECT_CODE_REFERENCE_MEDIA_INVALID\x10!\x12&\n" +
+	"\"REJECT_CODE_AIT_COVERAGE_THROTTLED\x10\"BGZEgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1b\x06proto3"
 
 var (
 	file_maxshot_common_v1_types_proto_rawDescOnce sync.Once
@@ -763,22 +911,24 @@ func file_maxshot_common_v1_types_proto_rawDescGZIP() []byte {
 	return file_maxshot_common_v1_types_proto_rawDescData
 }
 
-var file_maxshot_common_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_maxshot_common_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
 var file_maxshot_common_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_maxshot_common_v1_types_proto_goTypes = []any{
 	(Modality)(0),              // 0: maxshot.common.v1.Modality
 	(ModelTier)(0),             // 1: maxshot.common.v1.ModelTier
 	(FundingBucket)(0),         // 2: maxshot.common.v1.FundingBucket
 	(KeyFundingStrategy)(0),    // 3: maxshot.common.v1.KeyFundingStrategy
-	(BudgetPeriodKind)(0),      // 4: maxshot.common.v1.BudgetPeriodKind
-	(RejectCode)(0),            // 5: maxshot.common.v1.RejectCode
-	(*KeyValueAttribute)(nil),  // 6: maxshot.common.v1.KeyValueAttribute
-	(*BudgetPeriodRule)(nil),   // 7: maxshot.common.v1.BudgetPeriodRule
-	(*CursorPageRequest)(nil),  // 8: maxshot.common.v1.CursorPageRequest
-	(*CursorPageResponse)(nil), // 9: maxshot.common.v1.CursorPageResponse
+	(SearchPolicy)(0),          // 4: maxshot.common.v1.SearchPolicy
+	(CustomerChargeMode)(0),    // 5: maxshot.common.v1.CustomerChargeMode
+	(BudgetPeriodKind)(0),      // 6: maxshot.common.v1.BudgetPeriodKind
+	(RejectCode)(0),            // 7: maxshot.common.v1.RejectCode
+	(*KeyValueAttribute)(nil),  // 8: maxshot.common.v1.KeyValueAttribute
+	(*BudgetPeriodRule)(nil),   // 9: maxshot.common.v1.BudgetPeriodRule
+	(*CursorPageRequest)(nil),  // 10: maxshot.common.v1.CursorPageRequest
+	(*CursorPageResponse)(nil), // 11: maxshot.common.v1.CursorPageResponse
 }
 var file_maxshot_common_v1_types_proto_depIdxs = []int32{
-	4, // 0: maxshot.common.v1.BudgetPeriodRule.kind:type_name -> maxshot.common.v1.BudgetPeriodKind
+	6, // 0: maxshot.common.v1.BudgetPeriodRule.kind:type_name -> maxshot.common.v1.BudgetPeriodKind
 	1, // [1:1] is the sub-list for method output_type
 	1, // [1:1] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -796,7 +946,7 @@ func file_maxshot_common_v1_types_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_common_v1_types_proto_rawDesc), len(file_maxshot_common_v1_types_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      8,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,

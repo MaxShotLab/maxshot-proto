@@ -22,6 +22,7 @@ const (
 	ContractBackendService_PushFundedTerms_FullMethodName              = "/maxshot.contract_grant.v1.ContractBackendService/PushFundedTerms"
 	ContractBackendService_PushWalletEligibility_FullMethodName        = "/maxshot.contract_grant.v1.ContractBackendService/PushWalletEligibility"
 	ContractBackendService_GetContractOperationalStatus_FullMethodName = "/maxshot.contract_grant.v1.ContractBackendService/GetContractOperationalStatus"
+	ContractBackendService_GetAccountStakingSummary_FullMethodName     = "/maxshot.contract_grant.v1.ContractBackendService/GetAccountStakingSummary"
 )
 
 // ContractBackendServiceClient is the client API for ContractBackendService service.
@@ -35,8 +36,10 @@ type ContractBackendServiceClient interface {
 	PushFundedTerms(ctx context.Context, in *PushFundedTermsRequest, opts ...grpc.CallOption) (*PushFundedTermsResponse, error)
 	// PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
 	PushWalletEligibility(ctx context.Context, in *PushWalletEligibilityRequest, opts ...grpc.CallOption) (*PushWalletEligibilityResponse, error)
-	// GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+	// GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11).
 	GetContractOperationalStatus(ctx context.Context, in *GetContractOperationalStatusRequest, opts ...grpc.CallOption) (*GetContractOperationalStatusResponse, error)
+	// GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21).
+	GetAccountStakingSummary(ctx context.Context, in *GetAccountStakingSummaryRequest, opts ...grpc.CallOption) (*GetAccountStakingSummaryResponse, error)
 }
 
 type contractBackendServiceClient struct {
@@ -77,6 +80,16 @@ func (c *contractBackendServiceClient) GetContractOperationalStatus(ctx context.
 	return out, nil
 }
 
+func (c *contractBackendServiceClient) GetAccountStakingSummary(ctx context.Context, in *GetAccountStakingSummaryRequest, opts ...grpc.CallOption) (*GetAccountStakingSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountStakingSummaryResponse)
+	err := c.cc.Invoke(ctx, ContractBackendService_GetAccountStakingSummary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ContractBackendServiceServer is the server API for ContractBackendService service.
 // All implementations must embed UnimplementedContractBackendServiceServer
 // for forward compatibility.
@@ -88,8 +101,10 @@ type ContractBackendServiceServer interface {
 	PushFundedTerms(context.Context, *PushFundedTermsRequest) (*PushFundedTermsResponse, error)
 	// PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
 	PushWalletEligibility(context.Context, *PushWalletEligibilityRequest) (*PushWalletEligibilityResponse, error)
-	// GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+	// GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11).
 	GetContractOperationalStatus(context.Context, *GetContractOperationalStatusRequest) (*GetContractOperationalStatusResponse, error)
+	// GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21).
+	GetAccountStakingSummary(context.Context, *GetAccountStakingSummaryRequest) (*GetAccountStakingSummaryResponse, error)
 	mustEmbedUnimplementedContractBackendServiceServer()
 }
 
@@ -108,6 +123,9 @@ func (UnimplementedContractBackendServiceServer) PushWalletEligibility(context.C
 }
 func (UnimplementedContractBackendServiceServer) GetContractOperationalStatus(context.Context, *GetContractOperationalStatusRequest) (*GetContractOperationalStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetContractOperationalStatus not implemented")
+}
+func (UnimplementedContractBackendServiceServer) GetAccountStakingSummary(context.Context, *GetAccountStakingSummaryRequest) (*GetAccountStakingSummaryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccountStakingSummary not implemented")
 }
 func (UnimplementedContractBackendServiceServer) mustEmbedUnimplementedContractBackendServiceServer() {
 }
@@ -185,6 +203,24 @@ func _ContractBackendService_GetContractOperationalStatus_Handler(srv interface{
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ContractBackendService_GetAccountStakingSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountStakingSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContractBackendServiceServer).GetAccountStakingSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContractBackendService_GetAccountStakingSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContractBackendServiceServer).GetAccountStakingSummary(ctx, req.(*GetAccountStakingSummaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ContractBackendService_ServiceDesc is the grpc.ServiceDesc for ContractBackendService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -203,6 +239,10 @@ var ContractBackendService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetContractOperationalStatus",
 			Handler:    _ContractBackendService_GetContractOperationalStatus_Handler,
+		},
+		{
+			MethodName: "GetAccountStakingSummary",
+			Handler:    _ContractBackendService_GetAccountStakingSummary_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

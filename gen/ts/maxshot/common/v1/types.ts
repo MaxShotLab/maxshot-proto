@@ -205,7 +205,9 @@ export function fundingBucketToJSON(object: FundingBucket): string {
 /**
  * KeyFundingStrategy defines how a scoped API key selects funding buckets.
  * - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
- *   when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+ *   when an active subscription exists on the account and dollar_relay_enabled=false, blocks all non-subscription
+ *   PAYG buckets (Free, Referral, Dollar). When no active subscription exists (#154 fallback), runtime treats
+ *   PAYG fallback as permitted so Free/Referral/Dollar keys remain usable unless explicitly locked.
  * - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
  */
 export enum KeyFundingStrategy {
@@ -242,6 +244,100 @@ export function keyFundingStrategyToJSON(object: KeyFundingStrategy): string {
     case KeyFundingStrategy.KEY_FUNDING_STRATEGY_PAYG:
       return "KEY_FUNDING_STRATEGY_PAYG";
     case KeyFundingStrategy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** SearchPolicy defines how web-search requests interact with active subscription pools (plan-qualification.ts). */
+export enum SearchPolicy {
+  SEARCH_POLICY_UNSPECIFIED = 0,
+  /** SEARCH_POLICY_BASIC - Search requests may consume Basic or Premium subscription pools */
+  SEARCH_POLICY_BASIC = 1,
+  /** SEARCH_POLICY_PREMIUM_ONLY - Search requests may consume Premium subscription pool only */
+  SEARCH_POLICY_PREMIUM_ONLY = 2,
+  /** SEARCH_POLICY_NO_SUBSCRIPTION - Search requests cannot consume subscription pools (must use AIT/Free/Referral/Dollar) */
+  SEARCH_POLICY_NO_SUBSCRIPTION = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function searchPolicyFromJSON(object: any): SearchPolicy {
+  switch (object) {
+    case 0:
+    case "SEARCH_POLICY_UNSPECIFIED":
+      return SearchPolicy.SEARCH_POLICY_UNSPECIFIED;
+    case 1:
+    case "SEARCH_POLICY_BASIC":
+      return SearchPolicy.SEARCH_POLICY_BASIC;
+    case 2:
+    case "SEARCH_POLICY_PREMIUM_ONLY":
+      return SearchPolicy.SEARCH_POLICY_PREMIUM_ONLY;
+    case 3:
+    case "SEARCH_POLICY_NO_SUBSCRIPTION":
+      return SearchPolicy.SEARCH_POLICY_NO_SUBSCRIPTION;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SearchPolicy.UNRECOGNIZED;
+  }
+}
+
+export function searchPolicyToJSON(object: SearchPolicy): string {
+  switch (object) {
+    case SearchPolicy.SEARCH_POLICY_UNSPECIFIED:
+      return "SEARCH_POLICY_UNSPECIFIED";
+    case SearchPolicy.SEARCH_POLICY_BASIC:
+      return "SEARCH_POLICY_BASIC";
+    case SearchPolicy.SEARCH_POLICY_PREMIUM_ONLY:
+      return "SEARCH_POLICY_PREMIUM_ONLY";
+    case SearchPolicy.SEARCH_POLICY_NO_SUBSCRIPTION:
+      return "SEARCH_POLICY_NO_SUBSCRIPTION";
+    case SearchPolicy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * CustomerChargeMode governs whether customer billing uses published rate-card formulas
+ * or verified provider-reported cost with optional markup (decision 4A).
+ */
+export enum CustomerChargeMode {
+  CUSTOMER_CHARGE_MODE_UNSPECIFIED = 0,
+  /** CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA - Default: deterministic verified_usage * CustomerRateCard */
+  CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA = 1,
+  /** CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST - Bills provider_reported_customer_base_cost * markup_multiplier_dec */
+  CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function customerChargeModeFromJSON(object: any): CustomerChargeMode {
+  switch (object) {
+    case 0:
+    case "CUSTOMER_CHARGE_MODE_UNSPECIFIED":
+      return CustomerChargeMode.CUSTOMER_CHARGE_MODE_UNSPECIFIED;
+    case 1:
+    case "CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA":
+      return CustomerChargeMode.CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA;
+    case 2:
+    case "CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST":
+      return CustomerChargeMode.CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return CustomerChargeMode.UNRECOGNIZED;
+  }
+}
+
+export function customerChargeModeToJSON(object: CustomerChargeMode): string {
+  switch (object) {
+    case CustomerChargeMode.CUSTOMER_CHARGE_MODE_UNSPECIFIED:
+      return "CUSTOMER_CHARGE_MODE_UNSPECIFIED";
+    case CustomerChargeMode.CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA:
+      return "CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA";
+    case CustomerChargeMode.CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST:
+      return "CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST";
+    case CustomerChargeMode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -322,6 +418,14 @@ export enum RejectCode {
   REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET = 24,
   REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET = 25,
   REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED = 26,
+  REJECT_CODE_RATE_LIMIT_EXCEEDED = 27,
+  REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED = 28,
+  REJECT_CODE_QUOTE_EXPIRED = 29,
+  REJECT_CODE_QUOTE_MISMATCH = 30,
+  REJECT_CODE_SAFETY_REJECTED = 31,
+  REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED = 32,
+  REJECT_CODE_REFERENCE_MEDIA_INVALID = 33,
+  REJECT_CODE_AIT_COVERAGE_THROTTLED = 34,
   UNRECOGNIZED = -1,
 }
 
@@ -408,6 +512,30 @@ export function rejectCodeFromJSON(object: any): RejectCode {
     case 26:
     case "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED":
       return RejectCode.REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED;
+    case 27:
+    case "REJECT_CODE_RATE_LIMIT_EXCEEDED":
+      return RejectCode.REJECT_CODE_RATE_LIMIT_EXCEEDED;
+    case 28:
+    case "REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED":
+      return RejectCode.REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED;
+    case 29:
+    case "REJECT_CODE_QUOTE_EXPIRED":
+      return RejectCode.REJECT_CODE_QUOTE_EXPIRED;
+    case 30:
+    case "REJECT_CODE_QUOTE_MISMATCH":
+      return RejectCode.REJECT_CODE_QUOTE_MISMATCH;
+    case 31:
+    case "REJECT_CODE_SAFETY_REJECTED":
+      return RejectCode.REJECT_CODE_SAFETY_REJECTED;
+    case 32:
+    case "REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED":
+      return RejectCode.REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED;
+    case 33:
+    case "REJECT_CODE_REFERENCE_MEDIA_INVALID":
+      return RejectCode.REJECT_CODE_REFERENCE_MEDIA_INVALID;
+    case 34:
+    case "REJECT_CODE_AIT_COVERAGE_THROTTLED":
+      return RejectCode.REJECT_CODE_AIT_COVERAGE_THROTTLED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -471,6 +599,22 @@ export function rejectCodeToJSON(object: RejectCode): string {
       return "REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET";
     case RejectCode.REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED:
       return "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED";
+    case RejectCode.REJECT_CODE_RATE_LIMIT_EXCEEDED:
+      return "REJECT_CODE_RATE_LIMIT_EXCEEDED";
+    case RejectCode.REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED:
+      return "REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED";
+    case RejectCode.REJECT_CODE_QUOTE_EXPIRED:
+      return "REJECT_CODE_QUOTE_EXPIRED";
+    case RejectCode.REJECT_CODE_QUOTE_MISMATCH:
+      return "REJECT_CODE_QUOTE_MISMATCH";
+    case RejectCode.REJECT_CODE_SAFETY_REJECTED:
+      return "REJECT_CODE_SAFETY_REJECTED";
+    case RejectCode.REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED:
+      return "REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED";
+    case RejectCode.REJECT_CODE_REFERENCE_MEDIA_INVALID:
+      return "REJECT_CODE_REFERENCE_MEDIA_INVALID";
+    case RejectCode.REJECT_CODE_AIT_COVERAGE_THROTTLED:
+      return "REJECT_CODE_AIT_COVERAGE_THROTTLED";
     case RejectCode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";

@@ -22,6 +22,9 @@ import {
   BudgetPeriodKind,
   budgetPeriodKindFromJSON,
   budgetPeriodKindToJSON,
+  CustomerChargeMode,
+  customerChargeModeFromJSON,
+  customerChargeModeToJSON,
   FundingBucket,
   fundingBucketFromJSON,
   fundingBucketToJSON,
@@ -35,6 +38,9 @@ import {
   RejectCode,
   rejectCodeFromJSON,
   rejectCodeToJSON,
+  SearchPolicy,
+  searchPolicyFromJSON,
+  searchPolicyToJSON,
 } from "../../common/v1/types.js";
 
 export const protobufPackage = "maxshot.gateway_internal.v1";
@@ -383,6 +389,26 @@ export function uncertainResolutionActionToJSON(object: UncertainResolutionActio
   }
 }
 
+/**
+ * MediaPricingDimensions carries structured request/result dimensions so BillingExecutionService
+ * can deterministically recompute nonlinear Studio pricing rules from CatalogSnapshot (decision 2A).
+ */
+export interface MediaPricingDimensions {
+  resolution: string;
+  aspectRatio: string;
+  size: string;
+  widthPx: number;
+  heightPx: number;
+  durationSeconds: number;
+  durationMs: bigint;
+  generateAudio: boolean;
+  referenceImageCount: number;
+  referenceVideoCount: number;
+  referenceVideoTotalDurationMs: bigint;
+  upscaleFactor: number;
+  requestedOutputs: number;
+}
+
 /** UsageBound unifies multi-dimensional LLM token bounds/meters and Studio/API media generation units. */
 export interface UsageBound {
   inputTokens: bigint;
@@ -406,6 +432,7 @@ export interface UsageBound {
   mediaCharacterCount: bigint;
   /** e.g. path=i2v, resolution=1080p, edit_tool=inpaint */
   mediaAttributes: KeyValueAttribute[];
+  mediaDimensions?: MediaPricingDimensions | undefined;
 }
 
 export interface QuoteComponentLine {
@@ -462,6 +489,32 @@ export interface LockedVersionSet {
   fxVersion: string;
 }
 
+export interface BucketBalanceView {
+  bucket: FundingBucket;
+  availableMicroUsd: bigint;
+  heldMicroUsd: bigint;
+  availableCredits: bigint;
+  earliestExpiresAtUnixSec: bigint;
+}
+
+export interface FundingWindowStatus {
+  /** "5h" | "7d" */
+  windowKind: string;
+  limitMicroUsd: bigint;
+  usedMicroUsd: bigint;
+  heldMicroUsd: bigint;
+  remainingMicroUsd: bigint;
+  resetsAtUnixSec: bigint;
+  appliesToRequest: boolean;
+}
+
+export interface KeyGrossWindowStatus {
+  dailyLimitMicroUsd: bigint;
+  dailyUsedMicroUsd: bigint;
+  monthlyLimitMicroUsd: bigint;
+  monthlyUsedMicroUsd: bigint;
+}
+
 export interface ResolvePrincipalScopeRequest {
   apiKeySha256: string;
   internalAccountId: string;
@@ -477,7 +530,7 @@ export interface ResolvePrincipalScopeResponse {
   keyFundingStrategy: KeyFundingStrategy;
   /** independent key toggle (default true) */
   allowAitEarnedCredit: boolean;
-  /** on SUBSCRIPTION_FIRST keys, false blocks Free + Referral + Dollar */
+  /** when subscription active, false blocks Free + Referral + Dollar; #154 falls back when no active subscription */
   dollarRelayEnabled: boolean;
   /** account setting "Continue with Premium when Basic is not enough" */
   allowBasicToPremium: boolean;
@@ -486,6 +539,44 @@ export interface ResolvePrincipalScopeResponse {
   activePlanId: string;
   planBasicGroupIds: string[];
   planPremiumGroupIds: string[];
+  maxConcurrentStreams: number;
+  rpmLimit: number;
+  tpmLimit: bigint;
+  spendingLocked: boolean;
+  keyExpiresAtUnixMs: bigint;
+  searchPolicy: SearchPolicy;
+  /** true under switched qualification policy (decision 5A) */
+  mediaSharesSubscriptionWindows: boolean;
+  aitCoverageThrottledModelIds: string[];
+}
+
+export interface EvaluateCatalogDiscoveryRequest {
+  accountId: string;
+  keyId: string;
+  channel: ExecutionChannel;
+  /** empty evaluates all published models in current CatalogSnapshot */
+  customerModelIds: string[];
+}
+
+export interface ModelDiscoveryEvaluation {
+  customerModelId: string;
+  keyScopeAllowed: boolean;
+  subscriptionBasicEligible: boolean;
+  subscriptionPremiumEligible: boolean;
+  aitEarnedCreditEligible: boolean;
+  aitCoverageThrottled: boolean;
+  searchSubscriptionEligible: boolean;
+  spendableBuckets: FundingBucket[];
+  blockReason: RejectCode;
+}
+
+export interface EvaluateCatalogDiscoveryResponse {
+  catalogVersion: string;
+  fundingScenario: string;
+  bucketBalances: BucketBalanceView[];
+  windows: FundingWindowStatus[];
+  keyGrossWindow?: KeyGrossWindowStatus | undefined;
+  models: ModelDiscoveryEvaluation[];
 }
 
 export interface PreviewQuoteRequest {
@@ -503,6 +594,11 @@ export interface PreviewQuoteRequest {
   callerCeilingMicroUsd: bigint;
   zeroRetention: boolean;
   clientRegion: string;
+  /** true issues a 5-minute TTL locked quote_id for two-step Studio submission (BIL-R22) */
+  issueQuoteLock: boolean;
+  /** normalized generation parameter digest bound to quote_id */
+  requestHash: string;
+  effectiveChannel: string;
 }
 
 export interface PreviewQuoteResponse {
@@ -523,6 +619,16 @@ export interface PreviewQuoteResponse {
   projectedHoldBuckets: BucketAllocationLine[];
   budgetDiagnostic?: SpendingLimitDiagnostic | undefined;
   creditDiagnostic?: CreditShortfallDiagnostic | undefined;
+  quoteId: string;
+  quoteExpiresAtUnixMs: bigint;
+  catalogVersion: string;
+  rateCardVersion: string;
+  reservedCredits: bigint;
+  fundingScenario: string;
+  bucketBalances: BucketBalanceView[];
+  windows: FundingWindowStatus[];
+  keyGrossWindow?: KeyGrossWindowStatus | undefined;
+  mediaSharesSubscriptionWindows: boolean;
 }
 
 export interface AuthorizeAndHoldRequest {
@@ -554,6 +660,12 @@ export interface AuthorizeAndHoldRequest {
   /** links Studio async job record (BIL-R41) */
   studioOperationId: string;
   initialLeaseTtlMs: bigint;
+  /** optional 5-minute locked quote from PreviewQuote */
+  quoteId: string;
+  /** verified against locked quote when quote_id is supplied */
+  requestHash: string;
+  customerChargeModeOverride: CustomerChargeMode;
+  effectiveChannel: string;
 }
 
 export interface AuthorizeAndHoldResponse {
@@ -561,7 +673,7 @@ export interface AuthorizeAndHoldResponse {
   admitted: boolean;
   rejectCode: RejectCode;
   rejectMessage: string;
-  /** ULID, generated only when admitted (BIL-R24) */
+  /** ULID, generated when admitted and returned on IDEMPOTENT_IN_PROGRESS/COMPLETED replays (BIL-R24, BIL-R36) */
   requestId: string;
   holdId: string;
   leaseToken: string;
@@ -633,6 +745,10 @@ export interface AttemptCostRecord {
   dispatchedAtUnixMs: bigint;
   firstTokenAtUnixMs: bigint;
   completedAtUnixMs: bigint;
+  attemptNumber: number;
+  /** OpenRouter gen-... or Ark async task ID */
+  providerGenerationId: string;
+  httpStatus: number;
 }
 
 export interface SettleRequest {
@@ -652,6 +768,9 @@ export interface SettleRequest {
   estimatedStreamedOutputTokens: bigint;
   mediaOutputs: MediaOutputSettlementItem[];
   attempts: AttemptCostRecord[];
+  customerChargeMode: CustomerChargeMode;
+  /** base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies */
+  providerReportedCustomerBaseCostUsdDec: string;
 }
 
 export interface SettleResponse {
@@ -694,17 +813,352 @@ export interface ResolveUncertainRequest {
   reason: string;
   servingOfferingId: string;
   nativeRequestId: string;
-  /** populated when action == UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED */
+  /** populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery */
   verifiedUsage?: UsageBound | undefined;
   mediaOutputs: MediaOutputSettlementItem[];
   /** recorded into discrepancy ledger if already auto-released (BIL-R36) */
   lateProviderCostUsdDec: string;
+  attemptId: string;
+  providerGenerationId: string;
+  offeringId: string;
 }
 
 export interface ResolveUncertainResponse {
   resolved: boolean;
   settlement?: SettleResponse | undefined;
 }
+
+function createBaseMediaPricingDimensions(): MediaPricingDimensions {
+  return {
+    resolution: "",
+    aspectRatio: "",
+    size: "",
+    widthPx: 0,
+    heightPx: 0,
+    durationSeconds: 0,
+    durationMs: 0n,
+    generateAudio: false,
+    referenceImageCount: 0,
+    referenceVideoCount: 0,
+    referenceVideoTotalDurationMs: 0n,
+    upscaleFactor: 0,
+    requestedOutputs: 0,
+  };
+}
+
+export const MediaPricingDimensions: MessageFns<MediaPricingDimensions> = {
+  encode(message: MediaPricingDimensions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.resolution !== "") {
+      writer.uint32(10).string(message.resolution);
+    }
+    if (message.aspectRatio !== "") {
+      writer.uint32(18).string(message.aspectRatio);
+    }
+    if (message.size !== "") {
+      writer.uint32(26).string(message.size);
+    }
+    if (message.widthPx !== 0) {
+      writer.uint32(32).int32(message.widthPx);
+    }
+    if (message.heightPx !== 0) {
+      writer.uint32(40).int32(message.heightPx);
+    }
+    if (message.durationSeconds !== 0) {
+      writer.uint32(48).int32(message.durationSeconds);
+    }
+    if (message.durationMs !== 0n) {
+      if (BigInt.asIntN(64, message.durationMs) !== message.durationMs) {
+        throw new globalThis.Error("value provided for field message.durationMs of type int64 too large");
+      }
+      writer.uint32(56).int64(message.durationMs);
+    }
+    if (message.generateAudio !== false) {
+      writer.uint32(64).bool(message.generateAudio);
+    }
+    if (message.referenceImageCount !== 0) {
+      writer.uint32(72).int32(message.referenceImageCount);
+    }
+    if (message.referenceVideoCount !== 0) {
+      writer.uint32(80).int32(message.referenceVideoCount);
+    }
+    if (message.referenceVideoTotalDurationMs !== 0n) {
+      if (BigInt.asIntN(64, message.referenceVideoTotalDurationMs) !== message.referenceVideoTotalDurationMs) {
+        throw new globalThis.Error(
+          "value provided for field message.referenceVideoTotalDurationMs of type int64 too large",
+        );
+      }
+      writer.uint32(88).int64(message.referenceVideoTotalDurationMs);
+    }
+    if (message.upscaleFactor !== 0) {
+      writer.uint32(96).int32(message.upscaleFactor);
+    }
+    if (message.requestedOutputs !== 0) {
+      writer.uint32(104).int32(message.requestedOutputs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaPricingDimensions {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaPricingDimensions();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.resolution = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.aspectRatio = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.size = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.widthPx = reader.int32();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.heightPx = reader.int32();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.durationSeconds = reader.int32();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.durationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.generateAudio = reader.bool();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.referenceImageCount = reader.int32();
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.referenceVideoCount = reader.int32();
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.referenceVideoTotalDurationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.upscaleFactor = reader.int32();
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.requestedOutputs = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaPricingDimensions {
+    return {
+      resolution: isSet(object.resolution) ? globalThis.String(object.resolution) : "",
+      aspectRatio: isSet(object.aspectRatio)
+        ? globalThis.String(object.aspectRatio)
+        : isSet(object.aspect_ratio)
+        ? globalThis.String(object.aspect_ratio)
+        : "",
+      size: isSet(object.size) ? globalThis.String(object.size) : "",
+      widthPx: isSet(object.widthPx)
+        ? globalThis.Number(object.widthPx)
+        : isSet(object.width_px)
+        ? globalThis.Number(object.width_px)
+        : 0,
+      heightPx: isSet(object.heightPx)
+        ? globalThis.Number(object.heightPx)
+        : isSet(object.height_px)
+        ? globalThis.Number(object.height_px)
+        : 0,
+      durationSeconds: isSet(object.durationSeconds)
+        ? globalThis.Number(object.durationSeconds)
+        : isSet(object.duration_seconds)
+        ? globalThis.Number(object.duration_seconds)
+        : 0,
+      durationMs: isSet(object.durationMs)
+        ? BigInt(object.durationMs)
+        : isSet(object.duration_ms)
+        ? BigInt(object.duration_ms)
+        : 0n,
+      generateAudio: isSet(object.generateAudio)
+        ? globalThis.Boolean(object.generateAudio)
+        : isSet(object.generate_audio)
+        ? globalThis.Boolean(object.generate_audio)
+        : false,
+      referenceImageCount: isSet(object.referenceImageCount)
+        ? globalThis.Number(object.referenceImageCount)
+        : isSet(object.reference_image_count)
+        ? globalThis.Number(object.reference_image_count)
+        : 0,
+      referenceVideoCount: isSet(object.referenceVideoCount)
+        ? globalThis.Number(object.referenceVideoCount)
+        : isSet(object.reference_video_count)
+        ? globalThis.Number(object.reference_video_count)
+        : 0,
+      referenceVideoTotalDurationMs: isSet(object.referenceVideoTotalDurationMs)
+        ? BigInt(object.referenceVideoTotalDurationMs)
+        : isSet(object.reference_video_total_duration_ms)
+        ? BigInt(object.reference_video_total_duration_ms)
+        : 0n,
+      upscaleFactor: isSet(object.upscaleFactor)
+        ? globalThis.Number(object.upscaleFactor)
+        : isSet(object.upscale_factor)
+        ? globalThis.Number(object.upscale_factor)
+        : 0,
+      requestedOutputs: isSet(object.requestedOutputs)
+        ? globalThis.Number(object.requestedOutputs)
+        : isSet(object.requested_outputs)
+        ? globalThis.Number(object.requested_outputs)
+        : 0,
+    };
+  },
+
+  toJSON(message: MediaPricingDimensions): unknown {
+    const obj: any = {};
+    if (message.resolution !== "") {
+      obj.resolution = message.resolution;
+    }
+    if (message.aspectRatio !== "") {
+      obj.aspectRatio = message.aspectRatio;
+    }
+    if (message.size !== "") {
+      obj.size = message.size;
+    }
+    if (message.widthPx !== 0) {
+      obj.widthPx = Math.round(message.widthPx);
+    }
+    if (message.heightPx !== 0) {
+      obj.heightPx = Math.round(message.heightPx);
+    }
+    if (message.durationSeconds !== 0) {
+      obj.durationSeconds = Math.round(message.durationSeconds);
+    }
+    if (message.durationMs !== 0n) {
+      obj.durationMs = message.durationMs.toString();
+    }
+    if (message.generateAudio !== false) {
+      obj.generateAudio = message.generateAudio;
+    }
+    if (message.referenceImageCount !== 0) {
+      obj.referenceImageCount = Math.round(message.referenceImageCount);
+    }
+    if (message.referenceVideoCount !== 0) {
+      obj.referenceVideoCount = Math.round(message.referenceVideoCount);
+    }
+    if (message.referenceVideoTotalDurationMs !== 0n) {
+      obj.referenceVideoTotalDurationMs = message.referenceVideoTotalDurationMs.toString();
+    }
+    if (message.upscaleFactor !== 0) {
+      obj.upscaleFactor = Math.round(message.upscaleFactor);
+    }
+    if (message.requestedOutputs !== 0) {
+      obj.requestedOutputs = Math.round(message.requestedOutputs);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaPricingDimensions>, I>>(base?: I): MediaPricingDimensions {
+    return MediaPricingDimensions.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaPricingDimensions>, I>>(object: I): MediaPricingDimensions {
+    const message = createBaseMediaPricingDimensions();
+    message.resolution = object.resolution ?? "";
+    message.aspectRatio = object.aspectRatio ?? "";
+    message.size = object.size ?? "";
+    message.widthPx = object.widthPx ?? 0;
+    message.heightPx = object.heightPx ?? 0;
+    message.durationSeconds = object.durationSeconds ?? 0;
+    message.durationMs = (object.durationMs !== undefined && object.durationMs !== null)
+      ? BigInt(object.durationMs)
+      : 0n;
+    message.generateAudio = object.generateAudio ?? false;
+    message.referenceImageCount = object.referenceImageCount ?? 0;
+    message.referenceVideoCount = object.referenceVideoCount ?? 0;
+    message.referenceVideoTotalDurationMs =
+      (object.referenceVideoTotalDurationMs !== undefined && object.referenceVideoTotalDurationMs !== null)
+        ? BigInt(object.referenceVideoTotalDurationMs)
+        : 0n;
+    message.upscaleFactor = object.upscaleFactor ?? 0;
+    message.requestedOutputs = object.requestedOutputs ?? 0;
+    return message;
+  },
+};
 
 function createBaseUsageBound(): UsageBound {
   return {
@@ -727,6 +1181,7 @@ function createBaseUsageBound(): UsageBound {
     mediaHasAudio: false,
     mediaCharacterCount: 0n,
     mediaAttributes: [],
+    mediaDimensions: undefined,
   };
 }
 
@@ -826,6 +1281,9 @@ export const UsageBound: MessageFns<UsageBound> = {
     }
     for (const v of message.mediaAttributes) {
       KeyValueAttribute.encode(v!, writer.uint32(154).fork()).join();
+    }
+    if (message.mediaDimensions !== undefined) {
+      MediaPricingDimensions.encode(message.mediaDimensions, writer.uint32(162).fork()).join();
     }
     return writer;
   },
@@ -995,6 +1453,14 @@ export const UsageBound: MessageFns<UsageBound> = {
             message.mediaAttributes.push(KeyValueAttribute.decode(reader, reader.uint32()));
             continue;
           }
+          case 20: {
+            if (tag !== 162) {
+              break;
+            }
+
+            message.mediaDimensions = MediaPricingDimensions.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1104,6 +1570,11 @@ export const UsageBound: MessageFns<UsageBound> = {
         : globalThis.Array.isArray(object?.media_attributes)
         ? object.media_attributes.map((e: any) => KeyValueAttribute.fromJSON(e))
         : [],
+      mediaDimensions: isSet(object.mediaDimensions)
+        ? MediaPricingDimensions.fromJSON(object.mediaDimensions)
+        : isSet(object.media_dimensions)
+        ? MediaPricingDimensions.fromJSON(object.media_dimensions)
+        : undefined,
     };
   },
 
@@ -1166,6 +1637,9 @@ export const UsageBound: MessageFns<UsageBound> = {
     if (message.mediaAttributes?.length) {
       obj.mediaAttributes = message.mediaAttributes.map((e) => KeyValueAttribute.toJSON(e));
     }
+    if (message.mediaDimensions !== undefined) {
+      obj.mediaDimensions = MediaPricingDimensions.toJSON(message.mediaDimensions);
+    }
     return obj;
   },
 
@@ -1218,6 +1692,9 @@ export const UsageBound: MessageFns<UsageBound> = {
       ? BigInt(object.mediaCharacterCount)
       : 0n;
     message.mediaAttributes = object.mediaAttributes?.map((e) => KeyValueAttribute.fromPartial(e)) || [];
+    message.mediaDimensions = (object.mediaDimensions !== undefined && object.mediaDimensions !== null)
+      ? MediaPricingDimensions.fromPartial(object.mediaDimensions)
+      : undefined;
     return message;
   },
 };
@@ -2181,6 +2658,555 @@ export const LockedVersionSet: MessageFns<LockedVersionSet> = {
   },
 };
 
+function createBaseBucketBalanceView(): BucketBalanceView {
+  return { bucket: 0, availableMicroUsd: 0n, heldMicroUsd: 0n, availableCredits: 0n, earliestExpiresAtUnixSec: 0n };
+}
+
+export const BucketBalanceView: MessageFns<BucketBalanceView> = {
+  encode(message: BucketBalanceView, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.bucket !== 0) {
+      writer.uint32(8).int32(message.bucket);
+    }
+    if (message.availableMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.availableMicroUsd) !== message.availableMicroUsd) {
+        throw new globalThis.Error("value provided for field message.availableMicroUsd of type int64 too large");
+      }
+      writer.uint32(16).int64(message.availableMicroUsd);
+    }
+    if (message.heldMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.heldMicroUsd) !== message.heldMicroUsd) {
+        throw new globalThis.Error("value provided for field message.heldMicroUsd of type int64 too large");
+      }
+      writer.uint32(24).int64(message.heldMicroUsd);
+    }
+    if (message.availableCredits !== 0n) {
+      if (BigInt.asIntN(64, message.availableCredits) !== message.availableCredits) {
+        throw new globalThis.Error("value provided for field message.availableCredits of type int64 too large");
+      }
+      writer.uint32(32).int64(message.availableCredits);
+    }
+    if (message.earliestExpiresAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.earliestExpiresAtUnixSec) !== message.earliestExpiresAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.earliestExpiresAtUnixSec of type int64 too large");
+      }
+      writer.uint32(40).int64(message.earliestExpiresAtUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BucketBalanceView {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseBucketBalanceView();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.bucket = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.availableMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.heldMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.availableCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.earliestExpiresAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): BucketBalanceView {
+    return {
+      bucket: isSet(object.bucket) ? fundingBucketFromJSON(object.bucket) : 0,
+      availableMicroUsd: isSet(object.availableMicroUsd)
+        ? BigInt(object.availableMicroUsd)
+        : isSet(object.available_micro_usd)
+        ? BigInt(object.available_micro_usd)
+        : 0n,
+      heldMicroUsd: isSet(object.heldMicroUsd)
+        ? BigInt(object.heldMicroUsd)
+        : isSet(object.held_micro_usd)
+        ? BigInt(object.held_micro_usd)
+        : 0n,
+      availableCredits: isSet(object.availableCredits)
+        ? BigInt(object.availableCredits)
+        : isSet(object.available_credits)
+        ? BigInt(object.available_credits)
+        : 0n,
+      earliestExpiresAtUnixSec: isSet(object.earliestExpiresAtUnixSec)
+        ? BigInt(object.earliestExpiresAtUnixSec)
+        : isSet(object.earliest_expires_at_unix_sec)
+        ? BigInt(object.earliest_expires_at_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: BucketBalanceView): unknown {
+    const obj: any = {};
+    if (message.bucket !== 0) {
+      obj.bucket = fundingBucketToJSON(message.bucket);
+    }
+    if (message.availableMicroUsd !== 0n) {
+      obj.availableMicroUsd = message.availableMicroUsd.toString();
+    }
+    if (message.heldMicroUsd !== 0n) {
+      obj.heldMicroUsd = message.heldMicroUsd.toString();
+    }
+    if (message.availableCredits !== 0n) {
+      obj.availableCredits = message.availableCredits.toString();
+    }
+    if (message.earliestExpiresAtUnixSec !== 0n) {
+      obj.earliestExpiresAtUnixSec = message.earliestExpiresAtUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BucketBalanceView>, I>>(base?: I): BucketBalanceView {
+    return BucketBalanceView.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BucketBalanceView>, I>>(object: I): BucketBalanceView {
+    const message = createBaseBucketBalanceView();
+    message.bucket = object.bucket ?? 0;
+    message.availableMicroUsd = (object.availableMicroUsd !== undefined && object.availableMicroUsd !== null)
+      ? BigInt(object.availableMicroUsd)
+      : 0n;
+    message.heldMicroUsd = (object.heldMicroUsd !== undefined && object.heldMicroUsd !== null)
+      ? BigInt(object.heldMicroUsd)
+      : 0n;
+    message.availableCredits = (object.availableCredits !== undefined && object.availableCredits !== null)
+      ? BigInt(object.availableCredits)
+      : 0n;
+    message.earliestExpiresAtUnixSec =
+      (object.earliestExpiresAtUnixSec !== undefined && object.earliestExpiresAtUnixSec !== null)
+        ? BigInt(object.earliestExpiresAtUnixSec)
+        : 0n;
+    return message;
+  },
+};
+
+function createBaseFundingWindowStatus(): FundingWindowStatus {
+  return {
+    windowKind: "",
+    limitMicroUsd: 0n,
+    usedMicroUsd: 0n,
+    heldMicroUsd: 0n,
+    remainingMicroUsd: 0n,
+    resetsAtUnixSec: 0n,
+    appliesToRequest: false,
+  };
+}
+
+export const FundingWindowStatus: MessageFns<FundingWindowStatus> = {
+  encode(message: FundingWindowStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.windowKind !== "") {
+      writer.uint32(10).string(message.windowKind);
+    }
+    if (message.limitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.limitMicroUsd) !== message.limitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.limitMicroUsd of type int64 too large");
+      }
+      writer.uint32(16).int64(message.limitMicroUsd);
+    }
+    if (message.usedMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.usedMicroUsd) !== message.usedMicroUsd) {
+        throw new globalThis.Error("value provided for field message.usedMicroUsd of type int64 too large");
+      }
+      writer.uint32(24).int64(message.usedMicroUsd);
+    }
+    if (message.heldMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.heldMicroUsd) !== message.heldMicroUsd) {
+        throw new globalThis.Error("value provided for field message.heldMicroUsd of type int64 too large");
+      }
+      writer.uint32(32).int64(message.heldMicroUsd);
+    }
+    if (message.remainingMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.remainingMicroUsd) !== message.remainingMicroUsd) {
+        throw new globalThis.Error("value provided for field message.remainingMicroUsd of type int64 too large");
+      }
+      writer.uint32(40).int64(message.remainingMicroUsd);
+    }
+    if (message.resetsAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.resetsAtUnixSec) !== message.resetsAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.resetsAtUnixSec of type int64 too large");
+      }
+      writer.uint32(48).int64(message.resetsAtUnixSec);
+    }
+    if (message.appliesToRequest !== false) {
+      writer.uint32(56).bool(message.appliesToRequest);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FundingWindowStatus {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseFundingWindowStatus();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.windowKind = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.limitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.usedMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.heldMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.remainingMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.resetsAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.appliesToRequest = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): FundingWindowStatus {
+    return {
+      windowKind: isSet(object.windowKind)
+        ? globalThis.String(object.windowKind)
+        : isSet(object.window_kind)
+        ? globalThis.String(object.window_kind)
+        : "",
+      limitMicroUsd: isSet(object.limitMicroUsd)
+        ? BigInt(object.limitMicroUsd)
+        : isSet(object.limit_micro_usd)
+        ? BigInt(object.limit_micro_usd)
+        : 0n,
+      usedMicroUsd: isSet(object.usedMicroUsd)
+        ? BigInt(object.usedMicroUsd)
+        : isSet(object.used_micro_usd)
+        ? BigInt(object.used_micro_usd)
+        : 0n,
+      heldMicroUsd: isSet(object.heldMicroUsd)
+        ? BigInt(object.heldMicroUsd)
+        : isSet(object.held_micro_usd)
+        ? BigInt(object.held_micro_usd)
+        : 0n,
+      remainingMicroUsd: isSet(object.remainingMicroUsd)
+        ? BigInt(object.remainingMicroUsd)
+        : isSet(object.remaining_micro_usd)
+        ? BigInt(object.remaining_micro_usd)
+        : 0n,
+      resetsAtUnixSec: isSet(object.resetsAtUnixSec)
+        ? BigInt(object.resetsAtUnixSec)
+        : isSet(object.resets_at_unix_sec)
+        ? BigInt(object.resets_at_unix_sec)
+        : 0n,
+      appliesToRequest: isSet(object.appliesToRequest)
+        ? globalThis.Boolean(object.appliesToRequest)
+        : isSet(object.applies_to_request)
+        ? globalThis.Boolean(object.applies_to_request)
+        : false,
+    };
+  },
+
+  toJSON(message: FundingWindowStatus): unknown {
+    const obj: any = {};
+    if (message.windowKind !== "") {
+      obj.windowKind = message.windowKind;
+    }
+    if (message.limitMicroUsd !== 0n) {
+      obj.limitMicroUsd = message.limitMicroUsd.toString();
+    }
+    if (message.usedMicroUsd !== 0n) {
+      obj.usedMicroUsd = message.usedMicroUsd.toString();
+    }
+    if (message.heldMicroUsd !== 0n) {
+      obj.heldMicroUsd = message.heldMicroUsd.toString();
+    }
+    if (message.remainingMicroUsd !== 0n) {
+      obj.remainingMicroUsd = message.remainingMicroUsd.toString();
+    }
+    if (message.resetsAtUnixSec !== 0n) {
+      obj.resetsAtUnixSec = message.resetsAtUnixSec.toString();
+    }
+    if (message.appliesToRequest !== false) {
+      obj.appliesToRequest = message.appliesToRequest;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<FundingWindowStatus>, I>>(base?: I): FundingWindowStatus {
+    return FundingWindowStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<FundingWindowStatus>, I>>(object: I): FundingWindowStatus {
+    const message = createBaseFundingWindowStatus();
+    message.windowKind = object.windowKind ?? "";
+    message.limitMicroUsd = (object.limitMicroUsd !== undefined && object.limitMicroUsd !== null)
+      ? BigInt(object.limitMicroUsd)
+      : 0n;
+    message.usedMicroUsd = (object.usedMicroUsd !== undefined && object.usedMicroUsd !== null)
+      ? BigInt(object.usedMicroUsd)
+      : 0n;
+    message.heldMicroUsd = (object.heldMicroUsd !== undefined && object.heldMicroUsd !== null)
+      ? BigInt(object.heldMicroUsd)
+      : 0n;
+    message.remainingMicroUsd = (object.remainingMicroUsd !== undefined && object.remainingMicroUsd !== null)
+      ? BigInt(object.remainingMicroUsd)
+      : 0n;
+    message.resetsAtUnixSec = (object.resetsAtUnixSec !== undefined && object.resetsAtUnixSec !== null)
+      ? BigInt(object.resetsAtUnixSec)
+      : 0n;
+    message.appliesToRequest = object.appliesToRequest ?? false;
+    return message;
+  },
+};
+
+function createBaseKeyGrossWindowStatus(): KeyGrossWindowStatus {
+  return { dailyLimitMicroUsd: 0n, dailyUsedMicroUsd: 0n, monthlyLimitMicroUsd: 0n, monthlyUsedMicroUsd: 0n };
+}
+
+export const KeyGrossWindowStatus: MessageFns<KeyGrossWindowStatus> = {
+  encode(message: KeyGrossWindowStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.dailyLimitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.dailyLimitMicroUsd) !== message.dailyLimitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.dailyLimitMicroUsd of type int64 too large");
+      }
+      writer.uint32(8).int64(message.dailyLimitMicroUsd);
+    }
+    if (message.dailyUsedMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.dailyUsedMicroUsd) !== message.dailyUsedMicroUsd) {
+        throw new globalThis.Error("value provided for field message.dailyUsedMicroUsd of type int64 too large");
+      }
+      writer.uint32(16).int64(message.dailyUsedMicroUsd);
+    }
+    if (message.monthlyLimitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.monthlyLimitMicroUsd) !== message.monthlyLimitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.monthlyLimitMicroUsd of type int64 too large");
+      }
+      writer.uint32(24).int64(message.monthlyLimitMicroUsd);
+    }
+    if (message.monthlyUsedMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.monthlyUsedMicroUsd) !== message.monthlyUsedMicroUsd) {
+        throw new globalThis.Error("value provided for field message.monthlyUsedMicroUsd of type int64 too large");
+      }
+      writer.uint32(32).int64(message.monthlyUsedMicroUsd);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): KeyGrossWindowStatus {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseKeyGrossWindowStatus();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.dailyLimitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.dailyUsedMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.monthlyLimitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.monthlyUsedMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): KeyGrossWindowStatus {
+    return {
+      dailyLimitMicroUsd: isSet(object.dailyLimitMicroUsd)
+        ? BigInt(object.dailyLimitMicroUsd)
+        : isSet(object.daily_limit_micro_usd)
+        ? BigInt(object.daily_limit_micro_usd)
+        : 0n,
+      dailyUsedMicroUsd: isSet(object.dailyUsedMicroUsd)
+        ? BigInt(object.dailyUsedMicroUsd)
+        : isSet(object.daily_used_micro_usd)
+        ? BigInt(object.daily_used_micro_usd)
+        : 0n,
+      monthlyLimitMicroUsd: isSet(object.monthlyLimitMicroUsd)
+        ? BigInt(object.monthlyLimitMicroUsd)
+        : isSet(object.monthly_limit_micro_usd)
+        ? BigInt(object.monthly_limit_micro_usd)
+        : 0n,
+      monthlyUsedMicroUsd: isSet(object.monthlyUsedMicroUsd)
+        ? BigInt(object.monthlyUsedMicroUsd)
+        : isSet(object.monthly_used_micro_usd)
+        ? BigInt(object.monthly_used_micro_usd)
+        : 0n,
+    };
+  },
+
+  toJSON(message: KeyGrossWindowStatus): unknown {
+    const obj: any = {};
+    if (message.dailyLimitMicroUsd !== 0n) {
+      obj.dailyLimitMicroUsd = message.dailyLimitMicroUsd.toString();
+    }
+    if (message.dailyUsedMicroUsd !== 0n) {
+      obj.dailyUsedMicroUsd = message.dailyUsedMicroUsd.toString();
+    }
+    if (message.monthlyLimitMicroUsd !== 0n) {
+      obj.monthlyLimitMicroUsd = message.monthlyLimitMicroUsd.toString();
+    }
+    if (message.monthlyUsedMicroUsd !== 0n) {
+      obj.monthlyUsedMicroUsd = message.monthlyUsedMicroUsd.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<KeyGrossWindowStatus>, I>>(base?: I): KeyGrossWindowStatus {
+    return KeyGrossWindowStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<KeyGrossWindowStatus>, I>>(object: I): KeyGrossWindowStatus {
+    const message = createBaseKeyGrossWindowStatus();
+    message.dailyLimitMicroUsd = (object.dailyLimitMicroUsd !== undefined && object.dailyLimitMicroUsd !== null)
+      ? BigInt(object.dailyLimitMicroUsd)
+      : 0n;
+    message.dailyUsedMicroUsd = (object.dailyUsedMicroUsd !== undefined && object.dailyUsedMicroUsd !== null)
+      ? BigInt(object.dailyUsedMicroUsd)
+      : 0n;
+    message.monthlyLimitMicroUsd = (object.monthlyLimitMicroUsd !== undefined && object.monthlyLimitMicroUsd !== null)
+      ? BigInt(object.monthlyLimitMicroUsd)
+      : 0n;
+    message.monthlyUsedMicroUsd = (object.monthlyUsedMicroUsd !== undefined && object.monthlyUsedMicroUsd !== null)
+      ? BigInt(object.monthlyUsedMicroUsd)
+      : 0n;
+    return message;
+  },
+};
+
 function createBaseResolvePrincipalScopeRequest(): ResolvePrincipalScopeRequest {
   return { apiKeySha256: "", internalAccountId: "", clientRegion: "" };
 }
@@ -2310,6 +3336,14 @@ function createBaseResolvePrincipalScopeResponse(): ResolvePrincipalScopeRespons
     activePlanId: "",
     planBasicGroupIds: [],
     planPremiumGroupIds: [],
+    maxConcurrentStreams: 0,
+    rpmLimit: 0,
+    tpmLimit: 0n,
+    spendingLocked: false,
+    keyExpiresAtUnixMs: 0n,
+    searchPolicy: 0,
+    mediaSharesSubscriptionWindows: false,
+    aitCoverageThrottledModelIds: [],
   };
 }
 
@@ -2356,6 +3390,36 @@ export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResp
     }
     for (const v of message.planPremiumGroupIds) {
       writer.uint32(114).string(v!);
+    }
+    if (message.maxConcurrentStreams !== 0) {
+      writer.uint32(120).int32(message.maxConcurrentStreams);
+    }
+    if (message.rpmLimit !== 0) {
+      writer.uint32(128).int32(message.rpmLimit);
+    }
+    if (message.tpmLimit !== 0n) {
+      if (BigInt.asIntN(64, message.tpmLimit) !== message.tpmLimit) {
+        throw new globalThis.Error("value provided for field message.tpmLimit of type int64 too large");
+      }
+      writer.uint32(136).int64(message.tpmLimit);
+    }
+    if (message.spendingLocked !== false) {
+      writer.uint32(144).bool(message.spendingLocked);
+    }
+    if (message.keyExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.keyExpiresAtUnixMs) !== message.keyExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.keyExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(152).int64(message.keyExpiresAtUnixMs);
+    }
+    if (message.searchPolicy !== 0) {
+      writer.uint32(160).int32(message.searchPolicy);
+    }
+    if (message.mediaSharesSubscriptionWindows !== false) {
+      writer.uint32(168).bool(message.mediaSharesSubscriptionWindows);
+    }
+    for (const v of message.aitCoverageThrottledModelIds) {
+      writer.uint32(178).string(v!);
     }
     return writer;
   },
@@ -2485,6 +3549,70 @@ export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResp
             message.planPremiumGroupIds.push(reader.string());
             continue;
           }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.maxConcurrentStreams = reader.int32();
+            continue;
+          }
+          case 16: {
+            if (tag !== 128) {
+              break;
+            }
+
+            message.rpmLimit = reader.int32();
+            continue;
+          }
+          case 17: {
+            if (tag !== 136) {
+              break;
+            }
+
+            message.tpmLimit = reader.int64() as bigint;
+            continue;
+          }
+          case 18: {
+            if (tag !== 144) {
+              break;
+            }
+
+            message.spendingLocked = reader.bool();
+            continue;
+          }
+          case 19: {
+            if (tag !== 152) {
+              break;
+            }
+
+            message.keyExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 20: {
+            if (tag !== 160) {
+              break;
+            }
+
+            message.searchPolicy = reader.int32() as any;
+            continue;
+          }
+          case 21: {
+            if (tag !== 168) {
+              break;
+            }
+
+            message.mediaSharesSubscriptionWindows = reader.bool();
+            continue;
+          }
+          case 22: {
+            if (tag !== 178) {
+              break;
+            }
+
+            message.aitCoverageThrottledModelIds.push(reader.string());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2565,6 +3693,46 @@ export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResp
         : globalThis.Array.isArray(object?.plan_premium_group_ids)
         ? object.plan_premium_group_ids.map((e: any) => globalThis.String(e))
         : [],
+      maxConcurrentStreams: isSet(object.maxConcurrentStreams)
+        ? globalThis.Number(object.maxConcurrentStreams)
+        : isSet(object.max_concurrent_streams)
+        ? globalThis.Number(object.max_concurrent_streams)
+        : 0,
+      rpmLimit: isSet(object.rpmLimit)
+        ? globalThis.Number(object.rpmLimit)
+        : isSet(object.rpm_limit)
+        ? globalThis.Number(object.rpm_limit)
+        : 0,
+      tpmLimit: isSet(object.tpmLimit)
+        ? BigInt(object.tpmLimit)
+        : isSet(object.tpm_limit)
+        ? BigInt(object.tpm_limit)
+        : 0n,
+      spendingLocked: isSet(object.spendingLocked)
+        ? globalThis.Boolean(object.spendingLocked)
+        : isSet(object.spending_locked)
+        ? globalThis.Boolean(object.spending_locked)
+        : false,
+      keyExpiresAtUnixMs: isSet(object.keyExpiresAtUnixMs)
+        ? BigInt(object.keyExpiresAtUnixMs)
+        : isSet(object.key_expires_at_unix_ms)
+        ? BigInt(object.key_expires_at_unix_ms)
+        : 0n,
+      searchPolicy: isSet(object.searchPolicy)
+        ? searchPolicyFromJSON(object.searchPolicy)
+        : isSet(object.search_policy)
+        ? searchPolicyFromJSON(object.search_policy)
+        : 0,
+      mediaSharesSubscriptionWindows: isSet(object.mediaSharesSubscriptionWindows)
+        ? globalThis.Boolean(object.mediaSharesSubscriptionWindows)
+        : isSet(object.media_shares_subscription_windows)
+        ? globalThis.Boolean(object.media_shares_subscription_windows)
+        : false,
+      aitCoverageThrottledModelIds: globalThis.Array.isArray(object?.aitCoverageThrottledModelIds)
+        ? object.aitCoverageThrottledModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.ait_coverage_throttled_model_ids)
+        ? object.ait_coverage_throttled_model_ids.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -2612,6 +3780,30 @@ export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResp
     if (message.planPremiumGroupIds?.length) {
       obj.planPremiumGroupIds = message.planPremiumGroupIds;
     }
+    if (message.maxConcurrentStreams !== 0) {
+      obj.maxConcurrentStreams = Math.round(message.maxConcurrentStreams);
+    }
+    if (message.rpmLimit !== 0) {
+      obj.rpmLimit = Math.round(message.rpmLimit);
+    }
+    if (message.tpmLimit !== 0n) {
+      obj.tpmLimit = message.tpmLimit.toString();
+    }
+    if (message.spendingLocked !== false) {
+      obj.spendingLocked = message.spendingLocked;
+    }
+    if (message.keyExpiresAtUnixMs !== 0n) {
+      obj.keyExpiresAtUnixMs = message.keyExpiresAtUnixMs.toString();
+    }
+    if (message.searchPolicy !== 0) {
+      obj.searchPolicy = searchPolicyToJSON(message.searchPolicy);
+    }
+    if (message.mediaSharesSubscriptionWindows !== false) {
+      obj.mediaSharesSubscriptionWindows = message.mediaSharesSubscriptionWindows;
+    }
+    if (message.aitCoverageThrottledModelIds?.length) {
+      obj.aitCoverageThrottledModelIds = message.aitCoverageThrottledModelIds;
+    }
     return obj;
   },
 
@@ -2636,6 +3828,586 @@ export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResp
     message.activePlanId = object.activePlanId ?? "";
     message.planBasicGroupIds = object.planBasicGroupIds?.map((e) => e) || [];
     message.planPremiumGroupIds = object.planPremiumGroupIds?.map((e) => e) || [];
+    message.maxConcurrentStreams = object.maxConcurrentStreams ?? 0;
+    message.rpmLimit = object.rpmLimit ?? 0;
+    message.tpmLimit = (object.tpmLimit !== undefined && object.tpmLimit !== null) ? BigInt(object.tpmLimit) : 0n;
+    message.spendingLocked = object.spendingLocked ?? false;
+    message.keyExpiresAtUnixMs = (object.keyExpiresAtUnixMs !== undefined && object.keyExpiresAtUnixMs !== null)
+      ? BigInt(object.keyExpiresAtUnixMs)
+      : 0n;
+    message.searchPolicy = object.searchPolicy ?? 0;
+    message.mediaSharesSubscriptionWindows = object.mediaSharesSubscriptionWindows ?? false;
+    message.aitCoverageThrottledModelIds = object.aitCoverageThrottledModelIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseEvaluateCatalogDiscoveryRequest(): EvaluateCatalogDiscoveryRequest {
+  return { accountId: "", keyId: "", channel: 0, customerModelIds: [] };
+}
+
+export const EvaluateCatalogDiscoveryRequest: MessageFns<EvaluateCatalogDiscoveryRequest> = {
+  encode(message: EvaluateCatalogDiscoveryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.keyId !== "") {
+      writer.uint32(18).string(message.keyId);
+    }
+    if (message.channel !== 0) {
+      writer.uint32(24).int32(message.channel);
+    }
+    for (const v of message.customerModelIds) {
+      writer.uint32(34).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EvaluateCatalogDiscoveryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEvaluateCatalogDiscoveryRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.keyId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.channel = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.customerModelIds.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): EvaluateCatalogDiscoveryRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      keyId: isSet(object.keyId)
+        ? globalThis.String(object.keyId)
+        : isSet(object.key_id)
+        ? globalThis.String(object.key_id)
+        : "",
+      channel: isSet(object.channel) ? executionChannelFromJSON(object.channel) : 0,
+      customerModelIds: globalThis.Array.isArray(object?.customerModelIds)
+        ? object.customerModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.customer_model_ids)
+        ? object.customer_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: EvaluateCatalogDiscoveryRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.keyId !== "") {
+      obj.keyId = message.keyId;
+    }
+    if (message.channel !== 0) {
+      obj.channel = executionChannelToJSON(message.channel);
+    }
+    if (message.customerModelIds?.length) {
+      obj.customerModelIds = message.customerModelIds;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EvaluateCatalogDiscoveryRequest>, I>>(base?: I): EvaluateCatalogDiscoveryRequest {
+    return EvaluateCatalogDiscoveryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EvaluateCatalogDiscoveryRequest>, I>>(
+    object: I,
+  ): EvaluateCatalogDiscoveryRequest {
+    const message = createBaseEvaluateCatalogDiscoveryRequest();
+    message.accountId = object.accountId ?? "";
+    message.keyId = object.keyId ?? "";
+    message.channel = object.channel ?? 0;
+    message.customerModelIds = object.customerModelIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseModelDiscoveryEvaluation(): ModelDiscoveryEvaluation {
+  return {
+    customerModelId: "",
+    keyScopeAllowed: false,
+    subscriptionBasicEligible: false,
+    subscriptionPremiumEligible: false,
+    aitEarnedCreditEligible: false,
+    aitCoverageThrottled: false,
+    searchSubscriptionEligible: false,
+    spendableBuckets: [],
+    blockReason: 0,
+  };
+}
+
+export const ModelDiscoveryEvaluation: MessageFns<ModelDiscoveryEvaluation> = {
+  encode(message: ModelDiscoveryEvaluation, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.customerModelId !== "") {
+      writer.uint32(10).string(message.customerModelId);
+    }
+    if (message.keyScopeAllowed !== false) {
+      writer.uint32(16).bool(message.keyScopeAllowed);
+    }
+    if (message.subscriptionBasicEligible !== false) {
+      writer.uint32(24).bool(message.subscriptionBasicEligible);
+    }
+    if (message.subscriptionPremiumEligible !== false) {
+      writer.uint32(32).bool(message.subscriptionPremiumEligible);
+    }
+    if (message.aitEarnedCreditEligible !== false) {
+      writer.uint32(40).bool(message.aitEarnedCreditEligible);
+    }
+    if (message.aitCoverageThrottled !== false) {
+      writer.uint32(48).bool(message.aitCoverageThrottled);
+    }
+    if (message.searchSubscriptionEligible !== false) {
+      writer.uint32(56).bool(message.searchSubscriptionEligible);
+    }
+    if (message.spendableBuckets.length !== 0) {
+      writer.uint32(66).fork();
+      for (const v of message.spendableBuckets) {
+        writer.int32(v);
+      }
+      writer.join();
+    }
+    if (message.blockReason !== 0) {
+      writer.uint32(72).int32(message.blockReason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ModelDiscoveryEvaluation {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseModelDiscoveryEvaluation();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.customerModelId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.keyScopeAllowed = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.subscriptionBasicEligible = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.subscriptionPremiumEligible = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.aitEarnedCreditEligible = reader.bool();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.aitCoverageThrottled = reader.bool();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.searchSubscriptionEligible = reader.bool();
+            continue;
+          }
+          case 8: {
+            if (tag === 64) {
+              message.spendableBuckets.push(reader.int32() as any);
+
+              continue;
+            }
+
+            if (tag === 66) {
+              const end2 = reader.uint32() + reader.pos;
+              while (reader.pos < end2) {
+                message.spendableBuckets.push(reader.int32() as any);
+              }
+
+              continue;
+            }
+
+            break;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.blockReason = reader.int32() as any;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ModelDiscoveryEvaluation {
+    return {
+      customerModelId: isSet(object.customerModelId)
+        ? globalThis.String(object.customerModelId)
+        : isSet(object.customer_model_id)
+        ? globalThis.String(object.customer_model_id)
+        : "",
+      keyScopeAllowed: isSet(object.keyScopeAllowed)
+        ? globalThis.Boolean(object.keyScopeAllowed)
+        : isSet(object.key_scope_allowed)
+        ? globalThis.Boolean(object.key_scope_allowed)
+        : false,
+      subscriptionBasicEligible: isSet(object.subscriptionBasicEligible)
+        ? globalThis.Boolean(object.subscriptionBasicEligible)
+        : isSet(object.subscription_basic_eligible)
+        ? globalThis.Boolean(object.subscription_basic_eligible)
+        : false,
+      subscriptionPremiumEligible: isSet(object.subscriptionPremiumEligible)
+        ? globalThis.Boolean(object.subscriptionPremiumEligible)
+        : isSet(object.subscription_premium_eligible)
+        ? globalThis.Boolean(object.subscription_premium_eligible)
+        : false,
+      aitEarnedCreditEligible: isSet(object.aitEarnedCreditEligible)
+        ? globalThis.Boolean(object.aitEarnedCreditEligible)
+        : isSet(object.ait_earned_credit_eligible)
+        ? globalThis.Boolean(object.ait_earned_credit_eligible)
+        : false,
+      aitCoverageThrottled: isSet(object.aitCoverageThrottled)
+        ? globalThis.Boolean(object.aitCoverageThrottled)
+        : isSet(object.ait_coverage_throttled)
+        ? globalThis.Boolean(object.ait_coverage_throttled)
+        : false,
+      searchSubscriptionEligible: isSet(object.searchSubscriptionEligible)
+        ? globalThis.Boolean(object.searchSubscriptionEligible)
+        : isSet(object.search_subscription_eligible)
+        ? globalThis.Boolean(object.search_subscription_eligible)
+        : false,
+      spendableBuckets: globalThis.Array.isArray(object?.spendableBuckets)
+        ? object.spendableBuckets.map((e: any) => fundingBucketFromJSON(e))
+        : globalThis.Array.isArray(object?.spendable_buckets)
+        ? object.spendable_buckets.map((e: any) => fundingBucketFromJSON(e))
+        : [],
+      blockReason: isSet(object.blockReason)
+        ? rejectCodeFromJSON(object.blockReason)
+        : isSet(object.block_reason)
+        ? rejectCodeFromJSON(object.block_reason)
+        : 0,
+    };
+  },
+
+  toJSON(message: ModelDiscoveryEvaluation): unknown {
+    const obj: any = {};
+    if (message.customerModelId !== "") {
+      obj.customerModelId = message.customerModelId;
+    }
+    if (message.keyScopeAllowed !== false) {
+      obj.keyScopeAllowed = message.keyScopeAllowed;
+    }
+    if (message.subscriptionBasicEligible !== false) {
+      obj.subscriptionBasicEligible = message.subscriptionBasicEligible;
+    }
+    if (message.subscriptionPremiumEligible !== false) {
+      obj.subscriptionPremiumEligible = message.subscriptionPremiumEligible;
+    }
+    if (message.aitEarnedCreditEligible !== false) {
+      obj.aitEarnedCreditEligible = message.aitEarnedCreditEligible;
+    }
+    if (message.aitCoverageThrottled !== false) {
+      obj.aitCoverageThrottled = message.aitCoverageThrottled;
+    }
+    if (message.searchSubscriptionEligible !== false) {
+      obj.searchSubscriptionEligible = message.searchSubscriptionEligible;
+    }
+    if (message.spendableBuckets?.length) {
+      obj.spendableBuckets = message.spendableBuckets.map((e) => fundingBucketToJSON(e));
+    }
+    if (message.blockReason !== 0) {
+      obj.blockReason = rejectCodeToJSON(message.blockReason);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelDiscoveryEvaluation>, I>>(base?: I): ModelDiscoveryEvaluation {
+    return ModelDiscoveryEvaluation.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelDiscoveryEvaluation>, I>>(object: I): ModelDiscoveryEvaluation {
+    const message = createBaseModelDiscoveryEvaluation();
+    message.customerModelId = object.customerModelId ?? "";
+    message.keyScopeAllowed = object.keyScopeAllowed ?? false;
+    message.subscriptionBasicEligible = object.subscriptionBasicEligible ?? false;
+    message.subscriptionPremiumEligible = object.subscriptionPremiumEligible ?? false;
+    message.aitEarnedCreditEligible = object.aitEarnedCreditEligible ?? false;
+    message.aitCoverageThrottled = object.aitCoverageThrottled ?? false;
+    message.searchSubscriptionEligible = object.searchSubscriptionEligible ?? false;
+    message.spendableBuckets = object.spendableBuckets?.map((e) => e) || [];
+    message.blockReason = object.blockReason ?? 0;
+    return message;
+  },
+};
+
+function createBaseEvaluateCatalogDiscoveryResponse(): EvaluateCatalogDiscoveryResponse {
+  return {
+    catalogVersion: "",
+    fundingScenario: "",
+    bucketBalances: [],
+    windows: [],
+    keyGrossWindow: undefined,
+    models: [],
+  };
+}
+
+export const EvaluateCatalogDiscoveryResponse: MessageFns<EvaluateCatalogDiscoveryResponse> = {
+  encode(message: EvaluateCatalogDiscoveryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.catalogVersion !== "") {
+      writer.uint32(10).string(message.catalogVersion);
+    }
+    if (message.fundingScenario !== "") {
+      writer.uint32(18).string(message.fundingScenario);
+    }
+    for (const v of message.bucketBalances) {
+      BucketBalanceView.encode(v!, writer.uint32(26).fork()).join();
+    }
+    for (const v of message.windows) {
+      FundingWindowStatus.encode(v!, writer.uint32(34).fork()).join();
+    }
+    if (message.keyGrossWindow !== undefined) {
+      KeyGrossWindowStatus.encode(message.keyGrossWindow, writer.uint32(42).fork()).join();
+    }
+    for (const v of message.models) {
+      ModelDiscoveryEvaluation.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EvaluateCatalogDiscoveryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseEvaluateCatalogDiscoveryResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.catalogVersion = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.fundingScenario = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.bucketBalances.push(BucketBalanceView.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.windows.push(FundingWindowStatus.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.keyGrossWindow = KeyGrossWindowStatus.decode(reader, reader.uint32());
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.models.push(ModelDiscoveryEvaluation.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): EvaluateCatalogDiscoveryResponse {
+    return {
+      catalogVersion: isSet(object.catalogVersion)
+        ? globalThis.String(object.catalogVersion)
+        : isSet(object.catalog_version)
+        ? globalThis.String(object.catalog_version)
+        : "",
+      fundingScenario: isSet(object.fundingScenario)
+        ? globalThis.String(object.fundingScenario)
+        : isSet(object.funding_scenario)
+        ? globalThis.String(object.funding_scenario)
+        : "",
+      bucketBalances: globalThis.Array.isArray(object?.bucketBalances)
+        ? object.bucketBalances.map((e: any) => BucketBalanceView.fromJSON(e))
+        : globalThis.Array.isArray(object?.bucket_balances)
+        ? object.bucket_balances.map((e: any) => BucketBalanceView.fromJSON(e))
+        : [],
+      windows: globalThis.Array.isArray(object?.windows)
+        ? object.windows.map((e: any) => FundingWindowStatus.fromJSON(e))
+        : [],
+      keyGrossWindow: isSet(object.keyGrossWindow)
+        ? KeyGrossWindowStatus.fromJSON(object.keyGrossWindow)
+        : isSet(object.key_gross_window)
+        ? KeyGrossWindowStatus.fromJSON(object.key_gross_window)
+        : undefined,
+      models: globalThis.Array.isArray(object?.models)
+        ? object.models.map((e: any) => ModelDiscoveryEvaluation.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: EvaluateCatalogDiscoveryResponse): unknown {
+    const obj: any = {};
+    if (message.catalogVersion !== "") {
+      obj.catalogVersion = message.catalogVersion;
+    }
+    if (message.fundingScenario !== "") {
+      obj.fundingScenario = message.fundingScenario;
+    }
+    if (message.bucketBalances?.length) {
+      obj.bucketBalances = message.bucketBalances.map((e) => BucketBalanceView.toJSON(e));
+    }
+    if (message.windows?.length) {
+      obj.windows = message.windows.map((e) => FundingWindowStatus.toJSON(e));
+    }
+    if (message.keyGrossWindow !== undefined) {
+      obj.keyGrossWindow = KeyGrossWindowStatus.toJSON(message.keyGrossWindow);
+    }
+    if (message.models?.length) {
+      obj.models = message.models.map((e) => ModelDiscoveryEvaluation.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EvaluateCatalogDiscoveryResponse>, I>>(
+    base?: I,
+  ): EvaluateCatalogDiscoveryResponse {
+    return EvaluateCatalogDiscoveryResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EvaluateCatalogDiscoveryResponse>, I>>(
+    object: I,
+  ): EvaluateCatalogDiscoveryResponse {
+    const message = createBaseEvaluateCatalogDiscoveryResponse();
+    message.catalogVersion = object.catalogVersion ?? "";
+    message.fundingScenario = object.fundingScenario ?? "";
+    message.bucketBalances = object.bucketBalances?.map((e) => BucketBalanceView.fromPartial(e)) || [];
+    message.windows = object.windows?.map((e) => FundingWindowStatus.fromPartial(e)) || [];
+    message.keyGrossWindow = (object.keyGrossWindow !== undefined && object.keyGrossWindow !== null)
+      ? KeyGrossWindowStatus.fromPartial(object.keyGrossWindow)
+      : undefined;
+    message.models = object.models?.map((e) => ModelDiscoveryEvaluation.fromPartial(e)) || [];
     return message;
   },
 };
@@ -2656,6 +4428,9 @@ function createBasePreviewQuoteRequest(): PreviewQuoteRequest {
     callerCeilingMicroUsd: 0n,
     zeroRetention: false,
     clientRegion: "",
+    issueQuoteLock: false,
+    requestHash: "",
+    effectiveChannel: "",
   };
 }
 
@@ -2705,6 +4480,15 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
     }
     if (message.clientRegion !== "") {
       writer.uint32(114).string(message.clientRegion);
+    }
+    if (message.issueQuoteLock !== false) {
+      writer.uint32(120).bool(message.issueQuoteLock);
+    }
+    if (message.requestHash !== "") {
+      writer.uint32(130).string(message.requestHash);
+    }
+    if (message.effectiveChannel !== "") {
+      writer.uint32(138).string(message.effectiveChannel);
     }
     return writer;
   },
@@ -2834,6 +4618,30 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
             message.clientRegion = reader.string();
             continue;
           }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.issueQuoteLock = reader.bool();
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.requestHash = reader.string();
+            continue;
+          }
+          case 17: {
+            if (tag !== 138) {
+              break;
+            }
+
+            message.effectiveChannel = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2910,6 +4718,21 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
         : isSet(object.client_region)
         ? globalThis.String(object.client_region)
         : "",
+      issueQuoteLock: isSet(object.issueQuoteLock)
+        ? globalThis.Boolean(object.issueQuoteLock)
+        : isSet(object.issue_quote_lock)
+        ? globalThis.Boolean(object.issue_quote_lock)
+        : false,
+      requestHash: isSet(object.requestHash)
+        ? globalThis.String(object.requestHash)
+        : isSet(object.request_hash)
+        ? globalThis.String(object.request_hash)
+        : "",
+      effectiveChannel: isSet(object.effectiveChannel)
+        ? globalThis.String(object.effectiveChannel)
+        : isSet(object.effective_channel)
+        ? globalThis.String(object.effective_channel)
+        : "",
     };
   },
 
@@ -2957,6 +4780,15 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
     if (message.clientRegion !== "") {
       obj.clientRegion = message.clientRegion;
     }
+    if (message.issueQuoteLock !== false) {
+      obj.issueQuoteLock = message.issueQuoteLock;
+    }
+    if (message.requestHash !== "") {
+      obj.requestHash = message.requestHash;
+    }
+    if (message.effectiveChannel !== "") {
+      obj.effectiveChannel = message.effectiveChannel;
+    }
     return obj;
   },
 
@@ -2986,6 +4818,9 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
         : 0n;
     message.zeroRetention = object.zeroRetention ?? false;
     message.clientRegion = object.clientRegion ?? "";
+    message.issueQuoteLock = object.issueQuoteLock ?? false;
+    message.requestHash = object.requestHash ?? "";
+    message.effectiveChannel = object.effectiveChannel ?? "";
     return message;
   },
 };
@@ -3007,6 +4842,16 @@ function createBasePreviewQuoteResponse(): PreviewQuoteResponse {
     projectedHoldBuckets: [],
     budgetDiagnostic: undefined,
     creditDiagnostic: undefined,
+    quoteId: "",
+    quoteExpiresAtUnixMs: 0n,
+    catalogVersion: "",
+    rateCardVersion: "",
+    reservedCredits: 0n,
+    fundingScenario: "",
+    bucketBalances: [],
+    windows: [],
+    keyGrossWindow: undefined,
+    mediaSharesSubscriptionWindows: false,
   };
 }
 
@@ -3068,6 +4913,42 @@ export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
     }
     if (message.creditDiagnostic !== undefined) {
       CreditShortfallDiagnostic.encode(message.creditDiagnostic, writer.uint32(122).fork()).join();
+    }
+    if (message.quoteId !== "") {
+      writer.uint32(130).string(message.quoteId);
+    }
+    if (message.quoteExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.quoteExpiresAtUnixMs) !== message.quoteExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.quoteExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(136).int64(message.quoteExpiresAtUnixMs);
+    }
+    if (message.catalogVersion !== "") {
+      writer.uint32(146).string(message.catalogVersion);
+    }
+    if (message.rateCardVersion !== "") {
+      writer.uint32(154).string(message.rateCardVersion);
+    }
+    if (message.reservedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.reservedCredits) !== message.reservedCredits) {
+        throw new globalThis.Error("value provided for field message.reservedCredits of type int64 too large");
+      }
+      writer.uint32(160).int64(message.reservedCredits);
+    }
+    if (message.fundingScenario !== "") {
+      writer.uint32(170).string(message.fundingScenario);
+    }
+    for (const v of message.bucketBalances) {
+      BucketBalanceView.encode(v!, writer.uint32(178).fork()).join();
+    }
+    for (const v of message.windows) {
+      FundingWindowStatus.encode(v!, writer.uint32(186).fork()).join();
+    }
+    if (message.keyGrossWindow !== undefined) {
+      KeyGrossWindowStatus.encode(message.keyGrossWindow, writer.uint32(194).fork()).join();
+    }
+    if (message.mediaSharesSubscriptionWindows !== false) {
+      writer.uint32(200).bool(message.mediaSharesSubscriptionWindows);
     }
     return writer;
   },
@@ -3205,6 +5086,86 @@ export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
             message.creditDiagnostic = CreditShortfallDiagnostic.decode(reader, reader.uint32());
             continue;
           }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.quoteId = reader.string();
+            continue;
+          }
+          case 17: {
+            if (tag !== 136) {
+              break;
+            }
+
+            message.quoteExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 18: {
+            if (tag !== 146) {
+              break;
+            }
+
+            message.catalogVersion = reader.string();
+            continue;
+          }
+          case 19: {
+            if (tag !== 154) {
+              break;
+            }
+
+            message.rateCardVersion = reader.string();
+            continue;
+          }
+          case 20: {
+            if (tag !== 160) {
+              break;
+            }
+
+            message.reservedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 21: {
+            if (tag !== 170) {
+              break;
+            }
+
+            message.fundingScenario = reader.string();
+            continue;
+          }
+          case 22: {
+            if (tag !== 178) {
+              break;
+            }
+
+            message.bucketBalances.push(BucketBalanceView.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 23: {
+            if (tag !== 186) {
+              break;
+            }
+
+            message.windows.push(FundingWindowStatus.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 24: {
+            if (tag !== 194) {
+              break;
+            }
+
+            message.keyGrossWindow = KeyGrossWindowStatus.decode(reader, reader.uint32());
+            continue;
+          }
+          case 25: {
+            if (tag !== 200) {
+              break;
+            }
+
+            message.mediaSharesSubscriptionWindows = reader.bool();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3288,6 +5249,54 @@ export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
         : isSet(object.credit_diagnostic)
         ? CreditShortfallDiagnostic.fromJSON(object.credit_diagnostic)
         : undefined,
+      quoteId: isSet(object.quoteId)
+        ? globalThis.String(object.quoteId)
+        : isSet(object.quote_id)
+        ? globalThis.String(object.quote_id)
+        : "",
+      quoteExpiresAtUnixMs: isSet(object.quoteExpiresAtUnixMs)
+        ? BigInt(object.quoteExpiresAtUnixMs)
+        : isSet(object.quote_expires_at_unix_ms)
+        ? BigInt(object.quote_expires_at_unix_ms)
+        : 0n,
+      catalogVersion: isSet(object.catalogVersion)
+        ? globalThis.String(object.catalogVersion)
+        : isSet(object.catalog_version)
+        ? globalThis.String(object.catalog_version)
+        : "",
+      rateCardVersion: isSet(object.rateCardVersion)
+        ? globalThis.String(object.rateCardVersion)
+        : isSet(object.rate_card_version)
+        ? globalThis.String(object.rate_card_version)
+        : "",
+      reservedCredits: isSet(object.reservedCredits)
+        ? BigInt(object.reservedCredits)
+        : isSet(object.reserved_credits)
+        ? BigInt(object.reserved_credits)
+        : 0n,
+      fundingScenario: isSet(object.fundingScenario)
+        ? globalThis.String(object.fundingScenario)
+        : isSet(object.funding_scenario)
+        ? globalThis.String(object.funding_scenario)
+        : "",
+      bucketBalances: globalThis.Array.isArray(object?.bucketBalances)
+        ? object.bucketBalances.map((e: any) => BucketBalanceView.fromJSON(e))
+        : globalThis.Array.isArray(object?.bucket_balances)
+        ? object.bucket_balances.map((e: any) => BucketBalanceView.fromJSON(e))
+        : [],
+      windows: globalThis.Array.isArray(object?.windows)
+        ? object.windows.map((e: any) => FundingWindowStatus.fromJSON(e))
+        : [],
+      keyGrossWindow: isSet(object.keyGrossWindow)
+        ? KeyGrossWindowStatus.fromJSON(object.keyGrossWindow)
+        : isSet(object.key_gross_window)
+        ? KeyGrossWindowStatus.fromJSON(object.key_gross_window)
+        : undefined,
+      mediaSharesSubscriptionWindows: isSet(object.mediaSharesSubscriptionWindows)
+        ? globalThis.Boolean(object.mediaSharesSubscriptionWindows)
+        : isSet(object.media_shares_subscription_windows)
+        ? globalThis.Boolean(object.media_shares_subscription_windows)
+        : false,
     };
   },
 
@@ -3338,6 +5347,36 @@ export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
     if (message.creditDiagnostic !== undefined) {
       obj.creditDiagnostic = CreditShortfallDiagnostic.toJSON(message.creditDiagnostic);
     }
+    if (message.quoteId !== "") {
+      obj.quoteId = message.quoteId;
+    }
+    if (message.quoteExpiresAtUnixMs !== 0n) {
+      obj.quoteExpiresAtUnixMs = message.quoteExpiresAtUnixMs.toString();
+    }
+    if (message.catalogVersion !== "") {
+      obj.catalogVersion = message.catalogVersion;
+    }
+    if (message.rateCardVersion !== "") {
+      obj.rateCardVersion = message.rateCardVersion;
+    }
+    if (message.reservedCredits !== 0n) {
+      obj.reservedCredits = message.reservedCredits.toString();
+    }
+    if (message.fundingScenario !== "") {
+      obj.fundingScenario = message.fundingScenario;
+    }
+    if (message.bucketBalances?.length) {
+      obj.bucketBalances = message.bucketBalances.map((e) => BucketBalanceView.toJSON(e));
+    }
+    if (message.windows?.length) {
+      obj.windows = message.windows.map((e) => FundingWindowStatus.toJSON(e));
+    }
+    if (message.keyGrossWindow !== undefined) {
+      obj.keyGrossWindow = KeyGrossWindowStatus.toJSON(message.keyGrossWindow);
+    }
+    if (message.mediaSharesSubscriptionWindows !== false) {
+      obj.mediaSharesSubscriptionWindows = message.mediaSharesSubscriptionWindows;
+    }
     return obj;
   },
 
@@ -3374,6 +5413,22 @@ export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
     message.creditDiagnostic = (object.creditDiagnostic !== undefined && object.creditDiagnostic !== null)
       ? CreditShortfallDiagnostic.fromPartial(object.creditDiagnostic)
       : undefined;
+    message.quoteId = object.quoteId ?? "";
+    message.quoteExpiresAtUnixMs = (object.quoteExpiresAtUnixMs !== undefined && object.quoteExpiresAtUnixMs !== null)
+      ? BigInt(object.quoteExpiresAtUnixMs)
+      : 0n;
+    message.catalogVersion = object.catalogVersion ?? "";
+    message.rateCardVersion = object.rateCardVersion ?? "";
+    message.reservedCredits = (object.reservedCredits !== undefined && object.reservedCredits !== null)
+      ? BigInt(object.reservedCredits)
+      : 0n;
+    message.fundingScenario = object.fundingScenario ?? "";
+    message.bucketBalances = object.bucketBalances?.map((e) => BucketBalanceView.fromPartial(e)) || [];
+    message.windows = object.windows?.map((e) => FundingWindowStatus.fromPartial(e)) || [];
+    message.keyGrossWindow = (object.keyGrossWindow !== undefined && object.keyGrossWindow !== null)
+      ? KeyGrossWindowStatus.fromPartial(object.keyGrossWindow)
+      : undefined;
+    message.mediaSharesSubscriptionWindows = object.mediaSharesSubscriptionWindows ?? false;
     return message;
   },
 };
@@ -3403,6 +5458,10 @@ function createBaseAuthorizeAndHoldRequest(): AuthorizeAndHoldRequest {
     clientRegion: "",
     studioOperationId: "",
     initialLeaseTtlMs: 0n,
+    quoteId: "",
+    requestHash: "",
+    customerChargeModeOverride: 0,
+    effectiveChannel: "",
   };
 }
 
@@ -3482,6 +5541,18 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         throw new globalThis.Error("value provided for field message.initialLeaseTtlMs of type int64 too large");
       }
       writer.uint32(184).int64(message.initialLeaseTtlMs);
+    }
+    if (message.quoteId !== "") {
+      writer.uint32(194).string(message.quoteId);
+    }
+    if (message.requestHash !== "") {
+      writer.uint32(202).string(message.requestHash);
+    }
+    if (message.customerChargeModeOverride !== 0) {
+      writer.uint32(208).int32(message.customerChargeModeOverride);
+    }
+    if (message.effectiveChannel !== "") {
+      writer.uint32(218).string(message.effectiveChannel);
     }
     return writer;
   },
@@ -3683,6 +5754,38 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
             message.initialLeaseTtlMs = reader.int64() as bigint;
             continue;
           }
+          case 24: {
+            if (tag !== 194) {
+              break;
+            }
+
+            message.quoteId = reader.string();
+            continue;
+          }
+          case 25: {
+            if (tag !== 202) {
+              break;
+            }
+
+            message.requestHash = reader.string();
+            continue;
+          }
+          case 26: {
+            if (tag !== 208) {
+              break;
+            }
+
+            message.customerChargeModeOverride = reader.int32() as any;
+            continue;
+          }
+          case 27: {
+            if (tag !== 218) {
+              break;
+            }
+
+            message.effectiveChannel = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3804,6 +5907,26 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         : isSet(object.initial_lease_ttl_ms)
         ? BigInt(object.initial_lease_ttl_ms)
         : 0n,
+      quoteId: isSet(object.quoteId)
+        ? globalThis.String(object.quoteId)
+        : isSet(object.quote_id)
+        ? globalThis.String(object.quote_id)
+        : "",
+      requestHash: isSet(object.requestHash)
+        ? globalThis.String(object.requestHash)
+        : isSet(object.request_hash)
+        ? globalThis.String(object.request_hash)
+        : "",
+      customerChargeModeOverride: isSet(object.customerChargeModeOverride)
+        ? customerChargeModeFromJSON(object.customerChargeModeOverride)
+        : isSet(object.customer_charge_mode_override)
+        ? customerChargeModeFromJSON(object.customer_charge_mode_override)
+        : 0,
+      effectiveChannel: isSet(object.effectiveChannel)
+        ? globalThis.String(object.effectiveChannel)
+        : isSet(object.effective_channel)
+        ? globalThis.String(object.effective_channel)
+        : "",
     };
   },
 
@@ -3878,6 +6001,18 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     if (message.initialLeaseTtlMs !== 0n) {
       obj.initialLeaseTtlMs = message.initialLeaseTtlMs.toString();
     }
+    if (message.quoteId !== "") {
+      obj.quoteId = message.quoteId;
+    }
+    if (message.requestHash !== "") {
+      obj.requestHash = message.requestHash;
+    }
+    if (message.customerChargeModeOverride !== 0) {
+      obj.customerChargeModeOverride = customerChargeModeToJSON(message.customerChargeModeOverride);
+    }
+    if (message.effectiveChannel !== "") {
+      obj.effectiveChannel = message.effectiveChannel;
+    }
     return obj;
   },
 
@@ -3918,6 +6053,10 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     message.initialLeaseTtlMs = (object.initialLeaseTtlMs !== undefined && object.initialLeaseTtlMs !== null)
       ? BigInt(object.initialLeaseTtlMs)
       : 0n;
+    message.quoteId = object.quoteId ?? "";
+    message.requestHash = object.requestHash ?? "";
+    message.customerChargeModeOverride = object.customerChargeModeOverride ?? 0;
+    message.effectiveChannel = object.effectiveChannel ?? "";
     return message;
   },
 };
@@ -5157,6 +7296,9 @@ function createBaseAttemptCostRecord(): AttemptCostRecord {
     dispatchedAtUnixMs: 0n,
     firstTokenAtUnixMs: 0n,
     completedAtUnixMs: 0n,
+    attemptNumber: 0,
+    providerGenerationId: "",
+    httpStatus: 0,
   };
 }
 
@@ -5203,6 +7345,15 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
         throw new globalThis.Error("value provided for field message.completedAtUnixMs of type int64 too large");
       }
       writer.uint32(88).int64(message.completedAtUnixMs);
+    }
+    if (message.attemptNumber !== 0) {
+      writer.uint32(96).int32(message.attemptNumber);
+    }
+    if (message.providerGenerationId !== "") {
+      writer.uint32(106).string(message.providerGenerationId);
+    }
+    if (message.httpStatus !== 0) {
+      writer.uint32(112).int32(message.httpStatus);
     }
     return writer;
   },
@@ -5308,6 +7459,30 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
             message.completedAtUnixMs = reader.int64() as bigint;
             continue;
           }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.attemptNumber = reader.int32();
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.providerGenerationId = reader.string();
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.httpStatus = reader.int32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -5369,6 +7544,21 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
         : isSet(object.completed_at_unix_ms)
         ? BigInt(object.completed_at_unix_ms)
         : 0n,
+      attemptNumber: isSet(object.attemptNumber)
+        ? globalThis.Number(object.attemptNumber)
+        : isSet(object.attempt_number)
+        ? globalThis.Number(object.attempt_number)
+        : 0,
+      providerGenerationId: isSet(object.providerGenerationId)
+        ? globalThis.String(object.providerGenerationId)
+        : isSet(object.provider_generation_id)
+        ? globalThis.String(object.provider_generation_id)
+        : "",
+      httpStatus: isSet(object.httpStatus)
+        ? globalThis.Number(object.httpStatus)
+        : isSet(object.http_status)
+        ? globalThis.Number(object.http_status)
+        : 0,
     };
   },
 
@@ -5407,6 +7597,15 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     if (message.completedAtUnixMs !== 0n) {
       obj.completedAtUnixMs = message.completedAtUnixMs.toString();
     }
+    if (message.attemptNumber !== 0) {
+      obj.attemptNumber = Math.round(message.attemptNumber);
+    }
+    if (message.providerGenerationId !== "") {
+      obj.providerGenerationId = message.providerGenerationId;
+    }
+    if (message.httpStatus !== 0) {
+      obj.httpStatus = Math.round(message.httpStatus);
+    }
     return obj;
   },
 
@@ -5434,6 +7633,9 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     message.completedAtUnixMs = (object.completedAtUnixMs !== undefined && object.completedAtUnixMs !== null)
       ? BigInt(object.completedAtUnixMs)
       : 0n;
+    message.attemptNumber = object.attemptNumber ?? 0;
+    message.providerGenerationId = object.providerGenerationId ?? "";
+    message.httpStatus = object.httpStatus ?? 0;
     return message;
   },
 };
@@ -5453,6 +7655,8 @@ function createBaseSettleRequest(): SettleRequest {
     estimatedStreamedOutputTokens: 0n,
     mediaOutputs: [],
     attempts: [],
+    customerChargeMode: 0,
+    providerReportedCustomerBaseCostUsdDec: "",
   };
 }
 
@@ -5501,6 +7705,12 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     }
     for (const v of message.attempts) {
       AttemptCostRecord.encode(v!, writer.uint32(106).fork()).join();
+    }
+    if (message.customerChargeMode !== 0) {
+      writer.uint32(112).int32(message.customerChargeMode);
+    }
+    if (message.providerReportedCustomerBaseCostUsdDec !== "") {
+      writer.uint32(122).string(message.providerReportedCustomerBaseCostUsdDec);
     }
     return writer;
   },
@@ -5622,6 +7832,22 @@ export const SettleRequest: MessageFns<SettleRequest> = {
             message.attempts.push(AttemptCostRecord.decode(reader, reader.uint32()));
             continue;
           }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.customerChargeMode = reader.int32() as any;
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.providerReportedCustomerBaseCostUsdDec = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -5695,6 +7921,16 @@ export const SettleRequest: MessageFns<SettleRequest> = {
       attempts: globalThis.Array.isArray(object?.attempts)
         ? object.attempts.map((e: any) => AttemptCostRecord.fromJSON(e))
         : [],
+      customerChargeMode: isSet(object.customerChargeMode)
+        ? customerChargeModeFromJSON(object.customerChargeMode)
+        : isSet(object.customer_charge_mode)
+        ? customerChargeModeFromJSON(object.customer_charge_mode)
+        : 0,
+      providerReportedCustomerBaseCostUsdDec: isSet(object.providerReportedCustomerBaseCostUsdDec)
+        ? globalThis.String(object.providerReportedCustomerBaseCostUsdDec)
+        : isSet(object.provider_reported_customer_base_cost_usd_dec)
+        ? globalThis.String(object.provider_reported_customer_base_cost_usd_dec)
+        : "",
     };
   },
 
@@ -5739,6 +7975,12 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     if (message.attempts?.length) {
       obj.attempts = message.attempts.map((e) => AttemptCostRecord.toJSON(e));
     }
+    if (message.customerChargeMode !== 0) {
+      obj.customerChargeMode = customerChargeModeToJSON(message.customerChargeMode);
+    }
+    if (message.providerReportedCustomerBaseCostUsdDec !== "") {
+      obj.providerReportedCustomerBaseCostUsdDec = message.providerReportedCustomerBaseCostUsdDec;
+    }
     return obj;
   },
 
@@ -5765,6 +8007,8 @@ export const SettleRequest: MessageFns<SettleRequest> = {
         : 0n;
     message.mediaOutputs = object.mediaOutputs?.map((e) => MediaOutputSettlementItem.fromPartial(e)) || [];
     message.attempts = object.attempts?.map((e) => AttemptCostRecord.fromPartial(e)) || [];
+    message.customerChargeMode = object.customerChargeMode ?? 0;
+    message.providerReportedCustomerBaseCostUsdDec = object.providerReportedCustomerBaseCostUsdDec ?? "";
     return message;
   },
 };
@@ -6355,6 +8599,9 @@ function createBaseResolveUncertainRequest(): ResolveUncertainRequest {
     verifiedUsage: undefined,
     mediaOutputs: [],
     lateProviderCostUsdDec: "",
+    attemptId: "",
+    providerGenerationId: "",
+    offeringId: "",
   };
 }
 
@@ -6389,6 +8636,15 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
     }
     if (message.lateProviderCostUsdDec !== "") {
       writer.uint32(82).string(message.lateProviderCostUsdDec);
+    }
+    if (message.attemptId !== "") {
+      writer.uint32(90).string(message.attemptId);
+    }
+    if (message.providerGenerationId !== "") {
+      writer.uint32(98).string(message.providerGenerationId);
+    }
+    if (message.offeringId !== "") {
+      writer.uint32(106).string(message.offeringId);
     }
     return writer;
   },
@@ -6486,6 +8742,30 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
             message.lateProviderCostUsdDec = reader.string();
             continue;
           }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.attemptId = reader.string();
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.providerGenerationId = reader.string();
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.offeringId = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -6542,6 +8822,21 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
         : isSet(object.late_provider_cost_usd_dec)
         ? globalThis.String(object.late_provider_cost_usd_dec)
         : "",
+      attemptId: isSet(object.attemptId)
+        ? globalThis.String(object.attemptId)
+        : isSet(object.attempt_id)
+        ? globalThis.String(object.attempt_id)
+        : "",
+      providerGenerationId: isSet(object.providerGenerationId)
+        ? globalThis.String(object.providerGenerationId)
+        : isSet(object.provider_generation_id)
+        ? globalThis.String(object.provider_generation_id)
+        : "",
+      offeringId: isSet(object.offeringId)
+        ? globalThis.String(object.offeringId)
+        : isSet(object.offering_id)
+        ? globalThis.String(object.offering_id)
+        : "",
     };
   },
 
@@ -6577,6 +8872,15 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
     if (message.lateProviderCostUsdDec !== "") {
       obj.lateProviderCostUsdDec = message.lateProviderCostUsdDec;
     }
+    if (message.attemptId !== "") {
+      obj.attemptId = message.attemptId;
+    }
+    if (message.providerGenerationId !== "") {
+      obj.providerGenerationId = message.providerGenerationId;
+    }
+    if (message.offeringId !== "") {
+      obj.offeringId = message.offeringId;
+    }
     return obj;
   },
 
@@ -6597,6 +8901,9 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
       : undefined;
     message.mediaOutputs = object.mediaOutputs?.map((e) => MediaOutputSettlementItem.fromPartial(e)) || [];
     message.lateProviderCostUsdDec = object.lateProviderCostUsdDec ?? "";
+    message.attemptId = object.attemptId ?? "";
+    message.providerGenerationId = object.providerGenerationId ?? "";
+    message.offeringId = object.offeringId ?? "";
     return message;
   },
 };
@@ -6698,8 +9005,8 @@ export const ResolveUncertainResponse: MessageFns<ResolveUncertainResponse> = {
 export type BillingExecutionServiceService = typeof BillingExecutionServiceService;
 export const BillingExecutionServiceService = {
   /**
-   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
    */
   resolvePrincipalScope: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/ResolvePrincipalScope" as const,
@@ -6713,8 +9020,26 @@ export const BillingExecutionServiceService = {
     responseDeserialize: (value: Buffer): ResolvePrincipalScopeResponse => ResolvePrincipalScopeResponse.decode(value),
   },
   /**
+   * EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+   * for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+   */
+  evaluateCatalogDiscovery: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/EvaluateCatalogDiscovery" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: EvaluateCatalogDiscoveryRequest): Buffer =>
+      Buffer.from(EvaluateCatalogDiscoveryRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): EvaluateCatalogDiscoveryRequest =>
+      EvaluateCatalogDiscoveryRequest.decode(value),
+    responseSerialize: (value: EvaluateCatalogDiscoveryResponse): Buffer =>
+      Buffer.from(EvaluateCatalogDiscoveryResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): EvaluateCatalogDiscoveryResponse =>
+      EvaluateCatalogDiscoveryResponse.decode(value),
+  },
+  /**
    * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   * F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+   * and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
    */
   previewQuote: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/PreviewQuote" as const,
@@ -6728,7 +9053,7 @@ export const BillingExecutionServiceService = {
   },
   /**
    * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   * optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
    */
   authorizeAndHold: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold" as const,
@@ -6803,18 +9128,24 @@ export const BillingExecutionServiceService = {
 
 export interface BillingExecutionServiceServer extends UntypedServiceImplementation {
   /**
-   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
    */
   resolvePrincipalScope: handleUnaryCall<ResolvePrincipalScopeRequest, ResolvePrincipalScopeResponse>;
   /**
+   * EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+   * for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+   */
+  evaluateCatalogDiscovery: handleUnaryCall<EvaluateCatalogDiscoveryRequest, EvaluateCatalogDiscoveryResponse>;
+  /**
    * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   * F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+   * and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
    */
   previewQuote: handleUnaryCall<PreviewQuoteRequest, PreviewQuoteResponse>;
   /**
    * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   * optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
    */
   authorizeAndHold: handleUnaryCall<AuthorizeAndHoldRequest, AuthorizeAndHoldResponse>;
   /** MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes. */
@@ -6834,8 +9165,8 @@ export interface BillingExecutionServiceServer extends UntypedServiceImplementat
 
 export interface BillingExecutionServiceClient extends Client {
   /**
-   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
    */
   resolvePrincipalScope(
     request: ResolvePrincipalScopeRequest,
@@ -6853,8 +9184,28 @@ export interface BillingExecutionServiceClient extends Client {
     callback: (error: ServiceError | null, response: ResolvePrincipalScopeResponse) => void,
   ): ClientUnaryCall;
   /**
+   * EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+   * for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+   */
+  evaluateCatalogDiscovery(
+    request: EvaluateCatalogDiscoveryRequest,
+    callback: (error: ServiceError | null, response: EvaluateCatalogDiscoveryResponse) => void,
+  ): ClientUnaryCall;
+  evaluateCatalogDiscovery(
+    request: EvaluateCatalogDiscoveryRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: EvaluateCatalogDiscoveryResponse) => void,
+  ): ClientUnaryCall;
+  evaluateCatalogDiscovery(
+    request: EvaluateCatalogDiscoveryRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: EvaluateCatalogDiscoveryResponse) => void,
+  ): ClientUnaryCall;
+  /**
    * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   * F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+   * and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
    */
   previewQuote(
     request: PreviewQuoteRequest,
@@ -6873,7 +9224,7 @@ export interface BillingExecutionServiceClient extends Client {
   ): ClientUnaryCall;
   /**
    * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   * optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
    */
   authorizeAndHold(
     request: AuthorizeAndHoldRequest,

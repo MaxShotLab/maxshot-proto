@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	commonv1 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1"
 	contractgrantv1 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/contract_grant/v1"
+	gatewayinternalv1 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1"
 	providersyncv1 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/provider_sync/v1"
 	"github.com/MaxShotLab/maxshot-proto/pkg/grpcauth"
 	"google.golang.org/grpc"
@@ -243,5 +245,61 @@ func TestLoopbackUnaryStreamACLAndSkew(t *testing.T) {
 	)
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("expected Unauthenticated for stale timestamp, got: %v", err)
+	}
+}
+
+func TestExtendedContractsRoundTrip(t *testing.T) {
+	scope := &gatewayinternalv1.ResolvePrincipalScopeResponse{
+		Authenticated:                  true,
+		MaxConcurrentStreams:           4,
+		RpmLimit:                       120,
+		TpmLimit:                       200000,
+		SearchPolicy:                   commonv1.SearchPolicy_SEARCH_POLICY_PREMIUM_ONLY,
+		MediaSharesSubscriptionWindows: true,
+		AitCoverageThrottledModelIds:   []string{"model-heavy-1"},
+	}
+	b, err := proto.Marshal(scope)
+	if err != nil || len(b) == 0 {
+		t.Fatalf("marshal ResolvePrincipalScopeResponse: %v", err)
+	}
+
+	offering := &providersyncv1.OfferingRecord{
+		OfferingId:         "off-1",
+		CustomerChargeMode: commonv1.CustomerChargeMode_CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST,
+		HoldBufferBps:      11500,
+		MarkupMultiplierDec: "1.000000",
+		MandatoryReasoningPolicy: &providersyncv1.MandatoryReasoningPolicy{
+			Mandatory:        true,
+			SupportedEfforts: []string{"low", "medium", "high"},
+			DefaultEffort:    "medium",
+		},
+		CustomerRateCard: &providersyncv1.RateCard{
+			RateCardVersion:     "rc-v1",
+			MinimumChargeUsdDec: "0.010000",
+			MediaPricingFormula: &providersyncv1.MediaPricingFormula{
+				FormulaKind:       providersyncv1.MediaPricingFormulaKind_MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS,
+				VideoTokenFps:     24,
+				VideoTokenDivisor: 1024,
+			},
+		},
+	}
+	if _, err := proto.Marshal(offering); err != nil {
+		t.Fatalf("marshal OfferingRecord: %v", err)
+	}
+
+	grantReq := &contractgrantv1.IssueAitCreditGrantsRequest{
+		BatchId:       "b-summary",
+		TermId:        "t1",
+		BoundaryIndex: 2,
+		BoundarySummary: &contractgrantv1.BoundaryBatchSummary{
+			BatchSequence:               1,
+			TotalBatches:                1,
+			BoundaryTotalGrantCredits:   500000,
+			OnchainTotalStakedAitWeiDec: "1000000000000000000000",
+			FinalizedBlockNumber:        22000000,
+		},
+	}
+	if _, err := proto.Marshal(grantReq); err != nil {
+		t.Fatalf("marshal IssueAitCreditGrantsRequest: %v", err)
 	}
 }

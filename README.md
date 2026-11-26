@@ -31,11 +31,11 @@ maxshot-proto/
 
 | Protobuf Package | gRPC Service | 服务端承载方（Server） | 允许调用方 `service_id`（Client） | 核心职责 |
 | --- | --- | --- | --- | --- |
-| `maxshot.provider_sync.v1` | `ProviderSyncService` | **Provider 后端**（Go 或 TS） | `gateway-dp`, `gateway-billing`, `gateway-finance` | `WatchSyncEvents` 轻量版本号流、节点同步心跳、`GetCatalogSnapshot`（含精确十进制费率、`TierGroup`、Curation、7天观测性能）、公钥注册与加密凭证拉取、分钟级直方图指标上报、账期结算单/修正争议同步 |
-| `maxshot.provider_sync.v1` | `GatewayReconciliationService` | **Gateway 计费服务**（TS） | `provider-svc` | 按时间窗 / `offering_id` / `native_request_id` 按需分页拉取脱敏逐笔 `Attempt` 计量结算记录（支撑发票核对与争议排查，日常不跨网双写流水） |
-| `maxshot.contract_grant.v1` | `ContractBackendService` | **合约后端**（Go 或 TS） | `gateway-billing`, `gateway-admin` | 接收 Gateway 下发的权威 `FundedTerm` 配置与 1:1 钱包绑定/条款签署推送；向运营台提供只读合约暂停位与 `finalized` 同步高度 |
-| `maxshot.contract_grant.v1` | `AitCreditGrantService` | **Gateway 计费服务**（TS） | `contract-svc` | 供合约后端启动/重连拉取 `FundedTerm` 与钱包资格增量，并接收 7 天边界 `W(t)` 质押 `AIT Earned Credit` 批量入账 |
-| `maxshot.gateway_internal.v1` | `BillingExecutionService` | **Gateway 计费服务**（TS） | `gateway-dp`, `gateway-studio`, `gateway-bff`, `gateway-finance`, `gateway-admin` | 主体与目录权限解析（支撑无 DB 的 `/v1/models`）、提交前 `PreviewQuote`（含 `F` 免费模型回落与 Studio Dollar 确认）、全模态统一 `AuthorizeAndHold` / `MarkSending` / `ExtendExecutionLease` / `Settle`（含未冻结 Dollar 差额补扣与 24h 自动释放）及 `MarkUncertain` / `ResolveUncertain` |
+| `maxshot.provider_sync.v1` | `ProviderSyncService` | **Provider 后端**（Go 或 TS） | `gateway-dp`, `gateway-billing`, `gateway-studio`, `gateway-finance` | `WatchSyncEvents` 轻量版本号流、节点同步心跳、`GetCatalogSnapshot`（含精确十进制费率、`SourceGroup` / `TierGroup` / `ModelTierOverride`、媒体能力与计费公式、Curation、7天观测性能）、公钥注册与加密凭证拉取、分钟级直方图指标上报、账期结算单同步 |
+| `maxshot.provider_sync.v1` | `GatewayReconciliationService` | **Gateway 计费服务**（TS） | `provider-svc` | 按时间窗 / `offering_id` / `native_request_id` 按需分页拉取脱敏逐笔 `Attempt` 计量结算记录；接收 Provider Portal 确认的发票核对与争议调账并写入 Gateway Finance 差异账本（`PRV-R14 / ADM-R17 / ADM-R18`） |
+| `maxshot.contract_grant.v1` | `ContractBackendService` | **合约后端**（Go 或 TS） | `gateway-billing`, `gateway-admin` | 接收 Gateway 下发的权威 `FundedTerm` 配置与 1:1 钱包绑定/条款签署推送；向运营台与 BFF 提供只读合约暂停位、全局代币指标与单账户质押边界权益视图（`ADM-R20..R23`） |
+| `maxshot.contract_grant.v1` | `AitCreditGrantService` | **Gateway 计费服务**（TS） | `contract-svc` | 供合约后端启动/重连拉取 `FundedTerm` 与钱包资格增量，并接收 7 天边界 `W(t)` 质押 `AIT Earned Credit` 批量入账（含边界批次完整性汇总与链上 finalized 区块锚点） |
+| `maxshot.gateway_internal.v1` | `BillingExecutionService` | **Gateway 计费服务**（TS） | `gateway-dp`, `gateway-studio`, `gateway-bff`, `gateway-finance`, `gateway-admin` | 主体/限流/资格解析（支撑无 DB `/v1/models`、`EvaluateCatalogDiscovery` `/v1/discovery/models` 与 Redis 限流）、提交前 `PreviewQuote`（含 `/me/funding-estimate` 资金窗口/桶余额、5 分钟 Studio 锁价 `quote_id` 与 Dollar 确认）、全模态统一 `AuthorizeAndHold` / `MarkSending` / `ExtendExecutionLease` / `Settle`（含 `provider_actual` 计费、差额补扣与 24h 自动释放）及 `MarkUncertain` / `ResolveUncertain`（含文本 24h 恢复与媒体 `uncertain`） |
 
 ---
 

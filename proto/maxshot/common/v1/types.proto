@@ -38,12 +38,30 @@ enum FundingBucket {
 
 // KeyFundingStrategy defines how a scoped API key selects funding buckets.
 // - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
-//   when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+//   when an active subscription exists on the account and dollar_relay_enabled=false, blocks all non-subscription
+//   PAYG buckets (Free, Referral, Dollar). When no active subscription exists (#154 fallback), runtime treats
+//   PAYG fallback as permitted so Free/Referral/Dollar keys remain usable unless explicitly locked.
 // - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
 enum KeyFundingStrategy {
   KEY_FUNDING_STRATEGY_UNSPECIFIED = 0;
   KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST = 1;
   KEY_FUNDING_STRATEGY_PAYG = 2;
+}
+
+// SearchPolicy defines how web-search requests interact with active subscription pools (plan-qualification.ts).
+enum SearchPolicy {
+  SEARCH_POLICY_UNSPECIFIED = 0;
+  SEARCH_POLICY_BASIC = 1;           // Search requests may consume Basic or Premium subscription pools
+  SEARCH_POLICY_PREMIUM_ONLY = 2;    // Search requests may consume Premium subscription pool only
+  SEARCH_POLICY_NO_SUBSCRIPTION = 3; // Search requests cannot consume subscription pools (must use AIT/Free/Referral/Dollar)
+}
+
+// CustomerChargeMode governs whether customer billing uses published rate-card formulas
+// or verified provider-reported cost with optional markup (decision 4A).
+enum CustomerChargeMode {
+  CUSTOMER_CHARGE_MODE_UNSPECIFIED = 0;
+  CUSTOMER_CHARGE_MODE_RATE_CARD_FORMULA = 1;    // Default: deterministic verified_usage * CustomerRateCard
+  CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST = 2; // Bills provider_reported_customer_base_cost * markup_multiplier_dec
 }
 
 // BudgetPeriodKind enumerates spend-cap window types (matching scoped-configuration.ts).
@@ -83,6 +101,14 @@ enum RejectCode {
   REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET = 24;
   REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET = 25;
   REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED = 26;
+  REJECT_CODE_RATE_LIMIT_EXCEEDED = 27;
+  REJECT_CODE_CONCURRENT_STREAM_LIMIT_EXCEEDED = 28;
+  REJECT_CODE_QUOTE_EXPIRED = 29;
+  REJECT_CODE_QUOTE_MISMATCH = 30;
+  REJECT_CODE_SAFETY_REJECTED = 31;
+  REJECT_CODE_AUDIO_TOGGLE_NOT_SUPPORTED = 32;
+  REJECT_CODE_REFERENCE_MEDIA_INVALID = 33;
+  REJECT_CODE_AIT_COVERAGE_THROTTLED = 34;
 }
 
 // KeyValueAttribute replaces protobuf map<string, string> so Go and TypeScript

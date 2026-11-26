@@ -19,14 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BillingExecutionService_ResolvePrincipalScope_FullMethodName = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolvePrincipalScope"
-	BillingExecutionService_PreviewQuote_FullMethodName          = "/maxshot.gateway_internal.v1.BillingExecutionService/PreviewQuote"
-	BillingExecutionService_AuthorizeAndHold_FullMethodName      = "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold"
-	BillingExecutionService_MarkSending_FullMethodName           = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkSending"
-	BillingExecutionService_ExtendExecutionLease_FullMethodName  = "/maxshot.gateway_internal.v1.BillingExecutionService/ExtendExecutionLease"
-	BillingExecutionService_Settle_FullMethodName                = "/maxshot.gateway_internal.v1.BillingExecutionService/Settle"
-	BillingExecutionService_MarkUncertain_FullMethodName         = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkUncertain"
-	BillingExecutionService_ResolveUncertain_FullMethodName      = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain"
+	BillingExecutionService_ResolvePrincipalScope_FullMethodName    = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolvePrincipalScope"
+	BillingExecutionService_EvaluateCatalogDiscovery_FullMethodName = "/maxshot.gateway_internal.v1.BillingExecutionService/EvaluateCatalogDiscovery"
+	BillingExecutionService_PreviewQuote_FullMethodName             = "/maxshot.gateway_internal.v1.BillingExecutionService/PreviewQuote"
+	BillingExecutionService_AuthorizeAndHold_FullMethodName         = "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold"
+	BillingExecutionService_MarkSending_FullMethodName              = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkSending"
+	BillingExecutionService_ExtendExecutionLease_FullMethodName     = "/maxshot.gateway_internal.v1.BillingExecutionService/ExtendExecutionLease"
+	BillingExecutionService_Settle_FullMethodName                   = "/maxshot.gateway_internal.v1.BillingExecutionService/Settle"
+	BillingExecutionService_MarkUncertain_FullMethodName            = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkUncertain"
+	BillingExecutionService_ResolveUncertain_FullMethodName         = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain"
 )
 
 // BillingExecutionServiceClient is the client API for BillingExecutionService service.
@@ -39,14 +40,18 @@ const (
 // 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
 // 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 type BillingExecutionServiceClient interface {
-	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-	// so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+	// so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
 	ResolvePrincipalScope(ctx context.Context, in *ResolvePrincipalScopeRequest, opts ...grpc.CallOption) (*ResolvePrincipalScopeResponse, error)
+	// EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+	// for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+	EvaluateCatalogDiscovery(ctx context.Context, in *EvaluateCatalogDiscoveryRequest, opts ...grpc.CallOption) (*EvaluateCatalogDiscoveryResponse, error)
 	// PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-	// F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+	// F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+	// and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
 	PreviewQuote(ctx context.Context, in *PreviewQuoteRequest, opts ...grpc.CallOption) (*PreviewQuoteResponse, error)
 	// AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-	// and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+	// optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
 	AuthorizeAndHold(ctx context.Context, in *AuthorizeAndHoldRequest, opts ...grpc.CallOption) (*AuthorizeAndHoldResponse, error)
 	// MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
 	MarkSending(ctx context.Context, in *MarkSendingRequest, opts ...grpc.CallOption) (*MarkSendingResponse, error)
@@ -73,6 +78,16 @@ func (c *billingExecutionServiceClient) ResolvePrincipalScope(ctx context.Contex
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResolvePrincipalScopeResponse)
 	err := c.cc.Invoke(ctx, BillingExecutionService_ResolvePrincipalScope_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingExecutionServiceClient) EvaluateCatalogDiscovery(ctx context.Context, in *EvaluateCatalogDiscoveryRequest, opts ...grpc.CallOption) (*EvaluateCatalogDiscoveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvaluateCatalogDiscoveryResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_EvaluateCatalogDiscovery_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -159,14 +174,18 @@ func (c *billingExecutionServiceClient) ResolveUncertain(ctx context.Context, in
 // 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
 // 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 type BillingExecutionServiceServer interface {
-	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
-	// so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
+	// so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
 	ResolvePrincipalScope(context.Context, *ResolvePrincipalScopeRequest) (*ResolvePrincipalScopeResponse, error)
+	// EvaluateCatalogDiscovery evaluates viewer-specific model eligibility, search eligibility, and funding summary
+	// for /v1/discovery/models without connecting to PostgreSQL from gateway-dataplane (decision 6A).
+	EvaluateCatalogDiscovery(context.Context, *EvaluateCatalogDiscoveryRequest) (*EvaluateCatalogDiscoveryResponse, error)
 	// PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
-	// F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+	// F-model free-quota fallback status, Studio Dollar confirmation requirement, optional 5-minute quote lock,
+	// and full /me/funding-estimate window/pool details (BIL-R21..R23, decision 3A).
 	PreviewQuote(context.Context, *PreviewQuoteRequest) (*PreviewQuoteResponse, error)
 	// AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
-	// and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+	// optional locked quote verification, and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
 	AuthorizeAndHold(context.Context, *AuthorizeAndHoldRequest) (*AuthorizeAndHoldResponse, error)
 	// MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
 	MarkSending(context.Context, *MarkSendingRequest) (*MarkSendingResponse, error)
@@ -191,6 +210,9 @@ type UnimplementedBillingExecutionServiceServer struct{}
 
 func (UnimplementedBillingExecutionServiceServer) ResolvePrincipalScope(context.Context, *ResolvePrincipalScopeRequest) (*ResolvePrincipalScopeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolvePrincipalScope not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) EvaluateCatalogDiscovery(context.Context, *EvaluateCatalogDiscoveryRequest) (*EvaluateCatalogDiscoveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EvaluateCatalogDiscovery not implemented")
 }
 func (UnimplementedBillingExecutionServiceServer) PreviewQuote(context.Context, *PreviewQuoteRequest) (*PreviewQuoteResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PreviewQuote not implemented")
@@ -249,6 +271,24 @@ func _BillingExecutionService_ResolvePrincipalScope_Handler(srv interface{}, ctx
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BillingExecutionServiceServer).ResolvePrincipalScope(ctx, req.(*ResolvePrincipalScopeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingExecutionService_EvaluateCatalogDiscovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EvaluateCatalogDiscoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).EvaluateCatalogDiscovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_EvaluateCatalogDiscovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).EvaluateCatalogDiscovery(ctx, req.(*EvaluateCatalogDiscoveryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -389,6 +429,10 @@ var BillingExecutionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolvePrincipalScope",
 			Handler:    _BillingExecutionService_ResolvePrincipalScope_Handler,
+		},
+		{
+			MethodName: "EvaluateCatalogDiscovery",
+			Handler:    _BillingExecutionService_EvaluateCatalogDiscovery_Handler,
 		},
 		{
 			MethodName: "PreviewQuote",

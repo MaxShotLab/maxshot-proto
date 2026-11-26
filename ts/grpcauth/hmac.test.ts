@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 import * as grpc from "@grpc/grpc-js";
 
 import {
+  CustomerChargeMode,
+  SearchPolicy,
+} from "../../gen/ts/maxshot/common/v1/types.js";
+import {
   AitCreditGrantServiceClient,
   AitCreditGrantServiceService,
   GrantItemStatus,
@@ -13,6 +17,11 @@ import {
   type AitCreditGrantServiceServer,
 } from "../../gen/ts/maxshot/contract_grant/v1/contract_grant.js";
 import {
+  ResolvePrincipalScopeResponse,
+} from "../../gen/ts/maxshot/gateway_internal/v1/execution.js";
+import {
+  MediaPricingFormulaKind,
+  OfferingRecord,
   ProviderSyncServiceClient,
   ProviderSyncServiceService,
   SyncEventKind,
@@ -251,4 +260,58 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
   } finally {
     await new Promise<void>((resolve) => server.tryShutdown(() => resolve()));
   }
+});
+
+test("Extended 1A-8A contracts encode and decode cleanly in TS", () => {
+  const scopeBytes = ResolvePrincipalScopeResponse.encode({
+    authenticated: true,
+    rejectCode: 0,
+    rejectMessage: "",
+    accountId: "acc-1",
+    apiKeyId: "key-1",
+    keyFundingStrategy: 1,
+    allowAitEarnedCredit: true,
+    dollarRelayEnabled: false,
+    allowBasicToPremium: true,
+    allowedCatalogIds: ["catalog_text"],
+    modelAllowlist: [],
+    activePlanId: "plan_plus",
+    planBasicGroupIds: [],
+    planPremiumGroupIds: [],
+    maxConcurrentStreams: 4,
+    rpmLimit: 120,
+    tpmLimit: 200000n,
+    spendingLocked: false,
+    keyExpiresAtUnixMs: 0n,
+    searchPolicy: SearchPolicy.SEARCH_POLICY_PREMIUM_ONLY,
+    mediaSharesSubscriptionWindows: true,
+    aitCoverageThrottledModelIds: ["model-heavy-1"],
+  }).finish();
+  const decodedScope = ResolvePrincipalScopeResponse.decode(scopeBytes);
+  assert.equal(decodedScope.searchPolicy, SearchPolicy.SEARCH_POLICY_PREMIUM_ONLY);
+  assert.equal(decodedScope.mediaSharesSubscriptionWindows, true);
+
+  const offeringBytes = OfferingRecord.encode(
+    OfferingRecord.fromPartial({
+      offeringId: "off-1",
+      customerChargeMode: CustomerChargeMode.CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST,
+      holdBufferBps: 11500,
+      markupMultiplierDec: "1.000000",
+      customerRateCard: {
+        rateCardVersion: "rc-v1",
+        minimumChargeUsdDec: "0.010000",
+        mediaPricingFormula: {
+          formulaKind: MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS,
+          videoTokenFps: 24,
+          videoTokenDivisor: 1024,
+        },
+      },
+    }),
+  ).finish();
+  const decodedOffering = OfferingRecord.decode(offeringBytes);
+  assert.equal(
+    decodedOffering.customerChargeMode,
+    CustomerChargeMode.CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST,
+  );
+  assert.equal(decodedOffering.holdBufferBps, 11500);
 });

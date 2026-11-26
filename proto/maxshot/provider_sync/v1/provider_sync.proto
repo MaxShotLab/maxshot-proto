@@ -7,7 +7,8 @@ import "maxshot/common/v1/types.proto";
 option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/provider_sync/v1;providersyncv1";
 
 // ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
-// (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+// (Go gateway-dataplane, TS billing-account-service, TS studio-service/worker, and TS finance-worker)
+// over WireGuard + TLS + HMAC.
 // WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
 service ProviderSyncService {
   // WatchSyncEvents streams lightweight catalog/credential version notifications and heartbeats.
@@ -35,11 +36,15 @@ service ProviderSyncService {
   rpc SyncProviderStatements(SyncProviderStatementsRequest) returns (SyncProviderStatementsResponse);
 }
 
-// GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
-// during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+// GatewayReconciliationService is hosted by Gateway Billing / Finance and called on demand by Provider Backend
+// during invoice verification or dispute investigation/adjustment (PRV-R14 / ADM-R17 / ADM-R18) without duplicating raw attempt streams.
 service GatewayReconciliationService {
   // ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID.
   rpc ListOfferingAttemptRecords(ListOfferingAttemptRecordsRequest) returns (ListOfferingAttemptRecordsResponse);
+
+  // ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+  // into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+  rpc ApplyProviderDisputeAdjustment(ApplyProviderDisputeAdjustmentRequest) returns (ApplyProviderDisputeAdjustmentResponse);
 }
 
 enum RouteType {
@@ -128,6 +133,33 @@ enum StatementEntryKind {
   STATEMENT_ENTRY_KIND_DISPUTE_RESOLVED = 4;
 }
 
+enum MediaPricingFormulaKind {
+  MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED = 0;
+  MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS = 1;
+  MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS = 2;           // ceil(width * height * duration * fps / divisor) * rate
+  MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS = 3;      // ceil(w*scale)*ceil(h*scale)*duration_ms / 1048576 / 1000 * rate
+  MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP = 4; // fixed output tokens per resolution + billable reference inputs
+}
+
+message MediaResolutionPriceEntry {
+  string resolution = 1;
+  string size = 2;
+  bool with_audio = 3;
+  bool with_video_input = 4;
+  int64 fixed_output_tokens = 5;
+  string rate_per_unit_usd_dec = 6;
+  string unit_name = 7;
+}
+
+message MediaPricingFormula {
+  MediaPricingFormulaKind formula_kind = 1;
+  int32 video_token_fps = 2;
+  int32 video_token_divisor = 3;
+  int32 free_reference_images = 4;
+  int64 tokens_per_billable_reference_image = 5;
+  repeated MediaResolutionPriceEntry resolution_entries = 6;
+}
+
 // RateCondition expresses long-context tiers, UTC time bands, or Studio media mode/resolution selectors.
 message RateCondition {
   int64 min_prompt_tokens = 1; // applies when prompt_tokens > min_prompt_tokens (0 means unconditional)
@@ -154,6 +186,8 @@ message RateCard {
   int64 effective_at_unix_ms = 3;
   repeated RateComponent base_components = 4;
   repeated RateComponent conditional_overrides = 5; // evaluated in source order
+  string minimum_charge_usd_dec = 6;                // minimum USD charge per request/generation (e.g. "0.010000")
+  MediaPricingFormula media_pricing_formula = 7;    // optional nonlinear Studio media pricing formula (decision 2A)
 }
 
 message ProviderRecord {
@@ -173,6 +207,91 @@ message CatalogDefinition {
   bool enabled = 4;
 }
 
+message IntRange {
+  int32 min = 1;
+  int32 max = 2;
+}
+
+message MediaDefaultParameters {
+  string aspect_ratio = 1;
+  string resolution = 2;
+  int32 duration_seconds = 3;
+  bool generate_audio = 4;
+  string size = 5;
+}
+
+message MediaInputConstraint {
+  int32 min_count = 1;
+  int32 max_count = 2;
+  int32 min_width = 3;
+  int32 max_width = 4;
+  int32 min_height = 5;
+  int32 max_height = 6;
+  int64 max_pixels = 7;
+  int64 max_bytes = 8;
+  int64 min_duration_ms = 9;
+  int64 max_duration_ms = 10;
+  int64 max_total_duration_ms = 11;
+  repeated string allowed_mime_types = 12;
+  string min_aspect_ratio_dec = 13;
+  string max_aspect_ratio_dec = 14;
+}
+
+message MediaProviderOptionDescriptor {
+  string key = 1;
+  string value_type = 2;
+  bool required = 3;
+  repeated string enum_values = 4;
+  string min_dec = 5;
+  string max_dec = 6;
+  string default_value_json = 7;
+}
+
+message MediaModelCapabilitySpec {
+  repeated string aspect_ratios = 1;
+  repeated string resolutions = 2;
+  repeated string supported_sizes = 3;
+  repeated int32 durations_seconds = 4;
+  int32 max_outputs = 5;
+  bool supports_generate_audio = 6;
+  MediaDefaultParameters defaults = 7;
+  repeated string frame_image_roles = 8;
+  repeated string supported_frame_role_combinations = 9;
+  IntRange reference_image_count = 10;
+  MediaInputConstraint image_input_constraint = 11;
+  MediaInputConstraint video_input_constraint = 12;
+  MediaInputConstraint audio_input_constraint = 13;
+  repeated MediaProviderOptionDescriptor provider_options = 14;
+}
+
+message MediaSafetyPolicy {
+  string policy_id = 1;
+  string mode = 2; // e.g. "openai_moderation" | "allow_all"
+  string credential_revision = 3;
+  string video_frame_strategy = 4;
+  bool fail_closed = 5;
+}
+
+message MandatoryReasoningPolicy {
+  bool mandatory = 1;
+  repeated string supported_efforts = 2;
+  string default_effort = 3;
+}
+
+message ServerToolConfig {
+  string tool_name = 1;
+  bool enabled = 2;
+  string price_per_call_usd_dec = 3;
+  int32 default_max_results = 4;
+  int32 hard_max_results = 5;
+}
+
+message MediaOfferingSpec {
+  string clarity_parameter = 1; // "resolution" | "quality"
+  repeated string output_hostname_suffixes = 2; // SSRF guard for upstream media result URLs
+  string upstream_endpoint_kind = 3;
+}
+
 message CustomerModelRecord {
   string model_id = 1;
   string display_name = 2;
@@ -184,6 +303,10 @@ message CustomerModelRecord {
   int64 default_max_output_tokens = 8;
   repeated string model_aliases = 9;
   repeated string offering_ids = 10;
+  repeated string input_modalities = 11;
+  repeated string output_modalities = 12;
+  MediaModelCapabilitySpec media_capability = 13;
+  MediaSafetyPolicy media_safety_policy = 14;
 }
 
 // ObservedPerformanceSummary embeds 7-day rolling Maxshot-observed performance into CatalogSnapshot (PRV-R18, PRV-R34).
@@ -234,6 +357,13 @@ message OfferingRecord {
   RateCard provider_cost_card = 32;
   RateCard customer_rate_card = 33;
   ObservedPerformanceSummary observed_performance = 34;
+  maxshot.common.v1.CustomerChargeMode customer_charge_mode = 35;
+  int32 hold_buffer_bps = 36;               // e.g. 11500 for 115% pre-hold buffer on provider_actual dynamic quotes
+  string markup_multiplier_dec = 37;        // e.g. "1.000000" when customer_charge_mode == PROVIDER_ACTUAL_COST
+  MandatoryReasoningPolicy mandatory_reasoning_policy = 38;
+  repeated string omittable_parameters = 39; // unsupported sampling params (e.g. temperature, top_p) stripped silently (#154-4)
+  repeated ServerToolConfig server_tools = 40;
+  MediaOfferingSpec media_offering_spec = 41;
 }
 
 // TierGroupRecord carries Provider-computed Basic/Premium model tier groups
@@ -244,6 +374,29 @@ message TierGroupRecord {
   maxshot.common.v1.Modality modality = 3;
   maxshot.common.v1.ModelTier target_tier = 4; // BASIC or PREMIUM
   repeated string member_model_ids = 5;
+  int32 auto_publish_max_change_pct = 6; // default 25% safety valve (decision 5A)
+  repeated string source_group_ids = 7;
+  repeated string fixed_model_ids = 8;
+  repeated string excluded_model_ids = 9;
+}
+
+message SourceGroupRecord {
+  string group_id = 1;
+  string display_name = 2;
+  maxshot.common.v1.Modality modality = 3;
+  repeated string member_customer_model_ids = 4;
+  repeated string fixed_model_ids = 5;
+  repeated string excluded_model_ids = 6;
+  string auto_match_rule_json = 7;
+  string version = 8;
+}
+
+message ModelTierOverrideRecord {
+  string customer_model_id = 1;
+  maxshot.common.v1.Modality modality = 2;
+  maxshot.common.v1.ModelTier override_tier = 3;
+  string reason = 4;
+  int64 updated_at_unix_ms = 5;
 }
 
 message CuratedModelItem {
@@ -290,11 +443,13 @@ message CatalogSnapshot {
   CurationConfig curation = 8;
   repeated AutoPoolEntry auto_pool = 9;
   BudgetPolicy budget_policy = 10;
+  repeated SourceGroupRecord source_groups = 11;
+  repeated ModelTierOverrideRecord model_tier_overrides = 12;
 }
 
 message WatchSyncEventsRequest {
   string gateway_node_id = 1;
-  string node_role = 2; // "dataplane" | "billing"
+  string node_role = 2; // "dataplane" | "billing" | "studio" | "finance"
   string last_seen_catalog_version = 3;
   string last_seen_credential_revision = 4;
 }
@@ -366,6 +521,7 @@ message EncryptedCredentialItem {
   bytes nonce = 7;         // AES-256-GCM 12-byte nonce
   bytes ciphertext = 8;    // AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED)
   int64 updated_at_unix_ms = 9;
+  repeated string target_node_roles = 10; // e.g. ["dataplane", "studio", "finance"]
 }
 
 message SyncEncryptedCredentialsRequest {
@@ -460,6 +616,9 @@ message AttemptSettlementRecord {
   int64 discrepancy_micro_usd = 15;
   int64 dispatched_at_unix_ms = 16;
   int64 completed_at_unix_ms = 17;
+  int32 attempt_number = 18;
+  string provider_generation_id = 19;
+  int32 http_status = 20;
 }
 
 message ListOfferingAttemptRecordsRequest {
@@ -476,4 +635,25 @@ message ListOfferingAttemptRecordsRequest {
 message ListOfferingAttemptRecordsResponse {
   repeated AttemptSettlementRecord records = 1;
   maxshot.common.v1.CursorPageResponse page = 2;
+}
+
+message ApplyProviderDisputeAdjustmentRequest {
+  string adjustment_id = 1; // idempotency key for dispute adjustment
+  string statement_id = 2;
+  string provider_id = 3;
+  string offering_id = 4;
+  string period_start_date = 5; // YYYY-MM-DD
+  string period_end_date = 6;   // YYYY-MM-DD
+  string invoiced_cost_usd_dec = 7;
+  string adjustment_delta_usd_dec = 8; // signed decimal USD delta written to discrepancy ledger
+  string resolution_status = 9;        // "disputed" | "adjusted" | "resolved"
+  string reason = 10;
+  string operator_id = 11;
+  int64 resolved_at_unix_ms = 12;
+}
+
+message ApplyProviderDisputeAdjustmentResponse {
+  bool applied = 1;
+  string discrepancy_ledger_entry_id = 2;
+  string updated_statement_status = 3;
 }

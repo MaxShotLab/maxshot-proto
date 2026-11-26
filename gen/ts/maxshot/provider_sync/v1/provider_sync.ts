@@ -24,6 +24,9 @@ import {
   BudgetPeriodRule,
   CursorPageRequest,
   CursorPageResponse,
+  CustomerChargeMode,
+  customerChargeModeFromJSON,
+  customerChargeModeToJSON,
   KeyValueAttribute,
   Modality,
   modalityFromJSON,
@@ -584,6 +587,79 @@ export function statementEntryKindToJSON(object: StatementEntryKind): string {
   }
 }
 
+export enum MediaPricingFormulaKind {
+  MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED = 0,
+  MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS = 1,
+  /** MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS - ceil(width * height * duration * fps / divisor) * rate */
+  MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS = 2,
+  /** MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS - ceil(w*scale)*ceil(h*scale)*duration_ms / 1048576 / 1000 * rate */
+  MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS = 3,
+  /** MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP - fixed output tokens per resolution + billable reference inputs */
+  MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function mediaPricingFormulaKindFromJSON(object: any): MediaPricingFormulaKind {
+  switch (object) {
+    case 0:
+    case "MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED":
+      return MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED;
+    case 1:
+    case "MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS":
+      return MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS;
+    case 2:
+    case "MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS":
+      return MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS;
+    case 3:
+    case "MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS":
+      return MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS;
+    case 4:
+    case "MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP":
+      return MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return MediaPricingFormulaKind.UNRECOGNIZED;
+  }
+}
+
+export function mediaPricingFormulaKindToJSON(object: MediaPricingFormulaKind): string {
+  switch (object) {
+    case MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED:
+      return "MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED";
+    case MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS:
+      return "MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS";
+    case MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS:
+      return "MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS";
+    case MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS:
+      return "MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS";
+    case MediaPricingFormulaKind.MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP:
+      return "MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP";
+    case MediaPricingFormulaKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export interface MediaResolutionPriceEntry {
+  resolution: string;
+  size: string;
+  withAudio: boolean;
+  withVideoInput: boolean;
+  fixedOutputTokens: bigint;
+  ratePerUnitUsdDec: string;
+  unitName: string;
+}
+
+export interface MediaPricingFormula {
+  formulaKind: MediaPricingFormulaKind;
+  videoTokenFps: number;
+  videoTokenDivisor: number;
+  freeReferenceImages: number;
+  tokensPerBillableReferenceImage: bigint;
+  resolutionEntries: MediaResolutionPriceEntry[];
+}
+
 /** RateCondition expresses long-context tiers, UTC time bands, or Studio media mode/resolution selectors. */
 export interface RateCondition {
   /** applies when prompt_tokens > min_prompt_tokens (0 means unconditional) */
@@ -619,6 +695,10 @@ export interface RateCard {
   baseComponents: RateComponent[];
   /** evaluated in source order */
   conditionalOverrides: RateComponent[];
+  /** minimum USD charge per request/generation (e.g. "0.010000") */
+  minimumChargeUsdDec: string;
+  /** optional nonlinear Studio media pricing formula (decision 2A) */
+  mediaPricingFormula?: MediaPricingFormula | undefined;
 }
 
 export interface ProviderRecord {
@@ -639,6 +719,94 @@ export interface CatalogDefinition {
   enabled: boolean;
 }
 
+export interface IntRange {
+  min: number;
+  max: number;
+}
+
+export interface MediaDefaultParameters {
+  aspectRatio: string;
+  resolution: string;
+  durationSeconds: number;
+  generateAudio: boolean;
+  size: string;
+}
+
+export interface MediaInputConstraint {
+  minCount: number;
+  maxCount: number;
+  minWidth: number;
+  maxWidth: number;
+  minHeight: number;
+  maxHeight: number;
+  maxPixels: bigint;
+  maxBytes: bigint;
+  minDurationMs: bigint;
+  maxDurationMs: bigint;
+  maxTotalDurationMs: bigint;
+  allowedMimeTypes: string[];
+  minAspectRatioDec: string;
+  maxAspectRatioDec: string;
+}
+
+export interface MediaProviderOptionDescriptor {
+  key: string;
+  valueType: string;
+  required: boolean;
+  enumValues: string[];
+  minDec: string;
+  maxDec: string;
+  defaultValueJson: string;
+}
+
+export interface MediaModelCapabilitySpec {
+  aspectRatios: string[];
+  resolutions: string[];
+  supportedSizes: string[];
+  durationsSeconds: number[];
+  maxOutputs: number;
+  supportsGenerateAudio: boolean;
+  defaults?: MediaDefaultParameters | undefined;
+  frameImageRoles: string[];
+  supportedFrameRoleCombinations: string[];
+  referenceImageCount?: IntRange | undefined;
+  imageInputConstraint?: MediaInputConstraint | undefined;
+  videoInputConstraint?: MediaInputConstraint | undefined;
+  audioInputConstraint?: MediaInputConstraint | undefined;
+  providerOptions: MediaProviderOptionDescriptor[];
+}
+
+export interface MediaSafetyPolicy {
+  policyId: string;
+  /** e.g. "openai_moderation" | "allow_all" */
+  mode: string;
+  credentialRevision: string;
+  videoFrameStrategy: string;
+  failClosed: boolean;
+}
+
+export interface MandatoryReasoningPolicy {
+  mandatory: boolean;
+  supportedEfforts: string[];
+  defaultEffort: string;
+}
+
+export interface ServerToolConfig {
+  toolName: string;
+  enabled: boolean;
+  pricePerCallUsdDec: string;
+  defaultMaxResults: number;
+  hardMaxResults: number;
+}
+
+export interface MediaOfferingSpec {
+  /** "resolution" | "quality" */
+  clarityParameter: string;
+  /** SSRF guard for upstream media result URLs */
+  outputHostnameSuffixes: string[];
+  upstreamEndpointKind: string;
+}
+
 export interface CustomerModelRecord {
   modelId: string;
   displayName: string;
@@ -650,6 +818,10 @@ export interface CustomerModelRecord {
   defaultMaxOutputTokens: bigint;
   modelAliases: string[];
   offeringIds: string[];
+  inputModalities: string[];
+  outputModalities: string[];
+  mediaCapability?: MediaModelCapabilitySpec | undefined;
+  mediaSafetyPolicy?: MediaSafetyPolicy | undefined;
 }
 
 /** ObservedPerformanceSummary embeds 7-day rolling Maxshot-observed performance into CatalogSnapshot (PRV-R18, PRV-R34). */
@@ -708,6 +880,18 @@ export interface OfferingRecord {
   providerCostCard?: RateCard | undefined;
   customerRateCard?: RateCard | undefined;
   observedPerformance?: ObservedPerformanceSummary | undefined;
+  customerChargeMode: CustomerChargeMode;
+  /** e.g. 11500 for 115% pre-hold buffer on provider_actual dynamic quotes */
+  holdBufferBps: number;
+  /** e.g. "1.000000" when customer_charge_mode == PROVIDER_ACTUAL_COST */
+  markupMultiplierDec: string;
+  mandatoryReasoningPolicy?:
+    | MandatoryReasoningPolicy
+    | undefined;
+  /** unsupported sampling params (e.g. temperature, top_p) stripped silently (#154-4) */
+  omittableParameters: string[];
+  serverTools: ServerToolConfig[];
+  mediaOfferingSpec?: MediaOfferingSpec | undefined;
 }
 
 /**
@@ -721,6 +905,30 @@ export interface TierGroupRecord {
   /** BASIC or PREMIUM */
   targetTier: ModelTier;
   memberModelIds: string[];
+  /** default 25% safety valve (decision 5A) */
+  autoPublishMaxChangePct: number;
+  sourceGroupIds: string[];
+  fixedModelIds: string[];
+  excludedModelIds: string[];
+}
+
+export interface SourceGroupRecord {
+  groupId: string;
+  displayName: string;
+  modality: Modality;
+  memberCustomerModelIds: string[];
+  fixedModelIds: string[];
+  excludedModelIds: string[];
+  autoMatchRuleJson: string;
+  version: string;
+}
+
+export interface ModelTierOverrideRecord {
+  customerModelId: string;
+  modality: Modality;
+  overrideTier: ModelTier;
+  reason: string;
+  updatedAtUnixMs: bigint;
 }
 
 export interface CuratedModelItem {
@@ -767,11 +975,13 @@ export interface CatalogSnapshot {
   curation?: CurationConfig | undefined;
   autoPool: AutoPoolEntry[];
   budgetPolicy?: BudgetPolicy | undefined;
+  sourceGroups: SourceGroupRecord[];
+  modelTierOverrides: ModelTierOverrideRecord[];
 }
 
 export interface WatchSyncEventsRequest {
   gatewayNodeId: string;
-  /** "dataplane" | "billing" */
+  /** "dataplane" | "billing" | "studio" | "finance" */
   nodeRole: string;
   lastSeenCatalogVersion: string;
   lastSeenCredentialRevision: string;
@@ -849,6 +1059,8 @@ export interface EncryptedCredentialItem {
   /** AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED) */
   ciphertext: Buffer;
   updatedAtUnixMs: bigint;
+  /** e.g. ["dataplane", "studio", "finance"] */
+  targetNodeRoles: string[];
 }
 
 export interface SyncEncryptedCredentialsRequest {
@@ -950,6 +1162,9 @@ export interface AttemptSettlementRecord {
   discrepancyMicroUsd: bigint;
   dispatchedAtUnixMs: bigint;
   completedAtUnixMs: bigint;
+  attemptNumber: number;
+  providerGenerationId: string;
+  httpStatus: number;
 }
 
 export interface ListOfferingAttemptRecordsRequest {
@@ -967,6 +1182,418 @@ export interface ListOfferingAttemptRecordsResponse {
   records: AttemptSettlementRecord[];
   page?: CursorPageResponse | undefined;
 }
+
+export interface ApplyProviderDisputeAdjustmentRequest {
+  /** idempotency key for dispute adjustment */
+  adjustmentId: string;
+  statementId: string;
+  providerId: string;
+  offeringId: string;
+  /** YYYY-MM-DD */
+  periodStartDate: string;
+  /** YYYY-MM-DD */
+  periodEndDate: string;
+  invoicedCostUsdDec: string;
+  /** signed decimal USD delta written to discrepancy ledger */
+  adjustmentDeltaUsdDec: string;
+  /** "disputed" | "adjusted" | "resolved" */
+  resolutionStatus: string;
+  reason: string;
+  operatorId: string;
+  resolvedAtUnixMs: bigint;
+}
+
+export interface ApplyProviderDisputeAdjustmentResponse {
+  applied: boolean;
+  discrepancyLedgerEntryId: string;
+  updatedStatementStatus: string;
+}
+
+function createBaseMediaResolutionPriceEntry(): MediaResolutionPriceEntry {
+  return {
+    resolution: "",
+    size: "",
+    withAudio: false,
+    withVideoInput: false,
+    fixedOutputTokens: 0n,
+    ratePerUnitUsdDec: "",
+    unitName: "",
+  };
+}
+
+export const MediaResolutionPriceEntry: MessageFns<MediaResolutionPriceEntry> = {
+  encode(message: MediaResolutionPriceEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.resolution !== "") {
+      writer.uint32(10).string(message.resolution);
+    }
+    if (message.size !== "") {
+      writer.uint32(18).string(message.size);
+    }
+    if (message.withAudio !== false) {
+      writer.uint32(24).bool(message.withAudio);
+    }
+    if (message.withVideoInput !== false) {
+      writer.uint32(32).bool(message.withVideoInput);
+    }
+    if (message.fixedOutputTokens !== 0n) {
+      if (BigInt.asIntN(64, message.fixedOutputTokens) !== message.fixedOutputTokens) {
+        throw new globalThis.Error("value provided for field message.fixedOutputTokens of type int64 too large");
+      }
+      writer.uint32(40).int64(message.fixedOutputTokens);
+    }
+    if (message.ratePerUnitUsdDec !== "") {
+      writer.uint32(50).string(message.ratePerUnitUsdDec);
+    }
+    if (message.unitName !== "") {
+      writer.uint32(58).string(message.unitName);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaResolutionPriceEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaResolutionPriceEntry();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.resolution = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.size = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.withAudio = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.withVideoInput = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.fixedOutputTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.ratePerUnitUsdDec = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.unitName = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaResolutionPriceEntry {
+    return {
+      resolution: isSet(object.resolution) ? globalThis.String(object.resolution) : "",
+      size: isSet(object.size) ? globalThis.String(object.size) : "",
+      withAudio: isSet(object.withAudio)
+        ? globalThis.Boolean(object.withAudio)
+        : isSet(object.with_audio)
+        ? globalThis.Boolean(object.with_audio)
+        : false,
+      withVideoInput: isSet(object.withVideoInput)
+        ? globalThis.Boolean(object.withVideoInput)
+        : isSet(object.with_video_input)
+        ? globalThis.Boolean(object.with_video_input)
+        : false,
+      fixedOutputTokens: isSet(object.fixedOutputTokens)
+        ? BigInt(object.fixedOutputTokens)
+        : isSet(object.fixed_output_tokens)
+        ? BigInt(object.fixed_output_tokens)
+        : 0n,
+      ratePerUnitUsdDec: isSet(object.ratePerUnitUsdDec)
+        ? globalThis.String(object.ratePerUnitUsdDec)
+        : isSet(object.rate_per_unit_usd_dec)
+        ? globalThis.String(object.rate_per_unit_usd_dec)
+        : "",
+      unitName: isSet(object.unitName)
+        ? globalThis.String(object.unitName)
+        : isSet(object.unit_name)
+        ? globalThis.String(object.unit_name)
+        : "",
+    };
+  },
+
+  toJSON(message: MediaResolutionPriceEntry): unknown {
+    const obj: any = {};
+    if (message.resolution !== "") {
+      obj.resolution = message.resolution;
+    }
+    if (message.size !== "") {
+      obj.size = message.size;
+    }
+    if (message.withAudio !== false) {
+      obj.withAudio = message.withAudio;
+    }
+    if (message.withVideoInput !== false) {
+      obj.withVideoInput = message.withVideoInput;
+    }
+    if (message.fixedOutputTokens !== 0n) {
+      obj.fixedOutputTokens = message.fixedOutputTokens.toString();
+    }
+    if (message.ratePerUnitUsdDec !== "") {
+      obj.ratePerUnitUsdDec = message.ratePerUnitUsdDec;
+    }
+    if (message.unitName !== "") {
+      obj.unitName = message.unitName;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaResolutionPriceEntry>, I>>(base?: I): MediaResolutionPriceEntry {
+    return MediaResolutionPriceEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaResolutionPriceEntry>, I>>(object: I): MediaResolutionPriceEntry {
+    const message = createBaseMediaResolutionPriceEntry();
+    message.resolution = object.resolution ?? "";
+    message.size = object.size ?? "";
+    message.withAudio = object.withAudio ?? false;
+    message.withVideoInput = object.withVideoInput ?? false;
+    message.fixedOutputTokens = (object.fixedOutputTokens !== undefined && object.fixedOutputTokens !== null)
+      ? BigInt(object.fixedOutputTokens)
+      : 0n;
+    message.ratePerUnitUsdDec = object.ratePerUnitUsdDec ?? "";
+    message.unitName = object.unitName ?? "";
+    return message;
+  },
+};
+
+function createBaseMediaPricingFormula(): MediaPricingFormula {
+  return {
+    formulaKind: 0,
+    videoTokenFps: 0,
+    videoTokenDivisor: 0,
+    freeReferenceImages: 0,
+    tokensPerBillableReferenceImage: 0n,
+    resolutionEntries: [],
+  };
+}
+
+export const MediaPricingFormula: MessageFns<MediaPricingFormula> = {
+  encode(message: MediaPricingFormula, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.formulaKind !== 0) {
+      writer.uint32(8).int32(message.formulaKind);
+    }
+    if (message.videoTokenFps !== 0) {
+      writer.uint32(16).int32(message.videoTokenFps);
+    }
+    if (message.videoTokenDivisor !== 0) {
+      writer.uint32(24).int32(message.videoTokenDivisor);
+    }
+    if (message.freeReferenceImages !== 0) {
+      writer.uint32(32).int32(message.freeReferenceImages);
+    }
+    if (message.tokensPerBillableReferenceImage !== 0n) {
+      if (BigInt.asIntN(64, message.tokensPerBillableReferenceImage) !== message.tokensPerBillableReferenceImage) {
+        throw new globalThis.Error(
+          "value provided for field message.tokensPerBillableReferenceImage of type int64 too large",
+        );
+      }
+      writer.uint32(40).int64(message.tokensPerBillableReferenceImage);
+    }
+    for (const v of message.resolutionEntries) {
+      MediaResolutionPriceEntry.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaPricingFormula {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaPricingFormula();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.formulaKind = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.videoTokenFps = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.videoTokenDivisor = reader.int32();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.freeReferenceImages = reader.int32();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.tokensPerBillableReferenceImage = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.resolutionEntries.push(MediaResolutionPriceEntry.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaPricingFormula {
+    return {
+      formulaKind: isSet(object.formulaKind)
+        ? mediaPricingFormulaKindFromJSON(object.formulaKind)
+        : isSet(object.formula_kind)
+        ? mediaPricingFormulaKindFromJSON(object.formula_kind)
+        : 0,
+      videoTokenFps: isSet(object.videoTokenFps)
+        ? globalThis.Number(object.videoTokenFps)
+        : isSet(object.video_token_fps)
+        ? globalThis.Number(object.video_token_fps)
+        : 0,
+      videoTokenDivisor: isSet(object.videoTokenDivisor)
+        ? globalThis.Number(object.videoTokenDivisor)
+        : isSet(object.video_token_divisor)
+        ? globalThis.Number(object.video_token_divisor)
+        : 0,
+      freeReferenceImages: isSet(object.freeReferenceImages)
+        ? globalThis.Number(object.freeReferenceImages)
+        : isSet(object.free_reference_images)
+        ? globalThis.Number(object.free_reference_images)
+        : 0,
+      tokensPerBillableReferenceImage: isSet(object.tokensPerBillableReferenceImage)
+        ? BigInt(object.tokensPerBillableReferenceImage)
+        : isSet(object.tokens_per_billable_reference_image)
+        ? BigInt(object.tokens_per_billable_reference_image)
+        : 0n,
+      resolutionEntries: globalThis.Array.isArray(object?.resolutionEntries)
+        ? object.resolutionEntries.map((e: any) => MediaResolutionPriceEntry.fromJSON(e))
+        : globalThis.Array.isArray(object?.resolution_entries)
+        ? object.resolution_entries.map((e: any) => MediaResolutionPriceEntry.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MediaPricingFormula): unknown {
+    const obj: any = {};
+    if (message.formulaKind !== 0) {
+      obj.formulaKind = mediaPricingFormulaKindToJSON(message.formulaKind);
+    }
+    if (message.videoTokenFps !== 0) {
+      obj.videoTokenFps = Math.round(message.videoTokenFps);
+    }
+    if (message.videoTokenDivisor !== 0) {
+      obj.videoTokenDivisor = Math.round(message.videoTokenDivisor);
+    }
+    if (message.freeReferenceImages !== 0) {
+      obj.freeReferenceImages = Math.round(message.freeReferenceImages);
+    }
+    if (message.tokensPerBillableReferenceImage !== 0n) {
+      obj.tokensPerBillableReferenceImage = message.tokensPerBillableReferenceImage.toString();
+    }
+    if (message.resolutionEntries?.length) {
+      obj.resolutionEntries = message.resolutionEntries.map((e) => MediaResolutionPriceEntry.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaPricingFormula>, I>>(base?: I): MediaPricingFormula {
+    return MediaPricingFormula.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaPricingFormula>, I>>(object: I): MediaPricingFormula {
+    const message = createBaseMediaPricingFormula();
+    message.formulaKind = object.formulaKind ?? 0;
+    message.videoTokenFps = object.videoTokenFps ?? 0;
+    message.videoTokenDivisor = object.videoTokenDivisor ?? 0;
+    message.freeReferenceImages = object.freeReferenceImages ?? 0;
+    message.tokensPerBillableReferenceImage =
+      (object.tokensPerBillableReferenceImage !== undefined && object.tokensPerBillableReferenceImage !== null)
+        ? BigInt(object.tokensPerBillableReferenceImage)
+        : 0n;
+    message.resolutionEntries = object.resolutionEntries?.map((e) => MediaResolutionPriceEntry.fromPartial(e)) || [];
+    return message;
+  },
+};
 
 function createBaseRateCondition(): RateCondition {
   return { minPromptTokens: 0n, hasUtcWindow: false, utcStartHhmm: 0, utcEndHhmm: 0, utcDays: [], mediaAttributes: [] };
@@ -1286,7 +1913,15 @@ export const RateComponent: MessageFns<RateComponent> = {
 };
 
 function createBaseRateCard(): RateCard {
-  return { rateCardVersion: "", currency: "", effectiveAtUnixMs: 0n, baseComponents: [], conditionalOverrides: [] };
+  return {
+    rateCardVersion: "",
+    currency: "",
+    effectiveAtUnixMs: 0n,
+    baseComponents: [],
+    conditionalOverrides: [],
+    minimumChargeUsdDec: "",
+    mediaPricingFormula: undefined,
+  };
 }
 
 export const RateCard: MessageFns<RateCard> = {
@@ -1308,6 +1943,12 @@ export const RateCard: MessageFns<RateCard> = {
     }
     for (const v of message.conditionalOverrides) {
       RateComponent.encode(v!, writer.uint32(42).fork()).join();
+    }
+    if (message.minimumChargeUsdDec !== "") {
+      writer.uint32(50).string(message.minimumChargeUsdDec);
+    }
+    if (message.mediaPricingFormula !== undefined) {
+      MediaPricingFormula.encode(message.mediaPricingFormula, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -1365,6 +2006,22 @@ export const RateCard: MessageFns<RateCard> = {
             message.conditionalOverrides.push(RateComponent.decode(reader, reader.uint32()));
             continue;
           }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.minimumChargeUsdDec = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.mediaPricingFormula = MediaPricingFormula.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1400,6 +2057,16 @@ export const RateCard: MessageFns<RateCard> = {
         : globalThis.Array.isArray(object?.conditional_overrides)
         ? object.conditional_overrides.map((e: any) => RateComponent.fromJSON(e))
         : [],
+      minimumChargeUsdDec: isSet(object.minimumChargeUsdDec)
+        ? globalThis.String(object.minimumChargeUsdDec)
+        : isSet(object.minimum_charge_usd_dec)
+        ? globalThis.String(object.minimum_charge_usd_dec)
+        : "",
+      mediaPricingFormula: isSet(object.mediaPricingFormula)
+        ? MediaPricingFormula.fromJSON(object.mediaPricingFormula)
+        : isSet(object.media_pricing_formula)
+        ? MediaPricingFormula.fromJSON(object.media_pricing_formula)
+        : undefined,
     };
   },
 
@@ -1420,6 +2087,12 @@ export const RateCard: MessageFns<RateCard> = {
     if (message.conditionalOverrides?.length) {
       obj.conditionalOverrides = message.conditionalOverrides.map((e) => RateComponent.toJSON(e));
     }
+    if (message.minimumChargeUsdDec !== "") {
+      obj.minimumChargeUsdDec = message.minimumChargeUsdDec;
+    }
+    if (message.mediaPricingFormula !== undefined) {
+      obj.mediaPricingFormula = MediaPricingFormula.toJSON(message.mediaPricingFormula);
+    }
     return obj;
   },
 
@@ -1435,6 +2108,10 @@ export const RateCard: MessageFns<RateCard> = {
       : 0n;
     message.baseComponents = object.baseComponents?.map((e) => RateComponent.fromPartial(e)) || [];
     message.conditionalOverrides = object.conditionalOverrides?.map((e) => RateComponent.fromPartial(e)) || [];
+    message.minimumChargeUsdDec = object.minimumChargeUsdDec ?? "";
+    message.mediaPricingFormula = (object.mediaPricingFormula !== undefined && object.mediaPricingFormula !== null)
+      ? MediaPricingFormula.fromPartial(object.mediaPricingFormula)
+      : undefined;
     return message;
   },
 };
@@ -1757,6 +2434,1678 @@ export const CatalogDefinition: MessageFns<CatalogDefinition> = {
   },
 };
 
+function createBaseIntRange(): IntRange {
+  return { min: 0, max: 0 };
+}
+
+export const IntRange: MessageFns<IntRange> = {
+  encode(message: IntRange, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.min !== 0) {
+      writer.uint32(8).int32(message.min);
+    }
+    if (message.max !== 0) {
+      writer.uint32(16).int32(message.max);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IntRange {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseIntRange();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.min = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.max = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): IntRange {
+    return {
+      min: isSet(object.min) ? globalThis.Number(object.min) : 0,
+      max: isSet(object.max) ? globalThis.Number(object.max) : 0,
+    };
+  },
+
+  toJSON(message: IntRange): unknown {
+    const obj: any = {};
+    if (message.min !== 0) {
+      obj.min = Math.round(message.min);
+    }
+    if (message.max !== 0) {
+      obj.max = Math.round(message.max);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<IntRange>, I>>(base?: I): IntRange {
+    return IntRange.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<IntRange>, I>>(object: I): IntRange {
+    const message = createBaseIntRange();
+    message.min = object.min ?? 0;
+    message.max = object.max ?? 0;
+    return message;
+  },
+};
+
+function createBaseMediaDefaultParameters(): MediaDefaultParameters {
+  return { aspectRatio: "", resolution: "", durationSeconds: 0, generateAudio: false, size: "" };
+}
+
+export const MediaDefaultParameters: MessageFns<MediaDefaultParameters> = {
+  encode(message: MediaDefaultParameters, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.aspectRatio !== "") {
+      writer.uint32(10).string(message.aspectRatio);
+    }
+    if (message.resolution !== "") {
+      writer.uint32(18).string(message.resolution);
+    }
+    if (message.durationSeconds !== 0) {
+      writer.uint32(24).int32(message.durationSeconds);
+    }
+    if (message.generateAudio !== false) {
+      writer.uint32(32).bool(message.generateAudio);
+    }
+    if (message.size !== "") {
+      writer.uint32(42).string(message.size);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaDefaultParameters {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaDefaultParameters();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.aspectRatio = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.resolution = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.durationSeconds = reader.int32();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.generateAudio = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.size = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaDefaultParameters {
+    return {
+      aspectRatio: isSet(object.aspectRatio)
+        ? globalThis.String(object.aspectRatio)
+        : isSet(object.aspect_ratio)
+        ? globalThis.String(object.aspect_ratio)
+        : "",
+      resolution: isSet(object.resolution) ? globalThis.String(object.resolution) : "",
+      durationSeconds: isSet(object.durationSeconds)
+        ? globalThis.Number(object.durationSeconds)
+        : isSet(object.duration_seconds)
+        ? globalThis.Number(object.duration_seconds)
+        : 0,
+      generateAudio: isSet(object.generateAudio)
+        ? globalThis.Boolean(object.generateAudio)
+        : isSet(object.generate_audio)
+        ? globalThis.Boolean(object.generate_audio)
+        : false,
+      size: isSet(object.size) ? globalThis.String(object.size) : "",
+    };
+  },
+
+  toJSON(message: MediaDefaultParameters): unknown {
+    const obj: any = {};
+    if (message.aspectRatio !== "") {
+      obj.aspectRatio = message.aspectRatio;
+    }
+    if (message.resolution !== "") {
+      obj.resolution = message.resolution;
+    }
+    if (message.durationSeconds !== 0) {
+      obj.durationSeconds = Math.round(message.durationSeconds);
+    }
+    if (message.generateAudio !== false) {
+      obj.generateAudio = message.generateAudio;
+    }
+    if (message.size !== "") {
+      obj.size = message.size;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaDefaultParameters>, I>>(base?: I): MediaDefaultParameters {
+    return MediaDefaultParameters.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaDefaultParameters>, I>>(object: I): MediaDefaultParameters {
+    const message = createBaseMediaDefaultParameters();
+    message.aspectRatio = object.aspectRatio ?? "";
+    message.resolution = object.resolution ?? "";
+    message.durationSeconds = object.durationSeconds ?? 0;
+    message.generateAudio = object.generateAudio ?? false;
+    message.size = object.size ?? "";
+    return message;
+  },
+};
+
+function createBaseMediaInputConstraint(): MediaInputConstraint {
+  return {
+    minCount: 0,
+    maxCount: 0,
+    minWidth: 0,
+    maxWidth: 0,
+    minHeight: 0,
+    maxHeight: 0,
+    maxPixels: 0n,
+    maxBytes: 0n,
+    minDurationMs: 0n,
+    maxDurationMs: 0n,
+    maxTotalDurationMs: 0n,
+    allowedMimeTypes: [],
+    minAspectRatioDec: "",
+    maxAspectRatioDec: "",
+  };
+}
+
+export const MediaInputConstraint: MessageFns<MediaInputConstraint> = {
+  encode(message: MediaInputConstraint, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.minCount !== 0) {
+      writer.uint32(8).int32(message.minCount);
+    }
+    if (message.maxCount !== 0) {
+      writer.uint32(16).int32(message.maxCount);
+    }
+    if (message.minWidth !== 0) {
+      writer.uint32(24).int32(message.minWidth);
+    }
+    if (message.maxWidth !== 0) {
+      writer.uint32(32).int32(message.maxWidth);
+    }
+    if (message.minHeight !== 0) {
+      writer.uint32(40).int32(message.minHeight);
+    }
+    if (message.maxHeight !== 0) {
+      writer.uint32(48).int32(message.maxHeight);
+    }
+    if (message.maxPixels !== 0n) {
+      if (BigInt.asIntN(64, message.maxPixels) !== message.maxPixels) {
+        throw new globalThis.Error("value provided for field message.maxPixels of type int64 too large");
+      }
+      writer.uint32(56).int64(message.maxPixels);
+    }
+    if (message.maxBytes !== 0n) {
+      if (BigInt.asIntN(64, message.maxBytes) !== message.maxBytes) {
+        throw new globalThis.Error("value provided for field message.maxBytes of type int64 too large");
+      }
+      writer.uint32(64).int64(message.maxBytes);
+    }
+    if (message.minDurationMs !== 0n) {
+      if (BigInt.asIntN(64, message.minDurationMs) !== message.minDurationMs) {
+        throw new globalThis.Error("value provided for field message.minDurationMs of type int64 too large");
+      }
+      writer.uint32(72).int64(message.minDurationMs);
+    }
+    if (message.maxDurationMs !== 0n) {
+      if (BigInt.asIntN(64, message.maxDurationMs) !== message.maxDurationMs) {
+        throw new globalThis.Error("value provided for field message.maxDurationMs of type int64 too large");
+      }
+      writer.uint32(80).int64(message.maxDurationMs);
+    }
+    if (message.maxTotalDurationMs !== 0n) {
+      if (BigInt.asIntN(64, message.maxTotalDurationMs) !== message.maxTotalDurationMs) {
+        throw new globalThis.Error("value provided for field message.maxTotalDurationMs of type int64 too large");
+      }
+      writer.uint32(88).int64(message.maxTotalDurationMs);
+    }
+    for (const v of message.allowedMimeTypes) {
+      writer.uint32(98).string(v!);
+    }
+    if (message.minAspectRatioDec !== "") {
+      writer.uint32(106).string(message.minAspectRatioDec);
+    }
+    if (message.maxAspectRatioDec !== "") {
+      writer.uint32(114).string(message.maxAspectRatioDec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaInputConstraint {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaInputConstraint();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.minCount = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.maxCount = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.minWidth = reader.int32();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.maxWidth = reader.int32();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.minHeight = reader.int32();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.maxHeight = reader.int32();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.maxPixels = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.maxBytes = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.minDurationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.maxDurationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.maxTotalDurationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.allowedMimeTypes.push(reader.string());
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.minAspectRatioDec = reader.string();
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.maxAspectRatioDec = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaInputConstraint {
+    return {
+      minCount: isSet(object.minCount)
+        ? globalThis.Number(object.minCount)
+        : isSet(object.min_count)
+        ? globalThis.Number(object.min_count)
+        : 0,
+      maxCount: isSet(object.maxCount)
+        ? globalThis.Number(object.maxCount)
+        : isSet(object.max_count)
+        ? globalThis.Number(object.max_count)
+        : 0,
+      minWidth: isSet(object.minWidth)
+        ? globalThis.Number(object.minWidth)
+        : isSet(object.min_width)
+        ? globalThis.Number(object.min_width)
+        : 0,
+      maxWidth: isSet(object.maxWidth)
+        ? globalThis.Number(object.maxWidth)
+        : isSet(object.max_width)
+        ? globalThis.Number(object.max_width)
+        : 0,
+      minHeight: isSet(object.minHeight)
+        ? globalThis.Number(object.minHeight)
+        : isSet(object.min_height)
+        ? globalThis.Number(object.min_height)
+        : 0,
+      maxHeight: isSet(object.maxHeight)
+        ? globalThis.Number(object.maxHeight)
+        : isSet(object.max_height)
+        ? globalThis.Number(object.max_height)
+        : 0,
+      maxPixels: isSet(object.maxPixels)
+        ? BigInt(object.maxPixels)
+        : isSet(object.max_pixels)
+        ? BigInt(object.max_pixels)
+        : 0n,
+      maxBytes: isSet(object.maxBytes)
+        ? BigInt(object.maxBytes)
+        : isSet(object.max_bytes)
+        ? BigInt(object.max_bytes)
+        : 0n,
+      minDurationMs: isSet(object.minDurationMs)
+        ? BigInt(object.minDurationMs)
+        : isSet(object.min_duration_ms)
+        ? BigInt(object.min_duration_ms)
+        : 0n,
+      maxDurationMs: isSet(object.maxDurationMs)
+        ? BigInt(object.maxDurationMs)
+        : isSet(object.max_duration_ms)
+        ? BigInt(object.max_duration_ms)
+        : 0n,
+      maxTotalDurationMs: isSet(object.maxTotalDurationMs)
+        ? BigInt(object.maxTotalDurationMs)
+        : isSet(object.max_total_duration_ms)
+        ? BigInt(object.max_total_duration_ms)
+        : 0n,
+      allowedMimeTypes: globalThis.Array.isArray(object?.allowedMimeTypes)
+        ? object.allowedMimeTypes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.allowed_mime_types)
+        ? object.allowed_mime_types.map((e: any) => globalThis.String(e))
+        : [],
+      minAspectRatioDec: isSet(object.minAspectRatioDec)
+        ? globalThis.String(object.minAspectRatioDec)
+        : isSet(object.min_aspect_ratio_dec)
+        ? globalThis.String(object.min_aspect_ratio_dec)
+        : "",
+      maxAspectRatioDec: isSet(object.maxAspectRatioDec)
+        ? globalThis.String(object.maxAspectRatioDec)
+        : isSet(object.max_aspect_ratio_dec)
+        ? globalThis.String(object.max_aspect_ratio_dec)
+        : "",
+    };
+  },
+
+  toJSON(message: MediaInputConstraint): unknown {
+    const obj: any = {};
+    if (message.minCount !== 0) {
+      obj.minCount = Math.round(message.minCount);
+    }
+    if (message.maxCount !== 0) {
+      obj.maxCount = Math.round(message.maxCount);
+    }
+    if (message.minWidth !== 0) {
+      obj.minWidth = Math.round(message.minWidth);
+    }
+    if (message.maxWidth !== 0) {
+      obj.maxWidth = Math.round(message.maxWidth);
+    }
+    if (message.minHeight !== 0) {
+      obj.minHeight = Math.round(message.minHeight);
+    }
+    if (message.maxHeight !== 0) {
+      obj.maxHeight = Math.round(message.maxHeight);
+    }
+    if (message.maxPixels !== 0n) {
+      obj.maxPixels = message.maxPixels.toString();
+    }
+    if (message.maxBytes !== 0n) {
+      obj.maxBytes = message.maxBytes.toString();
+    }
+    if (message.minDurationMs !== 0n) {
+      obj.minDurationMs = message.minDurationMs.toString();
+    }
+    if (message.maxDurationMs !== 0n) {
+      obj.maxDurationMs = message.maxDurationMs.toString();
+    }
+    if (message.maxTotalDurationMs !== 0n) {
+      obj.maxTotalDurationMs = message.maxTotalDurationMs.toString();
+    }
+    if (message.allowedMimeTypes?.length) {
+      obj.allowedMimeTypes = message.allowedMimeTypes;
+    }
+    if (message.minAspectRatioDec !== "") {
+      obj.minAspectRatioDec = message.minAspectRatioDec;
+    }
+    if (message.maxAspectRatioDec !== "") {
+      obj.maxAspectRatioDec = message.maxAspectRatioDec;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaInputConstraint>, I>>(base?: I): MediaInputConstraint {
+    return MediaInputConstraint.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaInputConstraint>, I>>(object: I): MediaInputConstraint {
+    const message = createBaseMediaInputConstraint();
+    message.minCount = object.minCount ?? 0;
+    message.maxCount = object.maxCount ?? 0;
+    message.minWidth = object.minWidth ?? 0;
+    message.maxWidth = object.maxWidth ?? 0;
+    message.minHeight = object.minHeight ?? 0;
+    message.maxHeight = object.maxHeight ?? 0;
+    message.maxPixels = (object.maxPixels !== undefined && object.maxPixels !== null) ? BigInt(object.maxPixels) : 0n;
+    message.maxBytes = (object.maxBytes !== undefined && object.maxBytes !== null) ? BigInt(object.maxBytes) : 0n;
+    message.minDurationMs = (object.minDurationMs !== undefined && object.minDurationMs !== null)
+      ? BigInt(object.minDurationMs)
+      : 0n;
+    message.maxDurationMs = (object.maxDurationMs !== undefined && object.maxDurationMs !== null)
+      ? BigInt(object.maxDurationMs)
+      : 0n;
+    message.maxTotalDurationMs = (object.maxTotalDurationMs !== undefined && object.maxTotalDurationMs !== null)
+      ? BigInt(object.maxTotalDurationMs)
+      : 0n;
+    message.allowedMimeTypes = object.allowedMimeTypes?.map((e) => e) || [];
+    message.minAspectRatioDec = object.minAspectRatioDec ?? "";
+    message.maxAspectRatioDec = object.maxAspectRatioDec ?? "";
+    return message;
+  },
+};
+
+function createBaseMediaProviderOptionDescriptor(): MediaProviderOptionDescriptor {
+  return { key: "", valueType: "", required: false, enumValues: [], minDec: "", maxDec: "", defaultValueJson: "" };
+}
+
+export const MediaProviderOptionDescriptor: MessageFns<MediaProviderOptionDescriptor> = {
+  encode(message: MediaProviderOptionDescriptor, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.valueType !== "") {
+      writer.uint32(18).string(message.valueType);
+    }
+    if (message.required !== false) {
+      writer.uint32(24).bool(message.required);
+    }
+    for (const v of message.enumValues) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.minDec !== "") {
+      writer.uint32(42).string(message.minDec);
+    }
+    if (message.maxDec !== "") {
+      writer.uint32(50).string(message.maxDec);
+    }
+    if (message.defaultValueJson !== "") {
+      writer.uint32(58).string(message.defaultValueJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaProviderOptionDescriptor {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaProviderOptionDescriptor();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.valueType = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.required = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.enumValues.push(reader.string());
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.minDec = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.maxDec = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.defaultValueJson = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaProviderOptionDescriptor {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      valueType: isSet(object.valueType)
+        ? globalThis.String(object.valueType)
+        : isSet(object.value_type)
+        ? globalThis.String(object.value_type)
+        : "",
+      required: isSet(object.required) ? globalThis.Boolean(object.required) : false,
+      enumValues: globalThis.Array.isArray(object?.enumValues)
+        ? object.enumValues.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.enum_values)
+        ? object.enum_values.map((e: any) => globalThis.String(e))
+        : [],
+      minDec: isSet(object.minDec)
+        ? globalThis.String(object.minDec)
+        : isSet(object.min_dec)
+        ? globalThis.String(object.min_dec)
+        : "",
+      maxDec: isSet(object.maxDec)
+        ? globalThis.String(object.maxDec)
+        : isSet(object.max_dec)
+        ? globalThis.String(object.max_dec)
+        : "",
+      defaultValueJson: isSet(object.defaultValueJson)
+        ? globalThis.String(object.defaultValueJson)
+        : isSet(object.default_value_json)
+        ? globalThis.String(object.default_value_json)
+        : "",
+    };
+  },
+
+  toJSON(message: MediaProviderOptionDescriptor): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.valueType !== "") {
+      obj.valueType = message.valueType;
+    }
+    if (message.required !== false) {
+      obj.required = message.required;
+    }
+    if (message.enumValues?.length) {
+      obj.enumValues = message.enumValues;
+    }
+    if (message.minDec !== "") {
+      obj.minDec = message.minDec;
+    }
+    if (message.maxDec !== "") {
+      obj.maxDec = message.maxDec;
+    }
+    if (message.defaultValueJson !== "") {
+      obj.defaultValueJson = message.defaultValueJson;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaProviderOptionDescriptor>, I>>(base?: I): MediaProviderOptionDescriptor {
+    return MediaProviderOptionDescriptor.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaProviderOptionDescriptor>, I>>(
+    object: I,
+  ): MediaProviderOptionDescriptor {
+    const message = createBaseMediaProviderOptionDescriptor();
+    message.key = object.key ?? "";
+    message.valueType = object.valueType ?? "";
+    message.required = object.required ?? false;
+    message.enumValues = object.enumValues?.map((e) => e) || [];
+    message.minDec = object.minDec ?? "";
+    message.maxDec = object.maxDec ?? "";
+    message.defaultValueJson = object.defaultValueJson ?? "";
+    return message;
+  },
+};
+
+function createBaseMediaModelCapabilitySpec(): MediaModelCapabilitySpec {
+  return {
+    aspectRatios: [],
+    resolutions: [],
+    supportedSizes: [],
+    durationsSeconds: [],
+    maxOutputs: 0,
+    supportsGenerateAudio: false,
+    defaults: undefined,
+    frameImageRoles: [],
+    supportedFrameRoleCombinations: [],
+    referenceImageCount: undefined,
+    imageInputConstraint: undefined,
+    videoInputConstraint: undefined,
+    audioInputConstraint: undefined,
+    providerOptions: [],
+  };
+}
+
+export const MediaModelCapabilitySpec: MessageFns<MediaModelCapabilitySpec> = {
+  encode(message: MediaModelCapabilitySpec, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.aspectRatios) {
+      writer.uint32(10).string(v!);
+    }
+    for (const v of message.resolutions) {
+      writer.uint32(18).string(v!);
+    }
+    for (const v of message.supportedSizes) {
+      writer.uint32(26).string(v!);
+    }
+    if (message.durationsSeconds.length !== 0) {
+      writer.uint32(34).fork();
+      for (const v of message.durationsSeconds) {
+        writer.int32(v);
+      }
+      writer.join();
+    }
+    if (message.maxOutputs !== 0) {
+      writer.uint32(40).int32(message.maxOutputs);
+    }
+    if (message.supportsGenerateAudio !== false) {
+      writer.uint32(48).bool(message.supportsGenerateAudio);
+    }
+    if (message.defaults !== undefined) {
+      MediaDefaultParameters.encode(message.defaults, writer.uint32(58).fork()).join();
+    }
+    for (const v of message.frameImageRoles) {
+      writer.uint32(66).string(v!);
+    }
+    for (const v of message.supportedFrameRoleCombinations) {
+      writer.uint32(74).string(v!);
+    }
+    if (message.referenceImageCount !== undefined) {
+      IntRange.encode(message.referenceImageCount, writer.uint32(82).fork()).join();
+    }
+    if (message.imageInputConstraint !== undefined) {
+      MediaInputConstraint.encode(message.imageInputConstraint, writer.uint32(90).fork()).join();
+    }
+    if (message.videoInputConstraint !== undefined) {
+      MediaInputConstraint.encode(message.videoInputConstraint, writer.uint32(98).fork()).join();
+    }
+    if (message.audioInputConstraint !== undefined) {
+      MediaInputConstraint.encode(message.audioInputConstraint, writer.uint32(106).fork()).join();
+    }
+    for (const v of message.providerOptions) {
+      MediaProviderOptionDescriptor.encode(v!, writer.uint32(114).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaModelCapabilitySpec {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaModelCapabilitySpec();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.aspectRatios.push(reader.string());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.resolutions.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.supportedSizes.push(reader.string());
+            continue;
+          }
+          case 4: {
+            if (tag === 32) {
+              message.durationsSeconds.push(reader.int32());
+
+              continue;
+            }
+
+            if (tag === 34) {
+              const end2 = reader.uint32() + reader.pos;
+              while (reader.pos < end2) {
+                message.durationsSeconds.push(reader.int32());
+              }
+
+              continue;
+            }
+
+            break;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.maxOutputs = reader.int32();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.supportsGenerateAudio = reader.bool();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.defaults = MediaDefaultParameters.decode(reader, reader.uint32());
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.frameImageRoles.push(reader.string());
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.supportedFrameRoleCombinations.push(reader.string());
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.referenceImageCount = IntRange.decode(reader, reader.uint32());
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.imageInputConstraint = MediaInputConstraint.decode(reader, reader.uint32());
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.videoInputConstraint = MediaInputConstraint.decode(reader, reader.uint32());
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.audioInputConstraint = MediaInputConstraint.decode(reader, reader.uint32());
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.providerOptions.push(MediaProviderOptionDescriptor.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaModelCapabilitySpec {
+    return {
+      aspectRatios: globalThis.Array.isArray(object?.aspectRatios)
+        ? object.aspectRatios.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.aspect_ratios)
+        ? object.aspect_ratios.map((e: any) => globalThis.String(e))
+        : [],
+      resolutions: globalThis.Array.isArray(object?.resolutions)
+        ? object.resolutions.map((e: any) => globalThis.String(e))
+        : [],
+      supportedSizes: globalThis.Array.isArray(object?.supportedSizes)
+        ? object.supportedSizes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.supported_sizes)
+        ? object.supported_sizes.map((e: any) => globalThis.String(e))
+        : [],
+      durationsSeconds: globalThis.Array.isArray(object?.durationsSeconds)
+        ? object.durationsSeconds.map((e: any) => globalThis.Number(e))
+        : globalThis.Array.isArray(object?.durations_seconds)
+        ? object.durations_seconds.map((e: any) => globalThis.Number(e))
+        : [],
+      maxOutputs: isSet(object.maxOutputs)
+        ? globalThis.Number(object.maxOutputs)
+        : isSet(object.max_outputs)
+        ? globalThis.Number(object.max_outputs)
+        : 0,
+      supportsGenerateAudio: isSet(object.supportsGenerateAudio)
+        ? globalThis.Boolean(object.supportsGenerateAudio)
+        : isSet(object.supports_generate_audio)
+        ? globalThis.Boolean(object.supports_generate_audio)
+        : false,
+      defaults: isSet(object.defaults) ? MediaDefaultParameters.fromJSON(object.defaults) : undefined,
+      frameImageRoles: globalThis.Array.isArray(object?.frameImageRoles)
+        ? object.frameImageRoles.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.frame_image_roles)
+        ? object.frame_image_roles.map((e: any) => globalThis.String(e))
+        : [],
+      supportedFrameRoleCombinations: globalThis.Array.isArray(object?.supportedFrameRoleCombinations)
+        ? object.supportedFrameRoleCombinations.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.supported_frame_role_combinations)
+        ? object.supported_frame_role_combinations.map((e: any) => globalThis.String(e))
+        : [],
+      referenceImageCount: isSet(object.referenceImageCount)
+        ? IntRange.fromJSON(object.referenceImageCount)
+        : isSet(object.reference_image_count)
+        ? IntRange.fromJSON(object.reference_image_count)
+        : undefined,
+      imageInputConstraint: isSet(object.imageInputConstraint)
+        ? MediaInputConstraint.fromJSON(object.imageInputConstraint)
+        : isSet(object.image_input_constraint)
+        ? MediaInputConstraint.fromJSON(object.image_input_constraint)
+        : undefined,
+      videoInputConstraint: isSet(object.videoInputConstraint)
+        ? MediaInputConstraint.fromJSON(object.videoInputConstraint)
+        : isSet(object.video_input_constraint)
+        ? MediaInputConstraint.fromJSON(object.video_input_constraint)
+        : undefined,
+      audioInputConstraint: isSet(object.audioInputConstraint)
+        ? MediaInputConstraint.fromJSON(object.audioInputConstraint)
+        : isSet(object.audio_input_constraint)
+        ? MediaInputConstraint.fromJSON(object.audio_input_constraint)
+        : undefined,
+      providerOptions: globalThis.Array.isArray(object?.providerOptions)
+        ? object.providerOptions.map((e: any) => MediaProviderOptionDescriptor.fromJSON(e))
+        : globalThis.Array.isArray(object?.provider_options)
+        ? object.provider_options.map((e: any) => MediaProviderOptionDescriptor.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MediaModelCapabilitySpec): unknown {
+    const obj: any = {};
+    if (message.aspectRatios?.length) {
+      obj.aspectRatios = message.aspectRatios;
+    }
+    if (message.resolutions?.length) {
+      obj.resolutions = message.resolutions;
+    }
+    if (message.supportedSizes?.length) {
+      obj.supportedSizes = message.supportedSizes;
+    }
+    if (message.durationsSeconds?.length) {
+      obj.durationsSeconds = message.durationsSeconds.map((e) => Math.round(e));
+    }
+    if (message.maxOutputs !== 0) {
+      obj.maxOutputs = Math.round(message.maxOutputs);
+    }
+    if (message.supportsGenerateAudio !== false) {
+      obj.supportsGenerateAudio = message.supportsGenerateAudio;
+    }
+    if (message.defaults !== undefined) {
+      obj.defaults = MediaDefaultParameters.toJSON(message.defaults);
+    }
+    if (message.frameImageRoles?.length) {
+      obj.frameImageRoles = message.frameImageRoles;
+    }
+    if (message.supportedFrameRoleCombinations?.length) {
+      obj.supportedFrameRoleCombinations = message.supportedFrameRoleCombinations;
+    }
+    if (message.referenceImageCount !== undefined) {
+      obj.referenceImageCount = IntRange.toJSON(message.referenceImageCount);
+    }
+    if (message.imageInputConstraint !== undefined) {
+      obj.imageInputConstraint = MediaInputConstraint.toJSON(message.imageInputConstraint);
+    }
+    if (message.videoInputConstraint !== undefined) {
+      obj.videoInputConstraint = MediaInputConstraint.toJSON(message.videoInputConstraint);
+    }
+    if (message.audioInputConstraint !== undefined) {
+      obj.audioInputConstraint = MediaInputConstraint.toJSON(message.audioInputConstraint);
+    }
+    if (message.providerOptions?.length) {
+      obj.providerOptions = message.providerOptions.map((e) => MediaProviderOptionDescriptor.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaModelCapabilitySpec>, I>>(base?: I): MediaModelCapabilitySpec {
+    return MediaModelCapabilitySpec.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaModelCapabilitySpec>, I>>(object: I): MediaModelCapabilitySpec {
+    const message = createBaseMediaModelCapabilitySpec();
+    message.aspectRatios = object.aspectRatios?.map((e) => e) || [];
+    message.resolutions = object.resolutions?.map((e) => e) || [];
+    message.supportedSizes = object.supportedSizes?.map((e) => e) || [];
+    message.durationsSeconds = object.durationsSeconds?.map((e) => e) || [];
+    message.maxOutputs = object.maxOutputs ?? 0;
+    message.supportsGenerateAudio = object.supportsGenerateAudio ?? false;
+    message.defaults = (object.defaults !== undefined && object.defaults !== null)
+      ? MediaDefaultParameters.fromPartial(object.defaults)
+      : undefined;
+    message.frameImageRoles = object.frameImageRoles?.map((e) => e) || [];
+    message.supportedFrameRoleCombinations = object.supportedFrameRoleCombinations?.map((e) => e) || [];
+    message.referenceImageCount = (object.referenceImageCount !== undefined && object.referenceImageCount !== null)
+      ? IntRange.fromPartial(object.referenceImageCount)
+      : undefined;
+    message.imageInputConstraint = (object.imageInputConstraint !== undefined && object.imageInputConstraint !== null)
+      ? MediaInputConstraint.fromPartial(object.imageInputConstraint)
+      : undefined;
+    message.videoInputConstraint = (object.videoInputConstraint !== undefined && object.videoInputConstraint !== null)
+      ? MediaInputConstraint.fromPartial(object.videoInputConstraint)
+      : undefined;
+    message.audioInputConstraint = (object.audioInputConstraint !== undefined && object.audioInputConstraint !== null)
+      ? MediaInputConstraint.fromPartial(object.audioInputConstraint)
+      : undefined;
+    message.providerOptions = object.providerOptions?.map((e) => MediaProviderOptionDescriptor.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMediaSafetyPolicy(): MediaSafetyPolicy {
+  return { policyId: "", mode: "", credentialRevision: "", videoFrameStrategy: "", failClosed: false };
+}
+
+export const MediaSafetyPolicy: MessageFns<MediaSafetyPolicy> = {
+  encode(message: MediaSafetyPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.policyId !== "") {
+      writer.uint32(10).string(message.policyId);
+    }
+    if (message.mode !== "") {
+      writer.uint32(18).string(message.mode);
+    }
+    if (message.credentialRevision !== "") {
+      writer.uint32(26).string(message.credentialRevision);
+    }
+    if (message.videoFrameStrategy !== "") {
+      writer.uint32(34).string(message.videoFrameStrategy);
+    }
+    if (message.failClosed !== false) {
+      writer.uint32(40).bool(message.failClosed);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaSafetyPolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaSafetyPolicy();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.policyId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.mode = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.credentialRevision = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.videoFrameStrategy = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.failClosed = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaSafetyPolicy {
+    return {
+      policyId: isSet(object.policyId)
+        ? globalThis.String(object.policyId)
+        : isSet(object.policy_id)
+        ? globalThis.String(object.policy_id)
+        : "",
+      mode: isSet(object.mode) ? globalThis.String(object.mode) : "",
+      credentialRevision: isSet(object.credentialRevision)
+        ? globalThis.String(object.credentialRevision)
+        : isSet(object.credential_revision)
+        ? globalThis.String(object.credential_revision)
+        : "",
+      videoFrameStrategy: isSet(object.videoFrameStrategy)
+        ? globalThis.String(object.videoFrameStrategy)
+        : isSet(object.video_frame_strategy)
+        ? globalThis.String(object.video_frame_strategy)
+        : "",
+      failClosed: isSet(object.failClosed)
+        ? globalThis.Boolean(object.failClosed)
+        : isSet(object.fail_closed)
+        ? globalThis.Boolean(object.fail_closed)
+        : false,
+    };
+  },
+
+  toJSON(message: MediaSafetyPolicy): unknown {
+    const obj: any = {};
+    if (message.policyId !== "") {
+      obj.policyId = message.policyId;
+    }
+    if (message.mode !== "") {
+      obj.mode = message.mode;
+    }
+    if (message.credentialRevision !== "") {
+      obj.credentialRevision = message.credentialRevision;
+    }
+    if (message.videoFrameStrategy !== "") {
+      obj.videoFrameStrategy = message.videoFrameStrategy;
+    }
+    if (message.failClosed !== false) {
+      obj.failClosed = message.failClosed;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaSafetyPolicy>, I>>(base?: I): MediaSafetyPolicy {
+    return MediaSafetyPolicy.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaSafetyPolicy>, I>>(object: I): MediaSafetyPolicy {
+    const message = createBaseMediaSafetyPolicy();
+    message.policyId = object.policyId ?? "";
+    message.mode = object.mode ?? "";
+    message.credentialRevision = object.credentialRevision ?? "";
+    message.videoFrameStrategy = object.videoFrameStrategy ?? "";
+    message.failClosed = object.failClosed ?? false;
+    return message;
+  },
+};
+
+function createBaseMandatoryReasoningPolicy(): MandatoryReasoningPolicy {
+  return { mandatory: false, supportedEfforts: [], defaultEffort: "" };
+}
+
+export const MandatoryReasoningPolicy: MessageFns<MandatoryReasoningPolicy> = {
+  encode(message: MandatoryReasoningPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mandatory !== false) {
+      writer.uint32(8).bool(message.mandatory);
+    }
+    for (const v of message.supportedEfforts) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.defaultEffort !== "") {
+      writer.uint32(26).string(message.defaultEffort);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MandatoryReasoningPolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMandatoryReasoningPolicy();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.mandatory = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.supportedEfforts.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.defaultEffort = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MandatoryReasoningPolicy {
+    return {
+      mandatory: isSet(object.mandatory) ? globalThis.Boolean(object.mandatory) : false,
+      supportedEfforts: globalThis.Array.isArray(object?.supportedEfforts)
+        ? object.supportedEfforts.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.supported_efforts)
+        ? object.supported_efforts.map((e: any) => globalThis.String(e))
+        : [],
+      defaultEffort: isSet(object.defaultEffort)
+        ? globalThis.String(object.defaultEffort)
+        : isSet(object.default_effort)
+        ? globalThis.String(object.default_effort)
+        : "",
+    };
+  },
+
+  toJSON(message: MandatoryReasoningPolicy): unknown {
+    const obj: any = {};
+    if (message.mandatory !== false) {
+      obj.mandatory = message.mandatory;
+    }
+    if (message.supportedEfforts?.length) {
+      obj.supportedEfforts = message.supportedEfforts;
+    }
+    if (message.defaultEffort !== "") {
+      obj.defaultEffort = message.defaultEffort;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MandatoryReasoningPolicy>, I>>(base?: I): MandatoryReasoningPolicy {
+    return MandatoryReasoningPolicy.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MandatoryReasoningPolicy>, I>>(object: I): MandatoryReasoningPolicy {
+    const message = createBaseMandatoryReasoningPolicy();
+    message.mandatory = object.mandatory ?? false;
+    message.supportedEfforts = object.supportedEfforts?.map((e) => e) || [];
+    message.defaultEffort = object.defaultEffort ?? "";
+    return message;
+  },
+};
+
+function createBaseServerToolConfig(): ServerToolConfig {
+  return { toolName: "", enabled: false, pricePerCallUsdDec: "", defaultMaxResults: 0, hardMaxResults: 0 };
+}
+
+export const ServerToolConfig: MessageFns<ServerToolConfig> = {
+  encode(message: ServerToolConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.toolName !== "") {
+      writer.uint32(10).string(message.toolName);
+    }
+    if (message.enabled !== false) {
+      writer.uint32(16).bool(message.enabled);
+    }
+    if (message.pricePerCallUsdDec !== "") {
+      writer.uint32(26).string(message.pricePerCallUsdDec);
+    }
+    if (message.defaultMaxResults !== 0) {
+      writer.uint32(32).int32(message.defaultMaxResults);
+    }
+    if (message.hardMaxResults !== 0) {
+      writer.uint32(40).int32(message.hardMaxResults);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ServerToolConfig {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseServerToolConfig();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.toolName = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.enabled = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.pricePerCallUsdDec = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.defaultMaxResults = reader.int32();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.hardMaxResults = reader.int32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ServerToolConfig {
+    return {
+      toolName: isSet(object.toolName)
+        ? globalThis.String(object.toolName)
+        : isSet(object.tool_name)
+        ? globalThis.String(object.tool_name)
+        : "",
+      enabled: isSet(object.enabled) ? globalThis.Boolean(object.enabled) : false,
+      pricePerCallUsdDec: isSet(object.pricePerCallUsdDec)
+        ? globalThis.String(object.pricePerCallUsdDec)
+        : isSet(object.price_per_call_usd_dec)
+        ? globalThis.String(object.price_per_call_usd_dec)
+        : "",
+      defaultMaxResults: isSet(object.defaultMaxResults)
+        ? globalThis.Number(object.defaultMaxResults)
+        : isSet(object.default_max_results)
+        ? globalThis.Number(object.default_max_results)
+        : 0,
+      hardMaxResults: isSet(object.hardMaxResults)
+        ? globalThis.Number(object.hardMaxResults)
+        : isSet(object.hard_max_results)
+        ? globalThis.Number(object.hard_max_results)
+        : 0,
+    };
+  },
+
+  toJSON(message: ServerToolConfig): unknown {
+    const obj: any = {};
+    if (message.toolName !== "") {
+      obj.toolName = message.toolName;
+    }
+    if (message.enabled !== false) {
+      obj.enabled = message.enabled;
+    }
+    if (message.pricePerCallUsdDec !== "") {
+      obj.pricePerCallUsdDec = message.pricePerCallUsdDec;
+    }
+    if (message.defaultMaxResults !== 0) {
+      obj.defaultMaxResults = Math.round(message.defaultMaxResults);
+    }
+    if (message.hardMaxResults !== 0) {
+      obj.hardMaxResults = Math.round(message.hardMaxResults);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ServerToolConfig>, I>>(base?: I): ServerToolConfig {
+    return ServerToolConfig.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ServerToolConfig>, I>>(object: I): ServerToolConfig {
+    const message = createBaseServerToolConfig();
+    message.toolName = object.toolName ?? "";
+    message.enabled = object.enabled ?? false;
+    message.pricePerCallUsdDec = object.pricePerCallUsdDec ?? "";
+    message.defaultMaxResults = object.defaultMaxResults ?? 0;
+    message.hardMaxResults = object.hardMaxResults ?? 0;
+    return message;
+  },
+};
+
+function createBaseMediaOfferingSpec(): MediaOfferingSpec {
+  return { clarityParameter: "", outputHostnameSuffixes: [], upstreamEndpointKind: "" };
+}
+
+export const MediaOfferingSpec: MessageFns<MediaOfferingSpec> = {
+  encode(message: MediaOfferingSpec, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.clarityParameter !== "") {
+      writer.uint32(10).string(message.clarityParameter);
+    }
+    for (const v of message.outputHostnameSuffixes) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.upstreamEndpointKind !== "") {
+      writer.uint32(26).string(message.upstreamEndpointKind);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaOfferingSpec {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaOfferingSpec();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.clarityParameter = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.outputHostnameSuffixes.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.upstreamEndpointKind = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaOfferingSpec {
+    return {
+      clarityParameter: isSet(object.clarityParameter)
+        ? globalThis.String(object.clarityParameter)
+        : isSet(object.clarity_parameter)
+        ? globalThis.String(object.clarity_parameter)
+        : "",
+      outputHostnameSuffixes: globalThis.Array.isArray(object?.outputHostnameSuffixes)
+        ? object.outputHostnameSuffixes.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.output_hostname_suffixes)
+        ? object.output_hostname_suffixes.map((e: any) => globalThis.String(e))
+        : [],
+      upstreamEndpointKind: isSet(object.upstreamEndpointKind)
+        ? globalThis.String(object.upstreamEndpointKind)
+        : isSet(object.upstream_endpoint_kind)
+        ? globalThis.String(object.upstream_endpoint_kind)
+        : "",
+    };
+  },
+
+  toJSON(message: MediaOfferingSpec): unknown {
+    const obj: any = {};
+    if (message.clarityParameter !== "") {
+      obj.clarityParameter = message.clarityParameter;
+    }
+    if (message.outputHostnameSuffixes?.length) {
+      obj.outputHostnameSuffixes = message.outputHostnameSuffixes;
+    }
+    if (message.upstreamEndpointKind !== "") {
+      obj.upstreamEndpointKind = message.upstreamEndpointKind;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaOfferingSpec>, I>>(base?: I): MediaOfferingSpec {
+    return MediaOfferingSpec.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaOfferingSpec>, I>>(object: I): MediaOfferingSpec {
+    const message = createBaseMediaOfferingSpec();
+    message.clarityParameter = object.clarityParameter ?? "";
+    message.outputHostnameSuffixes = object.outputHostnameSuffixes?.map((e) => e) || [];
+    message.upstreamEndpointKind = object.upstreamEndpointKind ?? "";
+    return message;
+  },
+};
+
 function createBaseCustomerModelRecord(): CustomerModelRecord {
   return {
     modelId: "",
@@ -1769,6 +4118,10 @@ function createBaseCustomerModelRecord(): CustomerModelRecord {
     defaultMaxOutputTokens: 0n,
     modelAliases: [],
     offeringIds: [],
+    inputModalities: [],
+    outputModalities: [],
+    mediaCapability: undefined,
+    mediaSafetyPolicy: undefined,
   };
 }
 
@@ -1806,6 +4159,18 @@ export const CustomerModelRecord: MessageFns<CustomerModelRecord> = {
     }
     for (const v of message.offeringIds) {
       writer.uint32(82).string(v!);
+    }
+    for (const v of message.inputModalities) {
+      writer.uint32(90).string(v!);
+    }
+    for (const v of message.outputModalities) {
+      writer.uint32(98).string(v!);
+    }
+    if (message.mediaCapability !== undefined) {
+      MediaModelCapabilitySpec.encode(message.mediaCapability, writer.uint32(106).fork()).join();
+    }
+    if (message.mediaSafetyPolicy !== undefined) {
+      MediaSafetyPolicy.encode(message.mediaSafetyPolicy, writer.uint32(114).fork()).join();
     }
     return writer;
   },
@@ -1903,6 +4268,38 @@ export const CustomerModelRecord: MessageFns<CustomerModelRecord> = {
             message.offeringIds.push(reader.string());
             continue;
           }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.inputModalities.push(reader.string());
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.outputModalities.push(reader.string());
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.mediaCapability = MediaModelCapabilitySpec.decode(reader, reader.uint32());
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.mediaSafetyPolicy = MediaSafetyPolicy.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1955,6 +4352,26 @@ export const CustomerModelRecord: MessageFns<CustomerModelRecord> = {
         : globalThis.Array.isArray(object?.offering_ids)
         ? object.offering_ids.map((e: any) => globalThis.String(e))
         : [],
+      inputModalities: globalThis.Array.isArray(object?.inputModalities)
+        ? object.inputModalities.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.input_modalities)
+        ? object.input_modalities.map((e: any) => globalThis.String(e))
+        : [],
+      outputModalities: globalThis.Array.isArray(object?.outputModalities)
+        ? object.outputModalities.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.output_modalities)
+        ? object.output_modalities.map((e: any) => globalThis.String(e))
+        : [],
+      mediaCapability: isSet(object.mediaCapability)
+        ? MediaModelCapabilitySpec.fromJSON(object.mediaCapability)
+        : isSet(object.media_capability)
+        ? MediaModelCapabilitySpec.fromJSON(object.media_capability)
+        : undefined,
+      mediaSafetyPolicy: isSet(object.mediaSafetyPolicy)
+        ? MediaSafetyPolicy.fromJSON(object.mediaSafetyPolicy)
+        : isSet(object.media_safety_policy)
+        ? MediaSafetyPolicy.fromJSON(object.media_safety_policy)
+        : undefined,
     };
   },
 
@@ -1990,6 +4407,18 @@ export const CustomerModelRecord: MessageFns<CustomerModelRecord> = {
     if (message.offeringIds?.length) {
       obj.offeringIds = message.offeringIds;
     }
+    if (message.inputModalities?.length) {
+      obj.inputModalities = message.inputModalities;
+    }
+    if (message.outputModalities?.length) {
+      obj.outputModalities = message.outputModalities;
+    }
+    if (message.mediaCapability !== undefined) {
+      obj.mediaCapability = MediaModelCapabilitySpec.toJSON(message.mediaCapability);
+    }
+    if (message.mediaSafetyPolicy !== undefined) {
+      obj.mediaSafetyPolicy = MediaSafetyPolicy.toJSON(message.mediaSafetyPolicy);
+    }
     return obj;
   },
 
@@ -2011,6 +4440,14 @@ export const CustomerModelRecord: MessageFns<CustomerModelRecord> = {
         : 0n;
     message.modelAliases = object.modelAliases?.map((e) => e) || [];
     message.offeringIds = object.offeringIds?.map((e) => e) || [];
+    message.inputModalities = object.inputModalities?.map((e) => e) || [];
+    message.outputModalities = object.outputModalities?.map((e) => e) || [];
+    message.mediaCapability = (object.mediaCapability !== undefined && object.mediaCapability !== null)
+      ? MediaModelCapabilitySpec.fromPartial(object.mediaCapability)
+      : undefined;
+    message.mediaSafetyPolicy = (object.mediaSafetyPolicy !== undefined && object.mediaSafetyPolicy !== null)
+      ? MediaSafetyPolicy.fromPartial(object.mediaSafetyPolicy)
+      : undefined;
     return message;
   },
 };
@@ -2312,6 +4749,13 @@ function createBaseOfferingRecord(): OfferingRecord {
     providerCostCard: undefined,
     customerRateCard: undefined,
     observedPerformance: undefined,
+    customerChargeMode: 0,
+    holdBufferBps: 0,
+    markupMultiplierDec: "",
+    mandatoryReasoningPolicy: undefined,
+    omittableParameters: [],
+    serverTools: [],
+    mediaOfferingSpec: undefined,
   };
 }
 
@@ -2436,6 +4880,27 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     }
     if (message.observedPerformance !== undefined) {
       ObservedPerformanceSummary.encode(message.observedPerformance, writer.uint32(274).fork()).join();
+    }
+    if (message.customerChargeMode !== 0) {
+      writer.uint32(280).int32(message.customerChargeMode);
+    }
+    if (message.holdBufferBps !== 0) {
+      writer.uint32(288).int32(message.holdBufferBps);
+    }
+    if (message.markupMultiplierDec !== "") {
+      writer.uint32(298).string(message.markupMultiplierDec);
+    }
+    if (message.mandatoryReasoningPolicy !== undefined) {
+      MandatoryReasoningPolicy.encode(message.mandatoryReasoningPolicy, writer.uint32(306).fork()).join();
+    }
+    for (const v of message.omittableParameters) {
+      writer.uint32(314).string(v!);
+    }
+    for (const v of message.serverTools) {
+      ServerToolConfig.encode(v!, writer.uint32(322).fork()).join();
+    }
+    if (message.mediaOfferingSpec !== undefined) {
+      MediaOfferingSpec.encode(message.mediaOfferingSpec, writer.uint32(330).fork()).join();
     }
     return writer;
   },
@@ -2725,6 +5190,62 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
             message.observedPerformance = ObservedPerformanceSummary.decode(reader, reader.uint32());
             continue;
           }
+          case 35: {
+            if (tag !== 280) {
+              break;
+            }
+
+            message.customerChargeMode = reader.int32() as any;
+            continue;
+          }
+          case 36: {
+            if (tag !== 288) {
+              break;
+            }
+
+            message.holdBufferBps = reader.int32();
+            continue;
+          }
+          case 37: {
+            if (tag !== 298) {
+              break;
+            }
+
+            message.markupMultiplierDec = reader.string();
+            continue;
+          }
+          case 38: {
+            if (tag !== 306) {
+              break;
+            }
+
+            message.mandatoryReasoningPolicy = MandatoryReasoningPolicy.decode(reader, reader.uint32());
+            continue;
+          }
+          case 39: {
+            if (tag !== 314) {
+              break;
+            }
+
+            message.omittableParameters.push(reader.string());
+            continue;
+          }
+          case 40: {
+            if (tag !== 322) {
+              break;
+            }
+
+            message.serverTools.push(ServerToolConfig.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 41: {
+            if (tag !== 330) {
+              break;
+            }
+
+            message.mediaOfferingSpec = MediaOfferingSpec.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2907,6 +5428,41 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
         : isSet(object.observed_performance)
         ? ObservedPerformanceSummary.fromJSON(object.observed_performance)
         : undefined,
+      customerChargeMode: isSet(object.customerChargeMode)
+        ? customerChargeModeFromJSON(object.customerChargeMode)
+        : isSet(object.customer_charge_mode)
+        ? customerChargeModeFromJSON(object.customer_charge_mode)
+        : 0,
+      holdBufferBps: isSet(object.holdBufferBps)
+        ? globalThis.Number(object.holdBufferBps)
+        : isSet(object.hold_buffer_bps)
+        ? globalThis.Number(object.hold_buffer_bps)
+        : 0,
+      markupMultiplierDec: isSet(object.markupMultiplierDec)
+        ? globalThis.String(object.markupMultiplierDec)
+        : isSet(object.markup_multiplier_dec)
+        ? globalThis.String(object.markup_multiplier_dec)
+        : "",
+      mandatoryReasoningPolicy: isSet(object.mandatoryReasoningPolicy)
+        ? MandatoryReasoningPolicy.fromJSON(object.mandatoryReasoningPolicy)
+        : isSet(object.mandatory_reasoning_policy)
+        ? MandatoryReasoningPolicy.fromJSON(object.mandatory_reasoning_policy)
+        : undefined,
+      omittableParameters: globalThis.Array.isArray(object?.omittableParameters)
+        ? object.omittableParameters.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.omittable_parameters)
+        ? object.omittable_parameters.map((e: any) => globalThis.String(e))
+        : [],
+      serverTools: globalThis.Array.isArray(object?.serverTools)
+        ? object.serverTools.map((e: any) => ServerToolConfig.fromJSON(e))
+        : globalThis.Array.isArray(object?.server_tools)
+        ? object.server_tools.map((e: any) => ServerToolConfig.fromJSON(e))
+        : [],
+      mediaOfferingSpec: isSet(object.mediaOfferingSpec)
+        ? MediaOfferingSpec.fromJSON(object.mediaOfferingSpec)
+        : isSet(object.media_offering_spec)
+        ? MediaOfferingSpec.fromJSON(object.media_offering_spec)
+        : undefined,
     };
   },
 
@@ -3014,6 +5570,27 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     if (message.observedPerformance !== undefined) {
       obj.observedPerformance = ObservedPerformanceSummary.toJSON(message.observedPerformance);
     }
+    if (message.customerChargeMode !== 0) {
+      obj.customerChargeMode = customerChargeModeToJSON(message.customerChargeMode);
+    }
+    if (message.holdBufferBps !== 0) {
+      obj.holdBufferBps = Math.round(message.holdBufferBps);
+    }
+    if (message.markupMultiplierDec !== "") {
+      obj.markupMultiplierDec = message.markupMultiplierDec;
+    }
+    if (message.mandatoryReasoningPolicy !== undefined) {
+      obj.mandatoryReasoningPolicy = MandatoryReasoningPolicy.toJSON(message.mandatoryReasoningPolicy);
+    }
+    if (message.omittableParameters?.length) {
+      obj.omittableParameters = message.omittableParameters;
+    }
+    if (message.serverTools?.length) {
+      obj.serverTools = message.serverTools.map((e) => ServerToolConfig.toJSON(e));
+    }
+    if (message.mediaOfferingSpec !== undefined) {
+      obj.mediaOfferingSpec = MediaOfferingSpec.toJSON(message.mediaOfferingSpec);
+    }
     return obj;
   },
 
@@ -3075,12 +5652,34 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     message.observedPerformance = (object.observedPerformance !== undefined && object.observedPerformance !== null)
       ? ObservedPerformanceSummary.fromPartial(object.observedPerformance)
       : undefined;
+    message.customerChargeMode = object.customerChargeMode ?? 0;
+    message.holdBufferBps = object.holdBufferBps ?? 0;
+    message.markupMultiplierDec = object.markupMultiplierDec ?? "";
+    message.mandatoryReasoningPolicy =
+      (object.mandatoryReasoningPolicy !== undefined && object.mandatoryReasoningPolicy !== null)
+        ? MandatoryReasoningPolicy.fromPartial(object.mandatoryReasoningPolicy)
+        : undefined;
+    message.omittableParameters = object.omittableParameters?.map((e) => e) || [];
+    message.serverTools = object.serverTools?.map((e) => ServerToolConfig.fromPartial(e)) || [];
+    message.mediaOfferingSpec = (object.mediaOfferingSpec !== undefined && object.mediaOfferingSpec !== null)
+      ? MediaOfferingSpec.fromPartial(object.mediaOfferingSpec)
+      : undefined;
     return message;
   },
 };
 
 function createBaseTierGroupRecord(): TierGroupRecord {
-  return { groupId: "", displayName: "", modality: 0, targetTier: 0, memberModelIds: [] };
+  return {
+    groupId: "",
+    displayName: "",
+    modality: 0,
+    targetTier: 0,
+    memberModelIds: [],
+    autoPublishMaxChangePct: 0,
+    sourceGroupIds: [],
+    fixedModelIds: [],
+    excludedModelIds: [],
+  };
 }
 
 export const TierGroupRecord: MessageFns<TierGroupRecord> = {
@@ -3099,6 +5698,18 @@ export const TierGroupRecord: MessageFns<TierGroupRecord> = {
     }
     for (const v of message.memberModelIds) {
       writer.uint32(42).string(v!);
+    }
+    if (message.autoPublishMaxChangePct !== 0) {
+      writer.uint32(48).int32(message.autoPublishMaxChangePct);
+    }
+    for (const v of message.sourceGroupIds) {
+      writer.uint32(58).string(v!);
+    }
+    for (const v of message.fixedModelIds) {
+      writer.uint32(66).string(v!);
+    }
+    for (const v of message.excludedModelIds) {
+      writer.uint32(74).string(v!);
     }
     return writer;
   },
@@ -3156,6 +5767,38 @@ export const TierGroupRecord: MessageFns<TierGroupRecord> = {
             message.memberModelIds.push(reader.string());
             continue;
           }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.autoPublishMaxChangePct = reader.int32();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.sourceGroupIds.push(reader.string());
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.fixedModelIds.push(reader.string());
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.excludedModelIds.push(reader.string());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3191,6 +5834,26 @@ export const TierGroupRecord: MessageFns<TierGroupRecord> = {
         : globalThis.Array.isArray(object?.member_model_ids)
         ? object.member_model_ids.map((e: any) => globalThis.String(e))
         : [],
+      autoPublishMaxChangePct: isSet(object.autoPublishMaxChangePct)
+        ? globalThis.Number(object.autoPublishMaxChangePct)
+        : isSet(object.auto_publish_max_change_pct)
+        ? globalThis.Number(object.auto_publish_max_change_pct)
+        : 0,
+      sourceGroupIds: globalThis.Array.isArray(object?.sourceGroupIds)
+        ? object.sourceGroupIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.source_group_ids)
+        ? object.source_group_ids.map((e: any) => globalThis.String(e))
+        : [],
+      fixedModelIds: globalThis.Array.isArray(object?.fixedModelIds)
+        ? object.fixedModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.fixed_model_ids)
+        ? object.fixed_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+      excludedModelIds: globalThis.Array.isArray(object?.excludedModelIds)
+        ? object.excludedModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.excluded_model_ids)
+        ? object.excluded_model_ids.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -3211,6 +5874,18 @@ export const TierGroupRecord: MessageFns<TierGroupRecord> = {
     if (message.memberModelIds?.length) {
       obj.memberModelIds = message.memberModelIds;
     }
+    if (message.autoPublishMaxChangePct !== 0) {
+      obj.autoPublishMaxChangePct = Math.round(message.autoPublishMaxChangePct);
+    }
+    if (message.sourceGroupIds?.length) {
+      obj.sourceGroupIds = message.sourceGroupIds;
+    }
+    if (message.fixedModelIds?.length) {
+      obj.fixedModelIds = message.fixedModelIds;
+    }
+    if (message.excludedModelIds?.length) {
+      obj.excludedModelIds = message.excludedModelIds;
+    }
     return obj;
   },
 
@@ -3224,6 +5899,374 @@ export const TierGroupRecord: MessageFns<TierGroupRecord> = {
     message.modality = object.modality ?? 0;
     message.targetTier = object.targetTier ?? 0;
     message.memberModelIds = object.memberModelIds?.map((e) => e) || [];
+    message.autoPublishMaxChangePct = object.autoPublishMaxChangePct ?? 0;
+    message.sourceGroupIds = object.sourceGroupIds?.map((e) => e) || [];
+    message.fixedModelIds = object.fixedModelIds?.map((e) => e) || [];
+    message.excludedModelIds = object.excludedModelIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseSourceGroupRecord(): SourceGroupRecord {
+  return {
+    groupId: "",
+    displayName: "",
+    modality: 0,
+    memberCustomerModelIds: [],
+    fixedModelIds: [],
+    excludedModelIds: [],
+    autoMatchRuleJson: "",
+    version: "",
+  };
+}
+
+export const SourceGroupRecord: MessageFns<SourceGroupRecord> = {
+  encode(message: SourceGroupRecord, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.groupId !== "") {
+      writer.uint32(10).string(message.groupId);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(18).string(message.displayName);
+    }
+    if (message.modality !== 0) {
+      writer.uint32(24).int32(message.modality);
+    }
+    for (const v of message.memberCustomerModelIds) {
+      writer.uint32(34).string(v!);
+    }
+    for (const v of message.fixedModelIds) {
+      writer.uint32(42).string(v!);
+    }
+    for (const v of message.excludedModelIds) {
+      writer.uint32(50).string(v!);
+    }
+    if (message.autoMatchRuleJson !== "") {
+      writer.uint32(58).string(message.autoMatchRuleJson);
+    }
+    if (message.version !== "") {
+      writer.uint32(66).string(message.version);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SourceGroupRecord {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSourceGroupRecord();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.groupId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.displayName = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.modality = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.memberCustomerModelIds.push(reader.string());
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.fixedModelIds.push(reader.string());
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.excludedModelIds.push(reader.string());
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.autoMatchRuleJson = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.version = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SourceGroupRecord {
+    return {
+      groupId: isSet(object.groupId)
+        ? globalThis.String(object.groupId)
+        : isSet(object.group_id)
+        ? globalThis.String(object.group_id)
+        : "",
+      displayName: isSet(object.displayName)
+        ? globalThis.String(object.displayName)
+        : isSet(object.display_name)
+        ? globalThis.String(object.display_name)
+        : "",
+      modality: isSet(object.modality) ? modalityFromJSON(object.modality) : 0,
+      memberCustomerModelIds: globalThis.Array.isArray(object?.memberCustomerModelIds)
+        ? object.memberCustomerModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.member_customer_model_ids)
+        ? object.member_customer_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+      fixedModelIds: globalThis.Array.isArray(object?.fixedModelIds)
+        ? object.fixedModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.fixed_model_ids)
+        ? object.fixed_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+      excludedModelIds: globalThis.Array.isArray(object?.excludedModelIds)
+        ? object.excludedModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.excluded_model_ids)
+        ? object.excluded_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+      autoMatchRuleJson: isSet(object.autoMatchRuleJson)
+        ? globalThis.String(object.autoMatchRuleJson)
+        : isSet(object.auto_match_rule_json)
+        ? globalThis.String(object.auto_match_rule_json)
+        : "",
+      version: isSet(object.version) ? globalThis.String(object.version) : "",
+    };
+  },
+
+  toJSON(message: SourceGroupRecord): unknown {
+    const obj: any = {};
+    if (message.groupId !== "") {
+      obj.groupId = message.groupId;
+    }
+    if (message.displayName !== "") {
+      obj.displayName = message.displayName;
+    }
+    if (message.modality !== 0) {
+      obj.modality = modalityToJSON(message.modality);
+    }
+    if (message.memberCustomerModelIds?.length) {
+      obj.memberCustomerModelIds = message.memberCustomerModelIds;
+    }
+    if (message.fixedModelIds?.length) {
+      obj.fixedModelIds = message.fixedModelIds;
+    }
+    if (message.excludedModelIds?.length) {
+      obj.excludedModelIds = message.excludedModelIds;
+    }
+    if (message.autoMatchRuleJson !== "") {
+      obj.autoMatchRuleJson = message.autoMatchRuleJson;
+    }
+    if (message.version !== "") {
+      obj.version = message.version;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SourceGroupRecord>, I>>(base?: I): SourceGroupRecord {
+    return SourceGroupRecord.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SourceGroupRecord>, I>>(object: I): SourceGroupRecord {
+    const message = createBaseSourceGroupRecord();
+    message.groupId = object.groupId ?? "";
+    message.displayName = object.displayName ?? "";
+    message.modality = object.modality ?? 0;
+    message.memberCustomerModelIds = object.memberCustomerModelIds?.map((e) => e) || [];
+    message.fixedModelIds = object.fixedModelIds?.map((e) => e) || [];
+    message.excludedModelIds = object.excludedModelIds?.map((e) => e) || [];
+    message.autoMatchRuleJson = object.autoMatchRuleJson ?? "";
+    message.version = object.version ?? "";
+    return message;
+  },
+};
+
+function createBaseModelTierOverrideRecord(): ModelTierOverrideRecord {
+  return { customerModelId: "", modality: 0, overrideTier: 0, reason: "", updatedAtUnixMs: 0n };
+}
+
+export const ModelTierOverrideRecord: MessageFns<ModelTierOverrideRecord> = {
+  encode(message: ModelTierOverrideRecord, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.customerModelId !== "") {
+      writer.uint32(10).string(message.customerModelId);
+    }
+    if (message.modality !== 0) {
+      writer.uint32(16).int32(message.modality);
+    }
+    if (message.overrideTier !== 0) {
+      writer.uint32(24).int32(message.overrideTier);
+    }
+    if (message.reason !== "") {
+      writer.uint32(34).string(message.reason);
+    }
+    if (message.updatedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.updatedAtUnixMs) !== message.updatedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.updatedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.updatedAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ModelTierOverrideRecord {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseModelTierOverrideRecord();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.customerModelId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.modality = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.overrideTier = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.updatedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ModelTierOverrideRecord {
+    return {
+      customerModelId: isSet(object.customerModelId)
+        ? globalThis.String(object.customerModelId)
+        : isSet(object.customer_model_id)
+        ? globalThis.String(object.customer_model_id)
+        : "",
+      modality: isSet(object.modality) ? modalityFromJSON(object.modality) : 0,
+      overrideTier: isSet(object.overrideTier)
+        ? modelTierFromJSON(object.overrideTier)
+        : isSet(object.override_tier)
+        ? modelTierFromJSON(object.override_tier)
+        : 0,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      updatedAtUnixMs: isSet(object.updatedAtUnixMs)
+        ? BigInt(object.updatedAtUnixMs)
+        : isSet(object.updated_at_unix_ms)
+        ? BigInt(object.updated_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ModelTierOverrideRecord): unknown {
+    const obj: any = {};
+    if (message.customerModelId !== "") {
+      obj.customerModelId = message.customerModelId;
+    }
+    if (message.modality !== 0) {
+      obj.modality = modalityToJSON(message.modality);
+    }
+    if (message.overrideTier !== 0) {
+      obj.overrideTier = modelTierToJSON(message.overrideTier);
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.updatedAtUnixMs !== 0n) {
+      obj.updatedAtUnixMs = message.updatedAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelTierOverrideRecord>, I>>(base?: I): ModelTierOverrideRecord {
+    return ModelTierOverrideRecord.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelTierOverrideRecord>, I>>(object: I): ModelTierOverrideRecord {
+    const message = createBaseModelTierOverrideRecord();
+    message.customerModelId = object.customerModelId ?? "";
+    message.modality = object.modality ?? 0;
+    message.overrideTier = object.overrideTier ?? 0;
+    message.reason = object.reason ?? "";
+    message.updatedAtUnixMs = (object.updatedAtUnixMs !== undefined && object.updatedAtUnixMs !== null)
+      ? BigInt(object.updatedAtUnixMs)
+      : 0n;
     return message;
   },
 };
@@ -3895,6 +6938,8 @@ function createBaseCatalogSnapshot(): CatalogSnapshot {
     curation: undefined,
     autoPool: [],
     budgetPolicy: undefined,
+    sourceGroups: [],
+    modelTierOverrides: [],
   };
 }
 
@@ -3932,6 +6977,12 @@ export const CatalogSnapshot: MessageFns<CatalogSnapshot> = {
     }
     if (message.budgetPolicy !== undefined) {
       BudgetPolicy.encode(message.budgetPolicy, writer.uint32(82).fork()).join();
+    }
+    for (const v of message.sourceGroups) {
+      SourceGroupRecord.encode(v!, writer.uint32(90).fork()).join();
+    }
+    for (const v of message.modelTierOverrides) {
+      ModelTierOverrideRecord.encode(v!, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -4029,6 +7080,22 @@ export const CatalogSnapshot: MessageFns<CatalogSnapshot> = {
             message.budgetPolicy = BudgetPolicy.decode(reader, reader.uint32());
             continue;
           }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.sourceGroups.push(SourceGroupRecord.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.modelTierOverrides.push(ModelTierOverrideRecord.decode(reader, reader.uint32()));
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -4081,6 +7148,16 @@ export const CatalogSnapshot: MessageFns<CatalogSnapshot> = {
         : isSet(object.budget_policy)
         ? BudgetPolicy.fromJSON(object.budget_policy)
         : undefined,
+      sourceGroups: globalThis.Array.isArray(object?.sourceGroups)
+        ? object.sourceGroups.map((e: any) => SourceGroupRecord.fromJSON(e))
+        : globalThis.Array.isArray(object?.source_groups)
+        ? object.source_groups.map((e: any) => SourceGroupRecord.fromJSON(e))
+        : [],
+      modelTierOverrides: globalThis.Array.isArray(object?.modelTierOverrides)
+        ? object.modelTierOverrides.map((e: any) => ModelTierOverrideRecord.fromJSON(e))
+        : globalThis.Array.isArray(object?.model_tier_overrides)
+        ? object.model_tier_overrides.map((e: any) => ModelTierOverrideRecord.fromJSON(e))
+        : [],
     };
   },
 
@@ -4116,6 +7193,12 @@ export const CatalogSnapshot: MessageFns<CatalogSnapshot> = {
     if (message.budgetPolicy !== undefined) {
       obj.budgetPolicy = BudgetPolicy.toJSON(message.budgetPolicy);
     }
+    if (message.sourceGroups?.length) {
+      obj.sourceGroups = message.sourceGroups.map((e) => SourceGroupRecord.toJSON(e));
+    }
+    if (message.modelTierOverrides?.length) {
+      obj.modelTierOverrides = message.modelTierOverrides.map((e) => ModelTierOverrideRecord.toJSON(e));
+    }
     return obj;
   },
 
@@ -4140,6 +7223,8 @@ export const CatalogSnapshot: MessageFns<CatalogSnapshot> = {
     message.budgetPolicy = (object.budgetPolicy !== undefined && object.budgetPolicy !== null)
       ? BudgetPolicy.fromPartial(object.budgetPolicy)
       : undefined;
+    message.sourceGroups = object.sourceGroups?.map((e) => SourceGroupRecord.fromPartial(e)) || [];
+    message.modelTierOverrides = object.modelTierOverrides?.map((e) => ModelTierOverrideRecord.fromPartial(e)) || [];
     return message;
   },
 };
@@ -5379,6 +8464,7 @@ function createBaseEncryptedCredentialItem(): EncryptedCredentialItem {
     nonce: Buffer.alloc(0),
     ciphertext: Buffer.alloc(0),
     updatedAtUnixMs: 0n,
+    targetNodeRoles: [],
   };
 }
 
@@ -5413,6 +8499,9 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
         throw new globalThis.Error("value provided for field message.updatedAtUnixMs of type int64 too large");
       }
       writer.uint32(72).int64(message.updatedAtUnixMs);
+    }
+    for (const v of message.targetNodeRoles) {
+      writer.uint32(82).string(v!);
     }
     return writer;
   },
@@ -5502,6 +8591,14 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
             message.updatedAtUnixMs = reader.int64() as bigint;
             continue;
           }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.targetNodeRoles.push(reader.string());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -5549,6 +8646,11 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
         : isSet(object.updated_at_unix_ms)
         ? BigInt(object.updated_at_unix_ms)
         : 0n,
+      targetNodeRoles: globalThis.Array.isArray(object?.targetNodeRoles)
+        ? object.targetNodeRoles.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.target_node_roles)
+        ? object.target_node_roles.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -5581,6 +8683,9 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
     if (message.updatedAtUnixMs !== 0n) {
       obj.updatedAtUnixMs = message.updatedAtUnixMs.toString();
     }
+    if (message.targetNodeRoles?.length) {
+      obj.targetNodeRoles = message.targetNodeRoles;
+    }
     return obj;
   },
 
@@ -5600,6 +8705,7 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
     message.updatedAtUnixMs = (object.updatedAtUnixMs !== undefined && object.updatedAtUnixMs !== null)
       ? BigInt(object.updatedAtUnixMs)
       : 0n;
+    message.targetNodeRoles = object.targetNodeRoles?.map((e) => e) || [];
     return message;
   },
 };
@@ -7197,6 +10303,9 @@ function createBaseAttemptSettlementRecord(): AttemptSettlementRecord {
     discrepancyMicroUsd: 0n,
     dispatchedAtUnixMs: 0n,
     completedAtUnixMs: 0n,
+    attemptNumber: 0,
+    providerGenerationId: "",
+    httpStatus: 0,
   };
 }
 
@@ -7267,6 +10376,15 @@ export const AttemptSettlementRecord: MessageFns<AttemptSettlementRecord> = {
         throw new globalThis.Error("value provided for field message.completedAtUnixMs of type int64 too large");
       }
       writer.uint32(136).int64(message.completedAtUnixMs);
+    }
+    if (message.attemptNumber !== 0) {
+      writer.uint32(144).int32(message.attemptNumber);
+    }
+    if (message.providerGenerationId !== "") {
+      writer.uint32(154).string(message.providerGenerationId);
+    }
+    if (message.httpStatus !== 0) {
+      writer.uint32(160).int32(message.httpStatus);
     }
     return writer;
   },
@@ -7420,6 +10538,30 @@ export const AttemptSettlementRecord: MessageFns<AttemptSettlementRecord> = {
             message.completedAtUnixMs = reader.int64() as bigint;
             continue;
           }
+          case 18: {
+            if (tag !== 144) {
+              break;
+            }
+
+            message.attemptNumber = reader.int32();
+            continue;
+          }
+          case 19: {
+            if (tag !== 154) {
+              break;
+            }
+
+            message.providerGenerationId = reader.string();
+            continue;
+          }
+          case 20: {
+            if (tag !== 160) {
+              break;
+            }
+
+            message.httpStatus = reader.int32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -7515,6 +10657,21 @@ export const AttemptSettlementRecord: MessageFns<AttemptSettlementRecord> = {
         : isSet(object.completed_at_unix_ms)
         ? BigInt(object.completed_at_unix_ms)
         : 0n,
+      attemptNumber: isSet(object.attemptNumber)
+        ? globalThis.Number(object.attemptNumber)
+        : isSet(object.attempt_number)
+        ? globalThis.Number(object.attempt_number)
+        : 0,
+      providerGenerationId: isSet(object.providerGenerationId)
+        ? globalThis.String(object.providerGenerationId)
+        : isSet(object.provider_generation_id)
+        ? globalThis.String(object.provider_generation_id)
+        : "",
+      httpStatus: isSet(object.httpStatus)
+        ? globalThis.Number(object.httpStatus)
+        : isSet(object.http_status)
+        ? globalThis.Number(object.http_status)
+        : 0,
     };
   },
 
@@ -7571,6 +10728,15 @@ export const AttemptSettlementRecord: MessageFns<AttemptSettlementRecord> = {
     if (message.completedAtUnixMs !== 0n) {
       obj.completedAtUnixMs = message.completedAtUnixMs.toString();
     }
+    if (message.attemptNumber !== 0) {
+      obj.attemptNumber = Math.round(message.attemptNumber);
+    }
+    if (message.providerGenerationId !== "") {
+      obj.providerGenerationId = message.providerGenerationId;
+    }
+    if (message.httpStatus !== 0) {
+      obj.httpStatus = Math.round(message.httpStatus);
+    }
     return obj;
   },
 
@@ -7607,6 +10773,9 @@ export const AttemptSettlementRecord: MessageFns<AttemptSettlementRecord> = {
     message.completedAtUnixMs = (object.completedAtUnixMs !== undefined && object.completedAtUnixMs !== null)
       ? BigInt(object.completedAtUnixMs)
       : 0n;
+    message.attemptNumber = object.attemptNumber ?? 0;
+    message.providerGenerationId = object.providerGenerationId ?? "";
+    message.httpStatus = object.httpStatus ?? 0;
     return message;
   },
 };
@@ -7936,9 +11105,434 @@ export const ListOfferingAttemptRecordsResponse: MessageFns<ListOfferingAttemptR
   },
 };
 
+function createBaseApplyProviderDisputeAdjustmentRequest(): ApplyProviderDisputeAdjustmentRequest {
+  return {
+    adjustmentId: "",
+    statementId: "",
+    providerId: "",
+    offeringId: "",
+    periodStartDate: "",
+    periodEndDate: "",
+    invoicedCostUsdDec: "",
+    adjustmentDeltaUsdDec: "",
+    resolutionStatus: "",
+    reason: "",
+    operatorId: "",
+    resolvedAtUnixMs: 0n,
+  };
+}
+
+export const ApplyProviderDisputeAdjustmentRequest: MessageFns<ApplyProviderDisputeAdjustmentRequest> = {
+  encode(message: ApplyProviderDisputeAdjustmentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.adjustmentId !== "") {
+      writer.uint32(10).string(message.adjustmentId);
+    }
+    if (message.statementId !== "") {
+      writer.uint32(18).string(message.statementId);
+    }
+    if (message.providerId !== "") {
+      writer.uint32(26).string(message.providerId);
+    }
+    if (message.offeringId !== "") {
+      writer.uint32(34).string(message.offeringId);
+    }
+    if (message.periodStartDate !== "") {
+      writer.uint32(42).string(message.periodStartDate);
+    }
+    if (message.periodEndDate !== "") {
+      writer.uint32(50).string(message.periodEndDate);
+    }
+    if (message.invoicedCostUsdDec !== "") {
+      writer.uint32(58).string(message.invoicedCostUsdDec);
+    }
+    if (message.adjustmentDeltaUsdDec !== "") {
+      writer.uint32(66).string(message.adjustmentDeltaUsdDec);
+    }
+    if (message.resolutionStatus !== "") {
+      writer.uint32(74).string(message.resolutionStatus);
+    }
+    if (message.reason !== "") {
+      writer.uint32(82).string(message.reason);
+    }
+    if (message.operatorId !== "") {
+      writer.uint32(90).string(message.operatorId);
+    }
+    if (message.resolvedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.resolvedAtUnixMs) !== message.resolvedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.resolvedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(96).int64(message.resolvedAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ApplyProviderDisputeAdjustmentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseApplyProviderDisputeAdjustmentRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.adjustmentId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.statementId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.providerId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.offeringId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.periodStartDate = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.periodEndDate = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.invoicedCostUsdDec = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.adjustmentDeltaUsdDec = reader.string();
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.resolutionStatus = reader.string();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.operatorId = reader.string();
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.resolvedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ApplyProviderDisputeAdjustmentRequest {
+    return {
+      adjustmentId: isSet(object.adjustmentId)
+        ? globalThis.String(object.adjustmentId)
+        : isSet(object.adjustment_id)
+        ? globalThis.String(object.adjustment_id)
+        : "",
+      statementId: isSet(object.statementId)
+        ? globalThis.String(object.statementId)
+        : isSet(object.statement_id)
+        ? globalThis.String(object.statement_id)
+        : "",
+      providerId: isSet(object.providerId)
+        ? globalThis.String(object.providerId)
+        : isSet(object.provider_id)
+        ? globalThis.String(object.provider_id)
+        : "",
+      offeringId: isSet(object.offeringId)
+        ? globalThis.String(object.offeringId)
+        : isSet(object.offering_id)
+        ? globalThis.String(object.offering_id)
+        : "",
+      periodStartDate: isSet(object.periodStartDate)
+        ? globalThis.String(object.periodStartDate)
+        : isSet(object.period_start_date)
+        ? globalThis.String(object.period_start_date)
+        : "",
+      periodEndDate: isSet(object.periodEndDate)
+        ? globalThis.String(object.periodEndDate)
+        : isSet(object.period_end_date)
+        ? globalThis.String(object.period_end_date)
+        : "",
+      invoicedCostUsdDec: isSet(object.invoicedCostUsdDec)
+        ? globalThis.String(object.invoicedCostUsdDec)
+        : isSet(object.invoiced_cost_usd_dec)
+        ? globalThis.String(object.invoiced_cost_usd_dec)
+        : "",
+      adjustmentDeltaUsdDec: isSet(object.adjustmentDeltaUsdDec)
+        ? globalThis.String(object.adjustmentDeltaUsdDec)
+        : isSet(object.adjustment_delta_usd_dec)
+        ? globalThis.String(object.adjustment_delta_usd_dec)
+        : "",
+      resolutionStatus: isSet(object.resolutionStatus)
+        ? globalThis.String(object.resolutionStatus)
+        : isSet(object.resolution_status)
+        ? globalThis.String(object.resolution_status)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      operatorId: isSet(object.operatorId)
+        ? globalThis.String(object.operatorId)
+        : isSet(object.operator_id)
+        ? globalThis.String(object.operator_id)
+        : "",
+      resolvedAtUnixMs: isSet(object.resolvedAtUnixMs)
+        ? BigInt(object.resolvedAtUnixMs)
+        : isSet(object.resolved_at_unix_ms)
+        ? BigInt(object.resolved_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ApplyProviderDisputeAdjustmentRequest): unknown {
+    const obj: any = {};
+    if (message.adjustmentId !== "") {
+      obj.adjustmentId = message.adjustmentId;
+    }
+    if (message.statementId !== "") {
+      obj.statementId = message.statementId;
+    }
+    if (message.providerId !== "") {
+      obj.providerId = message.providerId;
+    }
+    if (message.offeringId !== "") {
+      obj.offeringId = message.offeringId;
+    }
+    if (message.periodStartDate !== "") {
+      obj.periodStartDate = message.periodStartDate;
+    }
+    if (message.periodEndDate !== "") {
+      obj.periodEndDate = message.periodEndDate;
+    }
+    if (message.invoicedCostUsdDec !== "") {
+      obj.invoicedCostUsdDec = message.invoicedCostUsdDec;
+    }
+    if (message.adjustmentDeltaUsdDec !== "") {
+      obj.adjustmentDeltaUsdDec = message.adjustmentDeltaUsdDec;
+    }
+    if (message.resolutionStatus !== "") {
+      obj.resolutionStatus = message.resolutionStatus;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.operatorId !== "") {
+      obj.operatorId = message.operatorId;
+    }
+    if (message.resolvedAtUnixMs !== 0n) {
+      obj.resolvedAtUnixMs = message.resolvedAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ApplyProviderDisputeAdjustmentRequest>, I>>(
+    base?: I,
+  ): ApplyProviderDisputeAdjustmentRequest {
+    return ApplyProviderDisputeAdjustmentRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ApplyProviderDisputeAdjustmentRequest>, I>>(
+    object: I,
+  ): ApplyProviderDisputeAdjustmentRequest {
+    const message = createBaseApplyProviderDisputeAdjustmentRequest();
+    message.adjustmentId = object.adjustmentId ?? "";
+    message.statementId = object.statementId ?? "";
+    message.providerId = object.providerId ?? "";
+    message.offeringId = object.offeringId ?? "";
+    message.periodStartDate = object.periodStartDate ?? "";
+    message.periodEndDate = object.periodEndDate ?? "";
+    message.invoicedCostUsdDec = object.invoicedCostUsdDec ?? "";
+    message.adjustmentDeltaUsdDec = object.adjustmentDeltaUsdDec ?? "";
+    message.resolutionStatus = object.resolutionStatus ?? "";
+    message.reason = object.reason ?? "";
+    message.operatorId = object.operatorId ?? "";
+    message.resolvedAtUnixMs = (object.resolvedAtUnixMs !== undefined && object.resolvedAtUnixMs !== null)
+      ? BigInt(object.resolvedAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseApplyProviderDisputeAdjustmentResponse(): ApplyProviderDisputeAdjustmentResponse {
+  return { applied: false, discrepancyLedgerEntryId: "", updatedStatementStatus: "" };
+}
+
+export const ApplyProviderDisputeAdjustmentResponse: MessageFns<ApplyProviderDisputeAdjustmentResponse> = {
+  encode(message: ApplyProviderDisputeAdjustmentResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.applied !== false) {
+      writer.uint32(8).bool(message.applied);
+    }
+    if (message.discrepancyLedgerEntryId !== "") {
+      writer.uint32(18).string(message.discrepancyLedgerEntryId);
+    }
+    if (message.updatedStatementStatus !== "") {
+      writer.uint32(26).string(message.updatedStatementStatus);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ApplyProviderDisputeAdjustmentResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseApplyProviderDisputeAdjustmentResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.applied = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.discrepancyLedgerEntryId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.updatedStatementStatus = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ApplyProviderDisputeAdjustmentResponse {
+    return {
+      applied: isSet(object.applied) ? globalThis.Boolean(object.applied) : false,
+      discrepancyLedgerEntryId: isSet(object.discrepancyLedgerEntryId)
+        ? globalThis.String(object.discrepancyLedgerEntryId)
+        : isSet(object.discrepancy_ledger_entry_id)
+        ? globalThis.String(object.discrepancy_ledger_entry_id)
+        : "",
+      updatedStatementStatus: isSet(object.updatedStatementStatus)
+        ? globalThis.String(object.updatedStatementStatus)
+        : isSet(object.updated_statement_status)
+        ? globalThis.String(object.updated_statement_status)
+        : "",
+    };
+  },
+
+  toJSON(message: ApplyProviderDisputeAdjustmentResponse): unknown {
+    const obj: any = {};
+    if (message.applied !== false) {
+      obj.applied = message.applied;
+    }
+    if (message.discrepancyLedgerEntryId !== "") {
+      obj.discrepancyLedgerEntryId = message.discrepancyLedgerEntryId;
+    }
+    if (message.updatedStatementStatus !== "") {
+      obj.updatedStatementStatus = message.updatedStatementStatus;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ApplyProviderDisputeAdjustmentResponse>, I>>(
+    base?: I,
+  ): ApplyProviderDisputeAdjustmentResponse {
+    return ApplyProviderDisputeAdjustmentResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ApplyProviderDisputeAdjustmentResponse>, I>>(
+    object: I,
+  ): ApplyProviderDisputeAdjustmentResponse {
+    const message = createBaseApplyProviderDisputeAdjustmentResponse();
+    message.applied = object.applied ?? false;
+    message.discrepancyLedgerEntryId = object.discrepancyLedgerEntryId ?? "";
+    message.updatedStatementStatus = object.updatedStatementStatus ?? "";
+    return message;
+  },
+};
+
 /**
  * ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
- * (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+ * (Go gateway-dataplane, TS billing-account-service, TS studio-service/worker, and TS finance-worker)
+ * over WireGuard + TLS + HMAC.
  * WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
  */
 export type ProviderSyncServiceService = typeof ProviderSyncServiceService;
@@ -8197,8 +11791,8 @@ export const ProviderSyncServiceClient = makeGenericClientConstructor(
 };
 
 /**
- * GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
- * during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+ * GatewayReconciliationService is hosted by Gateway Billing / Finance and called on demand by Provider Backend
+ * during invoice verification or dispute investigation/adjustment (PRV-R14 / ADM-R17 / ADM-R18) without duplicating raw attempt streams.
  */
 export type GatewayReconciliationServiceService = typeof GatewayReconciliationServiceService;
 export const GatewayReconciliationServiceService = {
@@ -8216,11 +11810,36 @@ export const GatewayReconciliationServiceService = {
     responseDeserialize: (value: Buffer): ListOfferingAttemptRecordsResponse =>
       ListOfferingAttemptRecordsResponse.decode(value),
   },
+  /**
+   * ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+   * into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+   */
+  applyProviderDisputeAdjustment: {
+    path: "/maxshot.provider_sync.v1.GatewayReconciliationService/ApplyProviderDisputeAdjustment" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ApplyProviderDisputeAdjustmentRequest): Buffer =>
+      Buffer.from(ApplyProviderDisputeAdjustmentRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ApplyProviderDisputeAdjustmentRequest =>
+      ApplyProviderDisputeAdjustmentRequest.decode(value),
+    responseSerialize: (value: ApplyProviderDisputeAdjustmentResponse): Buffer =>
+      Buffer.from(ApplyProviderDisputeAdjustmentResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ApplyProviderDisputeAdjustmentResponse =>
+      ApplyProviderDisputeAdjustmentResponse.decode(value),
+  },
 } as const;
 
 export interface GatewayReconciliationServiceServer extends UntypedServiceImplementation {
   /** ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID. */
   listOfferingAttemptRecords: handleUnaryCall<ListOfferingAttemptRecordsRequest, ListOfferingAttemptRecordsResponse>;
+  /**
+   * ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+   * into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+   */
+  applyProviderDisputeAdjustment: handleUnaryCall<
+    ApplyProviderDisputeAdjustmentRequest,
+    ApplyProviderDisputeAdjustmentResponse
+  >;
 }
 
 export interface GatewayReconciliationServiceClient extends Client {
@@ -8239,6 +11858,25 @@ export interface GatewayReconciliationServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ListOfferingAttemptRecordsResponse) => void,
+  ): ClientUnaryCall;
+  /**
+   * ApplyProviderDisputeAdjustment writes operator-confirmed invoice corrections or disputes from Provider Portal
+   * into Gateway Finance's discrepancy ledger (ADM-R17 / ADM-R18).
+   */
+  applyProviderDisputeAdjustment(
+    request: ApplyProviderDisputeAdjustmentRequest,
+    callback: (error: ServiceError | null, response: ApplyProviderDisputeAdjustmentResponse) => void,
+  ): ClientUnaryCall;
+  applyProviderDisputeAdjustment(
+    request: ApplyProviderDisputeAdjustmentRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ApplyProviderDisputeAdjustmentResponse) => void,
+  ): ClientUnaryCall;
+  applyProviderDisputeAdjustment(
+    request: ApplyProviderDisputeAdjustmentRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ApplyProviderDisputeAdjustmentResponse) => void,
   ): ClientUnaryCall;
 }
 

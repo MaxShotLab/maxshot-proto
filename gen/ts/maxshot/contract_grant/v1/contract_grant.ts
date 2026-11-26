@@ -153,6 +153,18 @@ export function grantItemStatusToJSON(object: GrantItemStatus): string {
 }
 
 /**
+ * AitCoverageThrottlePolicy implements TD-64 prospective high-cost model throttling during coverage breach
+ * without mutating FundedTermConfig.allowed_catalog_ids, credit rate, or duration.
+ */
+export interface AitCoverageThrottlePolicy {
+  throttleActive: boolean;
+  restrictedCustomerModelIds: string[];
+  maxAllowedModelRateUsdDec: string;
+  reason: string;
+  updatedAtUnixSec: bigint;
+}
+
+/**
  * FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
  * and replicated to Contract Backend. The rational N/D rate converts USD face value to integer Credits
  * at grant issuance time only; spending uses the unified Gateway ledger Credit unit.
@@ -176,6 +188,7 @@ export interface FundedTermConfig {
   maxTotalGrantCredits: bigint;
   status: FundedTermStatus;
   updatedAtUnixSec: bigint;
+  coverageThrottlePolicy?: AitCoverageThrottlePolicy | undefined;
 }
 
 export interface PushFundedTermsRequest {
@@ -245,7 +258,7 @@ export interface DirectedBridgeRoutePause {
 export interface GetContractOperationalStatusRequest {
 }
 
-/** GetContractOperationalStatusResponse feeds Gateway Admin read-only pause & finality monitoring (ADM-R22, TOK-R05). */
+/** GetContractOperationalStatusResponse feeds Gateway Admin read-only pause, finality, and token/staking monitoring (ADM-R22, ADM-R23, TOK-R05, XCT-R11). */
 export interface GetContractOperationalStatusResponse {
   mintPaused: boolean;
   burnPaused: boolean;
@@ -258,6 +271,53 @@ export interface GetContractOperationalStatusResponse {
   ethereumFinalizedTimestampUnixSec: bigint;
   activeTermId: string;
   nextGrantBoundaryUnixSec: bigint;
+  outstandingAitWeiDec: string;
+  highWaterMarkAitWeiDec: string;
+  totalStakedAitWeiDec: string;
+  totalLockedMaxWeiDec: string;
+  totalPendingMaxWeiDec: string;
+  latestFinalizedBlockNumber: bigint;
+}
+
+export interface GetAccountStakingSummaryRequest {
+  accountId: string;
+  walletAddress: string;
+  /** optional filter; empty returns active and recent terms */
+  termId: string;
+}
+
+export interface AccountTermBoundaryRecord {
+  termId: string;
+  boundaryIndex: number;
+  eligibleAitWeiSecondsDec: string;
+  cumulativeEntitlementCredits: bigint;
+  cumulativeGrantedCredits: bigint;
+  boundaryGrantCredits: bigint;
+  grantId: string;
+  boundaryEndUnixSec: bigint;
+}
+
+export interface GetAccountStakingSummaryResponse {
+  accountId: string;
+  boundWalletAddresses: string[];
+  activeStakedAitWeiDec: string;
+  activeLockedMaxWeiDec: string;
+  pendingUnlockMaxWeiDec: string;
+  boundaryRecords: AccountTermBoundaryRecord[];
+}
+
+export interface BoundaryBatchSummary {
+  /** 1-based batch index within (term_id, boundary_index) */
+  batchSequence: number;
+  totalBatches: number;
+  boundaryTotalGrantCredits: bigint;
+  boundaryTotalEligibleAitWeiSecondsDec: string;
+  /** feeds 7-day boundary read-only RPC invariant check (§3.3.4) */
+  onchainTotalStakedAitWeiDec: string;
+  finalizedBlockNumber: bigint;
+  finalizedBlockHash: string;
+  boundaryStartUnixSec: bigint;
+  boundaryEndUnixSec: bigint;
 }
 
 export interface AitGrantItem {
@@ -285,6 +345,7 @@ export interface IssueAitCreditGrantsRequest {
   termId: string;
   boundaryIndex: number;
   items: AitGrantItem[];
+  boundarySummary?: BoundaryBatchSummary | undefined;
 }
 
 export interface AitGrantItemResult {
@@ -300,6 +361,166 @@ export interface AitGrantItemResult {
 export interface IssueAitCreditGrantsResponse {
   results: AitGrantItemResult[];
 }
+
+function createBaseAitCoverageThrottlePolicy(): AitCoverageThrottlePolicy {
+  return {
+    throttleActive: false,
+    restrictedCustomerModelIds: [],
+    maxAllowedModelRateUsdDec: "",
+    reason: "",
+    updatedAtUnixSec: 0n,
+  };
+}
+
+export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = {
+  encode(message: AitCoverageThrottlePolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.throttleActive !== false) {
+      writer.uint32(8).bool(message.throttleActive);
+    }
+    for (const v of message.restrictedCustomerModelIds) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.maxAllowedModelRateUsdDec !== "") {
+      writer.uint32(26).string(message.maxAllowedModelRateUsdDec);
+    }
+    if (message.reason !== "") {
+      writer.uint32(34).string(message.reason);
+    }
+    if (message.updatedAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.updatedAtUnixSec) !== message.updatedAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.updatedAtUnixSec of type int64 too large");
+      }
+      writer.uint32(40).int64(message.updatedAtUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AitCoverageThrottlePolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAitCoverageThrottlePolicy();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.throttleActive = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.restrictedCustomerModelIds.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.maxAllowedModelRateUsdDec = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.updatedAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AitCoverageThrottlePolicy {
+    return {
+      throttleActive: isSet(object.throttleActive)
+        ? globalThis.Boolean(object.throttleActive)
+        : isSet(object.throttle_active)
+        ? globalThis.Boolean(object.throttle_active)
+        : false,
+      restrictedCustomerModelIds: globalThis.Array.isArray(object?.restrictedCustomerModelIds)
+        ? object.restrictedCustomerModelIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.restricted_customer_model_ids)
+        ? object.restricted_customer_model_ids.map((e: any) => globalThis.String(e))
+        : [],
+      maxAllowedModelRateUsdDec: isSet(object.maxAllowedModelRateUsdDec)
+        ? globalThis.String(object.maxAllowedModelRateUsdDec)
+        : isSet(object.max_allowed_model_rate_usd_dec)
+        ? globalThis.String(object.max_allowed_model_rate_usd_dec)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      updatedAtUnixSec: isSet(object.updatedAtUnixSec)
+        ? BigInt(object.updatedAtUnixSec)
+        : isSet(object.updated_at_unix_sec)
+        ? BigInt(object.updated_at_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: AitCoverageThrottlePolicy): unknown {
+    const obj: any = {};
+    if (message.throttleActive !== false) {
+      obj.throttleActive = message.throttleActive;
+    }
+    if (message.restrictedCustomerModelIds?.length) {
+      obj.restrictedCustomerModelIds = message.restrictedCustomerModelIds;
+    }
+    if (message.maxAllowedModelRateUsdDec !== "") {
+      obj.maxAllowedModelRateUsdDec = message.maxAllowedModelRateUsdDec;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.updatedAtUnixSec !== 0n) {
+      obj.updatedAtUnixSec = message.updatedAtUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AitCoverageThrottlePolicy>, I>>(base?: I): AitCoverageThrottlePolicy {
+    return AitCoverageThrottlePolicy.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AitCoverageThrottlePolicy>, I>>(object: I): AitCoverageThrottlePolicy {
+    const message = createBaseAitCoverageThrottlePolicy();
+    message.throttleActive = object.throttleActive ?? false;
+    message.restrictedCustomerModelIds = object.restrictedCustomerModelIds?.map((e) => e) || [];
+    message.maxAllowedModelRateUsdDec = object.maxAllowedModelRateUsdDec ?? "";
+    message.reason = object.reason ?? "";
+    message.updatedAtUnixSec = (object.updatedAtUnixSec !== undefined && object.updatedAtUnixSec !== null)
+      ? BigInt(object.updatedAtUnixSec)
+      : 0n;
+    return message;
+  },
+};
 
 function createBaseFundedTermConfig(): FundedTermConfig {
   return {
@@ -317,6 +538,7 @@ function createBaseFundedTermConfig(): FundedTermConfig {
     maxTotalGrantCredits: 0n,
     status: 0,
     updatedAtUnixSec: 0n,
+    coverageThrottlePolicy: undefined,
   };
 }
 
@@ -387,6 +609,9 @@ export const FundedTermConfig: MessageFns<FundedTermConfig> = {
         throw new globalThis.Error("value provided for field message.updatedAtUnixSec of type int64 too large");
       }
       writer.uint32(112).int64(message.updatedAtUnixSec);
+    }
+    if (message.coverageThrottlePolicy !== undefined) {
+      AitCoverageThrottlePolicy.encode(message.coverageThrottlePolicy, writer.uint32(122).fork()).join();
     }
     return writer;
   },
@@ -516,6 +741,14 @@ export const FundedTermConfig: MessageFns<FundedTermConfig> = {
             message.updatedAtUnixSec = reader.int64() as bigint;
             continue;
           }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.coverageThrottlePolicy = AitCoverageThrottlePolicy.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -596,6 +829,11 @@ export const FundedTermConfig: MessageFns<FundedTermConfig> = {
         : isSet(object.updated_at_unix_sec)
         ? BigInt(object.updated_at_unix_sec)
         : 0n,
+      coverageThrottlePolicy: isSet(object.coverageThrottlePolicy)
+        ? AitCoverageThrottlePolicy.fromJSON(object.coverageThrottlePolicy)
+        : isSet(object.coverage_throttle_policy)
+        ? AitCoverageThrottlePolicy.fromJSON(object.coverage_throttle_policy)
+        : undefined,
     };
   },
 
@@ -643,6 +881,9 @@ export const FundedTermConfig: MessageFns<FundedTermConfig> = {
     if (message.updatedAtUnixSec !== 0n) {
       obj.updatedAtUnixSec = message.updatedAtUnixSec.toString();
     }
+    if (message.coverageThrottlePolicy !== undefined) {
+      obj.coverageThrottlePolicy = AitCoverageThrottlePolicy.toJSON(message.coverageThrottlePolicy);
+    }
     return obj;
   },
 
@@ -681,6 +922,10 @@ export const FundedTermConfig: MessageFns<FundedTermConfig> = {
     message.updatedAtUnixSec = (object.updatedAtUnixSec !== undefined && object.updatedAtUnixSec !== null)
       ? BigInt(object.updatedAtUnixSec)
       : 0n;
+    message.coverageThrottlePolicy =
+      (object.coverageThrottlePolicy !== undefined && object.coverageThrottlePolicy !== null)
+        ? AitCoverageThrottlePolicy.fromPartial(object.coverageThrottlePolicy)
+        : undefined;
     return message;
   },
 };
@@ -1884,6 +2129,12 @@ function createBaseGetContractOperationalStatusResponse(): GetContractOperationa
     ethereumFinalizedTimestampUnixSec: 0n,
     activeTermId: "",
     nextGrantBoundaryUnixSec: 0n,
+    outstandingAitWeiDec: "",
+    highWaterMarkAitWeiDec: "",
+    totalStakedAitWeiDec: "",
+    totalLockedMaxWeiDec: "",
+    totalPendingMaxWeiDec: "",
+    latestFinalizedBlockNumber: 0n,
   };
 }
 
@@ -1935,6 +2186,29 @@ export const GetContractOperationalStatusResponse: MessageFns<GetContractOperati
         throw new globalThis.Error("value provided for field message.nextGrantBoundaryUnixSec of type int64 too large");
       }
       writer.uint32(88).int64(message.nextGrantBoundaryUnixSec);
+    }
+    if (message.outstandingAitWeiDec !== "") {
+      writer.uint32(98).string(message.outstandingAitWeiDec);
+    }
+    if (message.highWaterMarkAitWeiDec !== "") {
+      writer.uint32(106).string(message.highWaterMarkAitWeiDec);
+    }
+    if (message.totalStakedAitWeiDec !== "") {
+      writer.uint32(114).string(message.totalStakedAitWeiDec);
+    }
+    if (message.totalLockedMaxWeiDec !== "") {
+      writer.uint32(122).string(message.totalLockedMaxWeiDec);
+    }
+    if (message.totalPendingMaxWeiDec !== "") {
+      writer.uint32(130).string(message.totalPendingMaxWeiDec);
+    }
+    if (message.latestFinalizedBlockNumber !== 0n) {
+      if (BigInt.asUintN(64, message.latestFinalizedBlockNumber) !== message.latestFinalizedBlockNumber) {
+        throw new globalThis.Error(
+          "value provided for field message.latestFinalizedBlockNumber of type uint64 too large",
+        );
+      }
+      writer.uint32(136).uint64(message.latestFinalizedBlockNumber);
     }
     return writer;
   },
@@ -2040,6 +2314,54 @@ export const GetContractOperationalStatusResponse: MessageFns<GetContractOperati
             message.nextGrantBoundaryUnixSec = reader.int64() as bigint;
             continue;
           }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.outstandingAitWeiDec = reader.string();
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.highWaterMarkAitWeiDec = reader.string();
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.totalStakedAitWeiDec = reader.string();
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.totalLockedMaxWeiDec = reader.string();
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.totalPendingMaxWeiDec = reader.string();
+            continue;
+          }
+          case 17: {
+            if (tag !== 136) {
+              break;
+            }
+
+            message.latestFinalizedBlockNumber = reader.uint64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2109,6 +2431,36 @@ export const GetContractOperationalStatusResponse: MessageFns<GetContractOperati
         : isSet(object.next_grant_boundary_unix_sec)
         ? BigInt(object.next_grant_boundary_unix_sec)
         : 0n,
+      outstandingAitWeiDec: isSet(object.outstandingAitWeiDec)
+        ? globalThis.String(object.outstandingAitWeiDec)
+        : isSet(object.outstanding_ait_wei_dec)
+        ? globalThis.String(object.outstanding_ait_wei_dec)
+        : "",
+      highWaterMarkAitWeiDec: isSet(object.highWaterMarkAitWeiDec)
+        ? globalThis.String(object.highWaterMarkAitWeiDec)
+        : isSet(object.high_water_mark_ait_wei_dec)
+        ? globalThis.String(object.high_water_mark_ait_wei_dec)
+        : "",
+      totalStakedAitWeiDec: isSet(object.totalStakedAitWeiDec)
+        ? globalThis.String(object.totalStakedAitWeiDec)
+        : isSet(object.total_staked_ait_wei_dec)
+        ? globalThis.String(object.total_staked_ait_wei_dec)
+        : "",
+      totalLockedMaxWeiDec: isSet(object.totalLockedMaxWeiDec)
+        ? globalThis.String(object.totalLockedMaxWeiDec)
+        : isSet(object.total_locked_max_wei_dec)
+        ? globalThis.String(object.total_locked_max_wei_dec)
+        : "",
+      totalPendingMaxWeiDec: isSet(object.totalPendingMaxWeiDec)
+        ? globalThis.String(object.totalPendingMaxWeiDec)
+        : isSet(object.total_pending_max_wei_dec)
+        ? globalThis.String(object.total_pending_max_wei_dec)
+        : "",
+      latestFinalizedBlockNumber: isSet(object.latestFinalizedBlockNumber)
+        ? BigInt(object.latestFinalizedBlockNumber)
+        : isSet(object.latest_finalized_block_number)
+        ? BigInt(object.latest_finalized_block_number)
+        : 0n,
     };
   },
 
@@ -2147,6 +2499,24 @@ export const GetContractOperationalStatusResponse: MessageFns<GetContractOperati
     if (message.nextGrantBoundaryUnixSec !== 0n) {
       obj.nextGrantBoundaryUnixSec = message.nextGrantBoundaryUnixSec.toString();
     }
+    if (message.outstandingAitWeiDec !== "") {
+      obj.outstandingAitWeiDec = message.outstandingAitWeiDec;
+    }
+    if (message.highWaterMarkAitWeiDec !== "") {
+      obj.highWaterMarkAitWeiDec = message.highWaterMarkAitWeiDec;
+    }
+    if (message.totalStakedAitWeiDec !== "") {
+      obj.totalStakedAitWeiDec = message.totalStakedAitWeiDec;
+    }
+    if (message.totalLockedMaxWeiDec !== "") {
+      obj.totalLockedMaxWeiDec = message.totalLockedMaxWeiDec;
+    }
+    if (message.totalPendingMaxWeiDec !== "") {
+      obj.totalPendingMaxWeiDec = message.totalPendingMaxWeiDec;
+    }
+    if (message.latestFinalizedBlockNumber !== 0n) {
+      obj.latestFinalizedBlockNumber = message.latestFinalizedBlockNumber.toString();
+    }
     return obj;
   },
 
@@ -2182,6 +2552,826 @@ export const GetContractOperationalStatusResponse: MessageFns<GetContractOperati
       (object.nextGrantBoundaryUnixSec !== undefined && object.nextGrantBoundaryUnixSec !== null)
         ? BigInt(object.nextGrantBoundaryUnixSec)
         : 0n;
+    message.outstandingAitWeiDec = object.outstandingAitWeiDec ?? "";
+    message.highWaterMarkAitWeiDec = object.highWaterMarkAitWeiDec ?? "";
+    message.totalStakedAitWeiDec = object.totalStakedAitWeiDec ?? "";
+    message.totalLockedMaxWeiDec = object.totalLockedMaxWeiDec ?? "";
+    message.totalPendingMaxWeiDec = object.totalPendingMaxWeiDec ?? "";
+    message.latestFinalizedBlockNumber =
+      (object.latestFinalizedBlockNumber !== undefined && object.latestFinalizedBlockNumber !== null)
+        ? BigInt(object.latestFinalizedBlockNumber)
+        : 0n;
+    return message;
+  },
+};
+
+function createBaseGetAccountStakingSummaryRequest(): GetAccountStakingSummaryRequest {
+  return { accountId: "", walletAddress: "", termId: "" };
+}
+
+export const GetAccountStakingSummaryRequest: MessageFns<GetAccountStakingSummaryRequest> = {
+  encode(message: GetAccountStakingSummaryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.walletAddress !== "") {
+      writer.uint32(18).string(message.walletAddress);
+    }
+    if (message.termId !== "") {
+      writer.uint32(26).string(message.termId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAccountStakingSummaryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetAccountStakingSummaryRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.walletAddress = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetAccountStakingSummaryRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      walletAddress: isSet(object.walletAddress)
+        ? globalThis.String(object.walletAddress)
+        : isSet(object.wallet_address)
+        ? globalThis.String(object.wallet_address)
+        : "",
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetAccountStakingSummaryRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.walletAddress !== "") {
+      obj.walletAddress = message.walletAddress;
+    }
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetAccountStakingSummaryRequest>, I>>(base?: I): GetAccountStakingSummaryRequest {
+    return GetAccountStakingSummaryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetAccountStakingSummaryRequest>, I>>(
+    object: I,
+  ): GetAccountStakingSummaryRequest {
+    const message = createBaseGetAccountStakingSummaryRequest();
+    message.accountId = object.accountId ?? "";
+    message.walletAddress = object.walletAddress ?? "";
+    message.termId = object.termId ?? "";
+    return message;
+  },
+};
+
+function createBaseAccountTermBoundaryRecord(): AccountTermBoundaryRecord {
+  return {
+    termId: "",
+    boundaryIndex: 0,
+    eligibleAitWeiSecondsDec: "",
+    cumulativeEntitlementCredits: 0n,
+    cumulativeGrantedCredits: 0n,
+    boundaryGrantCredits: 0n,
+    grantId: "",
+    boundaryEndUnixSec: 0n,
+  };
+}
+
+export const AccountTermBoundaryRecord: MessageFns<AccountTermBoundaryRecord> = {
+  encode(message: AccountTermBoundaryRecord, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.termId !== "") {
+      writer.uint32(10).string(message.termId);
+    }
+    if (message.boundaryIndex !== 0) {
+      writer.uint32(16).int32(message.boundaryIndex);
+    }
+    if (message.eligibleAitWeiSecondsDec !== "") {
+      writer.uint32(26).string(message.eligibleAitWeiSecondsDec);
+    }
+    if (message.cumulativeEntitlementCredits !== 0n) {
+      if (BigInt.asIntN(64, message.cumulativeEntitlementCredits) !== message.cumulativeEntitlementCredits) {
+        throw new globalThis.Error(
+          "value provided for field message.cumulativeEntitlementCredits of type int64 too large",
+        );
+      }
+      writer.uint32(32).int64(message.cumulativeEntitlementCredits);
+    }
+    if (message.cumulativeGrantedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.cumulativeGrantedCredits) !== message.cumulativeGrantedCredits) {
+        throw new globalThis.Error("value provided for field message.cumulativeGrantedCredits of type int64 too large");
+      }
+      writer.uint32(40).int64(message.cumulativeGrantedCredits);
+    }
+    if (message.boundaryGrantCredits !== 0n) {
+      if (BigInt.asIntN(64, message.boundaryGrantCredits) !== message.boundaryGrantCredits) {
+        throw new globalThis.Error("value provided for field message.boundaryGrantCredits of type int64 too large");
+      }
+      writer.uint32(48).int64(message.boundaryGrantCredits);
+    }
+    if (message.grantId !== "") {
+      writer.uint32(58).string(message.grantId);
+    }
+    if (message.boundaryEndUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.boundaryEndUnixSec) !== message.boundaryEndUnixSec) {
+        throw new globalThis.Error("value provided for field message.boundaryEndUnixSec of type int64 too large");
+      }
+      writer.uint32(64).int64(message.boundaryEndUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AccountTermBoundaryRecord {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAccountTermBoundaryRecord();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.boundaryIndex = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.eligibleAitWeiSecondsDec = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.cumulativeEntitlementCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.cumulativeGrantedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.boundaryGrantCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.grantId = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.boundaryEndUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AccountTermBoundaryRecord {
+    return {
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+      boundaryIndex: isSet(object.boundaryIndex)
+        ? globalThis.Number(object.boundaryIndex)
+        : isSet(object.boundary_index)
+        ? globalThis.Number(object.boundary_index)
+        : 0,
+      eligibleAitWeiSecondsDec: isSet(object.eligibleAitWeiSecondsDec)
+        ? globalThis.String(object.eligibleAitWeiSecondsDec)
+        : isSet(object.eligible_ait_wei_seconds_dec)
+        ? globalThis.String(object.eligible_ait_wei_seconds_dec)
+        : "",
+      cumulativeEntitlementCredits: isSet(object.cumulativeEntitlementCredits)
+        ? BigInt(object.cumulativeEntitlementCredits)
+        : isSet(object.cumulative_entitlement_credits)
+        ? BigInt(object.cumulative_entitlement_credits)
+        : 0n,
+      cumulativeGrantedCredits: isSet(object.cumulativeGrantedCredits)
+        ? BigInt(object.cumulativeGrantedCredits)
+        : isSet(object.cumulative_granted_credits)
+        ? BigInt(object.cumulative_granted_credits)
+        : 0n,
+      boundaryGrantCredits: isSet(object.boundaryGrantCredits)
+        ? BigInt(object.boundaryGrantCredits)
+        : isSet(object.boundary_grant_credits)
+        ? BigInt(object.boundary_grant_credits)
+        : 0n,
+      grantId: isSet(object.grantId)
+        ? globalThis.String(object.grantId)
+        : isSet(object.grant_id)
+        ? globalThis.String(object.grant_id)
+        : "",
+      boundaryEndUnixSec: isSet(object.boundaryEndUnixSec)
+        ? BigInt(object.boundaryEndUnixSec)
+        : isSet(object.boundary_end_unix_sec)
+        ? BigInt(object.boundary_end_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: AccountTermBoundaryRecord): unknown {
+    const obj: any = {};
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    if (message.boundaryIndex !== 0) {
+      obj.boundaryIndex = Math.round(message.boundaryIndex);
+    }
+    if (message.eligibleAitWeiSecondsDec !== "") {
+      obj.eligibleAitWeiSecondsDec = message.eligibleAitWeiSecondsDec;
+    }
+    if (message.cumulativeEntitlementCredits !== 0n) {
+      obj.cumulativeEntitlementCredits = message.cumulativeEntitlementCredits.toString();
+    }
+    if (message.cumulativeGrantedCredits !== 0n) {
+      obj.cumulativeGrantedCredits = message.cumulativeGrantedCredits.toString();
+    }
+    if (message.boundaryGrantCredits !== 0n) {
+      obj.boundaryGrantCredits = message.boundaryGrantCredits.toString();
+    }
+    if (message.grantId !== "") {
+      obj.grantId = message.grantId;
+    }
+    if (message.boundaryEndUnixSec !== 0n) {
+      obj.boundaryEndUnixSec = message.boundaryEndUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AccountTermBoundaryRecord>, I>>(base?: I): AccountTermBoundaryRecord {
+    return AccountTermBoundaryRecord.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AccountTermBoundaryRecord>, I>>(object: I): AccountTermBoundaryRecord {
+    const message = createBaseAccountTermBoundaryRecord();
+    message.termId = object.termId ?? "";
+    message.boundaryIndex = object.boundaryIndex ?? 0;
+    message.eligibleAitWeiSecondsDec = object.eligibleAitWeiSecondsDec ?? "";
+    message.cumulativeEntitlementCredits =
+      (object.cumulativeEntitlementCredits !== undefined && object.cumulativeEntitlementCredits !== null)
+        ? BigInt(object.cumulativeEntitlementCredits)
+        : 0n;
+    message.cumulativeGrantedCredits =
+      (object.cumulativeGrantedCredits !== undefined && object.cumulativeGrantedCredits !== null)
+        ? BigInt(object.cumulativeGrantedCredits)
+        : 0n;
+    message.boundaryGrantCredits = (object.boundaryGrantCredits !== undefined && object.boundaryGrantCredits !== null)
+      ? BigInt(object.boundaryGrantCredits)
+      : 0n;
+    message.grantId = object.grantId ?? "";
+    message.boundaryEndUnixSec = (object.boundaryEndUnixSec !== undefined && object.boundaryEndUnixSec !== null)
+      ? BigInt(object.boundaryEndUnixSec)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseGetAccountStakingSummaryResponse(): GetAccountStakingSummaryResponse {
+  return {
+    accountId: "",
+    boundWalletAddresses: [],
+    activeStakedAitWeiDec: "",
+    activeLockedMaxWeiDec: "",
+    pendingUnlockMaxWeiDec: "",
+    boundaryRecords: [],
+  };
+}
+
+export const GetAccountStakingSummaryResponse: MessageFns<GetAccountStakingSummaryResponse> = {
+  encode(message: GetAccountStakingSummaryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    for (const v of message.boundWalletAddresses) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.activeStakedAitWeiDec !== "") {
+      writer.uint32(26).string(message.activeStakedAitWeiDec);
+    }
+    if (message.activeLockedMaxWeiDec !== "") {
+      writer.uint32(34).string(message.activeLockedMaxWeiDec);
+    }
+    if (message.pendingUnlockMaxWeiDec !== "") {
+      writer.uint32(42).string(message.pendingUnlockMaxWeiDec);
+    }
+    for (const v of message.boundaryRecords) {
+      AccountTermBoundaryRecord.encode(v!, writer.uint32(50).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAccountStakingSummaryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetAccountStakingSummaryResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.boundWalletAddresses.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.activeStakedAitWeiDec = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.activeLockedMaxWeiDec = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.pendingUnlockMaxWeiDec = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.boundaryRecords.push(AccountTermBoundaryRecord.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetAccountStakingSummaryResponse {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      boundWalletAddresses: globalThis.Array.isArray(object?.boundWalletAddresses)
+        ? object.boundWalletAddresses.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.bound_wallet_addresses)
+        ? object.bound_wallet_addresses.map((e: any) => globalThis.String(e))
+        : [],
+      activeStakedAitWeiDec: isSet(object.activeStakedAitWeiDec)
+        ? globalThis.String(object.activeStakedAitWeiDec)
+        : isSet(object.active_staked_ait_wei_dec)
+        ? globalThis.String(object.active_staked_ait_wei_dec)
+        : "",
+      activeLockedMaxWeiDec: isSet(object.activeLockedMaxWeiDec)
+        ? globalThis.String(object.activeLockedMaxWeiDec)
+        : isSet(object.active_locked_max_wei_dec)
+        ? globalThis.String(object.active_locked_max_wei_dec)
+        : "",
+      pendingUnlockMaxWeiDec: isSet(object.pendingUnlockMaxWeiDec)
+        ? globalThis.String(object.pendingUnlockMaxWeiDec)
+        : isSet(object.pending_unlock_max_wei_dec)
+        ? globalThis.String(object.pending_unlock_max_wei_dec)
+        : "",
+      boundaryRecords: globalThis.Array.isArray(object?.boundaryRecords)
+        ? object.boundaryRecords.map((e: any) => AccountTermBoundaryRecord.fromJSON(e))
+        : globalThis.Array.isArray(object?.boundary_records)
+        ? object.boundary_records.map((e: any) => AccountTermBoundaryRecord.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: GetAccountStakingSummaryResponse): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.boundWalletAddresses?.length) {
+      obj.boundWalletAddresses = message.boundWalletAddresses;
+    }
+    if (message.activeStakedAitWeiDec !== "") {
+      obj.activeStakedAitWeiDec = message.activeStakedAitWeiDec;
+    }
+    if (message.activeLockedMaxWeiDec !== "") {
+      obj.activeLockedMaxWeiDec = message.activeLockedMaxWeiDec;
+    }
+    if (message.pendingUnlockMaxWeiDec !== "") {
+      obj.pendingUnlockMaxWeiDec = message.pendingUnlockMaxWeiDec;
+    }
+    if (message.boundaryRecords?.length) {
+      obj.boundaryRecords = message.boundaryRecords.map((e) => AccountTermBoundaryRecord.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetAccountStakingSummaryResponse>, I>>(
+    base?: I,
+  ): GetAccountStakingSummaryResponse {
+    return GetAccountStakingSummaryResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetAccountStakingSummaryResponse>, I>>(
+    object: I,
+  ): GetAccountStakingSummaryResponse {
+    const message = createBaseGetAccountStakingSummaryResponse();
+    message.accountId = object.accountId ?? "";
+    message.boundWalletAddresses = object.boundWalletAddresses?.map((e) => e) || [];
+    message.activeStakedAitWeiDec = object.activeStakedAitWeiDec ?? "";
+    message.activeLockedMaxWeiDec = object.activeLockedMaxWeiDec ?? "";
+    message.pendingUnlockMaxWeiDec = object.pendingUnlockMaxWeiDec ?? "";
+    message.boundaryRecords = object.boundaryRecords?.map((e) => AccountTermBoundaryRecord.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseBoundaryBatchSummary(): BoundaryBatchSummary {
+  return {
+    batchSequence: 0,
+    totalBatches: 0,
+    boundaryTotalGrantCredits: 0n,
+    boundaryTotalEligibleAitWeiSecondsDec: "",
+    onchainTotalStakedAitWeiDec: "",
+    finalizedBlockNumber: 0n,
+    finalizedBlockHash: "",
+    boundaryStartUnixSec: 0n,
+    boundaryEndUnixSec: 0n,
+  };
+}
+
+export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
+  encode(message: BoundaryBatchSummary, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.batchSequence !== 0) {
+      writer.uint32(8).int32(message.batchSequence);
+    }
+    if (message.totalBatches !== 0) {
+      writer.uint32(16).int32(message.totalBatches);
+    }
+    if (message.boundaryTotalGrantCredits !== 0n) {
+      if (BigInt.asIntN(64, message.boundaryTotalGrantCredits) !== message.boundaryTotalGrantCredits) {
+        throw new globalThis.Error(
+          "value provided for field message.boundaryTotalGrantCredits of type int64 too large",
+        );
+      }
+      writer.uint32(24).int64(message.boundaryTotalGrantCredits);
+    }
+    if (message.boundaryTotalEligibleAitWeiSecondsDec !== "") {
+      writer.uint32(34).string(message.boundaryTotalEligibleAitWeiSecondsDec);
+    }
+    if (message.onchainTotalStakedAitWeiDec !== "") {
+      writer.uint32(42).string(message.onchainTotalStakedAitWeiDec);
+    }
+    if (message.finalizedBlockNumber !== 0n) {
+      if (BigInt.asUintN(64, message.finalizedBlockNumber) !== message.finalizedBlockNumber) {
+        throw new globalThis.Error("value provided for field message.finalizedBlockNumber of type uint64 too large");
+      }
+      writer.uint32(48).uint64(message.finalizedBlockNumber);
+    }
+    if (message.finalizedBlockHash !== "") {
+      writer.uint32(58).string(message.finalizedBlockHash);
+    }
+    if (message.boundaryStartUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.boundaryStartUnixSec) !== message.boundaryStartUnixSec) {
+        throw new globalThis.Error("value provided for field message.boundaryStartUnixSec of type int64 too large");
+      }
+      writer.uint32(64).int64(message.boundaryStartUnixSec);
+    }
+    if (message.boundaryEndUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.boundaryEndUnixSec) !== message.boundaryEndUnixSec) {
+        throw new globalThis.Error("value provided for field message.boundaryEndUnixSec of type int64 too large");
+      }
+      writer.uint32(72).int64(message.boundaryEndUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BoundaryBatchSummary {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseBoundaryBatchSummary();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.batchSequence = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.totalBatches = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.boundaryTotalGrantCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.boundaryTotalEligibleAitWeiSecondsDec = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.onchainTotalStakedAitWeiDec = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.finalizedBlockNumber = reader.uint64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.finalizedBlockHash = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.boundaryStartUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.boundaryEndUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): BoundaryBatchSummary {
+    return {
+      batchSequence: isSet(object.batchSequence)
+        ? globalThis.Number(object.batchSequence)
+        : isSet(object.batch_sequence)
+        ? globalThis.Number(object.batch_sequence)
+        : 0,
+      totalBatches: isSet(object.totalBatches)
+        ? globalThis.Number(object.totalBatches)
+        : isSet(object.total_batches)
+        ? globalThis.Number(object.total_batches)
+        : 0,
+      boundaryTotalGrantCredits: isSet(object.boundaryTotalGrantCredits)
+        ? BigInt(object.boundaryTotalGrantCredits)
+        : isSet(object.boundary_total_grant_credits)
+        ? BigInt(object.boundary_total_grant_credits)
+        : 0n,
+      boundaryTotalEligibleAitWeiSecondsDec: isSet(object.boundaryTotalEligibleAitWeiSecondsDec)
+        ? globalThis.String(object.boundaryTotalEligibleAitWeiSecondsDec)
+        : isSet(object.boundary_total_eligible_ait_wei_seconds_dec)
+        ? globalThis.String(object.boundary_total_eligible_ait_wei_seconds_dec)
+        : "",
+      onchainTotalStakedAitWeiDec: isSet(object.onchainTotalStakedAitWeiDec)
+        ? globalThis.String(object.onchainTotalStakedAitWeiDec)
+        : isSet(object.onchain_total_staked_ait_wei_dec)
+        ? globalThis.String(object.onchain_total_staked_ait_wei_dec)
+        : "",
+      finalizedBlockNumber: isSet(object.finalizedBlockNumber)
+        ? BigInt(object.finalizedBlockNumber)
+        : isSet(object.finalized_block_number)
+        ? BigInt(object.finalized_block_number)
+        : 0n,
+      finalizedBlockHash: isSet(object.finalizedBlockHash)
+        ? globalThis.String(object.finalizedBlockHash)
+        : isSet(object.finalized_block_hash)
+        ? globalThis.String(object.finalized_block_hash)
+        : "",
+      boundaryStartUnixSec: isSet(object.boundaryStartUnixSec)
+        ? BigInt(object.boundaryStartUnixSec)
+        : isSet(object.boundary_start_unix_sec)
+        ? BigInt(object.boundary_start_unix_sec)
+        : 0n,
+      boundaryEndUnixSec: isSet(object.boundaryEndUnixSec)
+        ? BigInt(object.boundaryEndUnixSec)
+        : isSet(object.boundary_end_unix_sec)
+        ? BigInt(object.boundary_end_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: BoundaryBatchSummary): unknown {
+    const obj: any = {};
+    if (message.batchSequence !== 0) {
+      obj.batchSequence = Math.round(message.batchSequence);
+    }
+    if (message.totalBatches !== 0) {
+      obj.totalBatches = Math.round(message.totalBatches);
+    }
+    if (message.boundaryTotalGrantCredits !== 0n) {
+      obj.boundaryTotalGrantCredits = message.boundaryTotalGrantCredits.toString();
+    }
+    if (message.boundaryTotalEligibleAitWeiSecondsDec !== "") {
+      obj.boundaryTotalEligibleAitWeiSecondsDec = message.boundaryTotalEligibleAitWeiSecondsDec;
+    }
+    if (message.onchainTotalStakedAitWeiDec !== "") {
+      obj.onchainTotalStakedAitWeiDec = message.onchainTotalStakedAitWeiDec;
+    }
+    if (message.finalizedBlockNumber !== 0n) {
+      obj.finalizedBlockNumber = message.finalizedBlockNumber.toString();
+    }
+    if (message.finalizedBlockHash !== "") {
+      obj.finalizedBlockHash = message.finalizedBlockHash;
+    }
+    if (message.boundaryStartUnixSec !== 0n) {
+      obj.boundaryStartUnixSec = message.boundaryStartUnixSec.toString();
+    }
+    if (message.boundaryEndUnixSec !== 0n) {
+      obj.boundaryEndUnixSec = message.boundaryEndUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BoundaryBatchSummary>, I>>(base?: I): BoundaryBatchSummary {
+    return BoundaryBatchSummary.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BoundaryBatchSummary>, I>>(object: I): BoundaryBatchSummary {
+    const message = createBaseBoundaryBatchSummary();
+    message.batchSequence = object.batchSequence ?? 0;
+    message.totalBatches = object.totalBatches ?? 0;
+    message.boundaryTotalGrantCredits =
+      (object.boundaryTotalGrantCredits !== undefined && object.boundaryTotalGrantCredits !== null)
+        ? BigInt(object.boundaryTotalGrantCredits)
+        : 0n;
+    message.boundaryTotalEligibleAitWeiSecondsDec = object.boundaryTotalEligibleAitWeiSecondsDec ?? "";
+    message.onchainTotalStakedAitWeiDec = object.onchainTotalStakedAitWeiDec ?? "";
+    message.finalizedBlockNumber = (object.finalizedBlockNumber !== undefined && object.finalizedBlockNumber !== null)
+      ? BigInt(object.finalizedBlockNumber)
+      : 0n;
+    message.finalizedBlockHash = object.finalizedBlockHash ?? "";
+    message.boundaryStartUnixSec = (object.boundaryStartUnixSec !== undefined && object.boundaryStartUnixSec !== null)
+      ? BigInt(object.boundaryStartUnixSec)
+      : 0n;
+    message.boundaryEndUnixSec = (object.boundaryEndUnixSec !== undefined && object.boundaryEndUnixSec !== null)
+      ? BigInt(object.boundaryEndUnixSec)
+      : 0n;
     return message;
   },
 };
@@ -2586,7 +3776,7 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
 };
 
 function createBaseIssueAitCreditGrantsRequest(): IssueAitCreditGrantsRequest {
-  return { batchId: "", termId: "", boundaryIndex: 0, items: [] };
+  return { batchId: "", termId: "", boundaryIndex: 0, items: [], boundarySummary: undefined };
 }
 
 export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest> = {
@@ -2602,6 +3792,9 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
     }
     for (const v of message.items) {
       AitGrantItem.encode(v!, writer.uint32(34).fork()).join();
+    }
+    if (message.boundarySummary !== undefined) {
+      BoundaryBatchSummary.encode(message.boundarySummary, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -2651,6 +3844,14 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
             message.items.push(AitGrantItem.decode(reader, reader.uint32()));
             continue;
           }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.boundarySummary = BoundaryBatchSummary.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -2681,6 +3882,11 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
         ? globalThis.Number(object.boundary_index)
         : 0,
       items: globalThis.Array.isArray(object?.items) ? object.items.map((e: any) => AitGrantItem.fromJSON(e)) : [],
+      boundarySummary: isSet(object.boundarySummary)
+        ? BoundaryBatchSummary.fromJSON(object.boundarySummary)
+        : isSet(object.boundary_summary)
+        ? BoundaryBatchSummary.fromJSON(object.boundary_summary)
+        : undefined,
     };
   },
 
@@ -2698,6 +3904,9 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
     if (message.items?.length) {
       obj.items = message.items.map((e) => AitGrantItem.toJSON(e));
     }
+    if (message.boundarySummary !== undefined) {
+      obj.boundarySummary = BoundaryBatchSummary.toJSON(message.boundarySummary);
+    }
     return obj;
   },
 
@@ -2710,6 +3919,9 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
     message.termId = object.termId ?? "";
     message.boundaryIndex = object.boundaryIndex ?? 0;
     message.items = object.items?.map((e) => AitGrantItem.fromPartial(e)) || [];
+    message.boundarySummary = (object.boundarySummary !== undefined && object.boundarySummary !== null)
+      ? BoundaryBatchSummary.fromPartial(object.boundarySummary)
+      : undefined;
     return message;
   },
 };
@@ -2995,7 +4207,7 @@ export const ContractBackendServiceService = {
       Buffer.from(PushWalletEligibilityResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): PushWalletEligibilityResponse => PushWalletEligibilityResponse.decode(value),
   },
-  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  /** GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11). */
   getContractOperationalStatus: {
     path: "/maxshot.contract_grant.v1.ContractBackendService/GetContractOperationalStatus" as const,
     requestStream: false as const,
@@ -3009,6 +4221,20 @@ export const ContractBackendServiceService = {
     responseDeserialize: (value: Buffer): GetContractOperationalStatusResponse =>
       GetContractOperationalStatusResponse.decode(value),
   },
+  /** GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21). */
+  getAccountStakingSummary: {
+    path: "/maxshot.contract_grant.v1.ContractBackendService/GetAccountStakingSummary" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetAccountStakingSummaryRequest): Buffer =>
+      Buffer.from(GetAccountStakingSummaryRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetAccountStakingSummaryRequest =>
+      GetAccountStakingSummaryRequest.decode(value),
+    responseSerialize: (value: GetAccountStakingSummaryResponse): Buffer =>
+      Buffer.from(GetAccountStakingSummaryResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetAccountStakingSummaryResponse =>
+      GetAccountStakingSummaryResponse.decode(value),
+  },
 } as const;
 
 export interface ContractBackendServiceServer extends UntypedServiceImplementation {
@@ -3016,11 +4242,13 @@ export interface ContractBackendServiceServer extends UntypedServiceImplementati
   pushFundedTerms: handleUnaryCall<PushFundedTermsRequest, PushFundedTermsResponse>;
   /** PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend. */
   pushWalletEligibility: handleUnaryCall<PushWalletEligibilityRequest, PushWalletEligibilityResponse>;
-  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  /** GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11). */
   getContractOperationalStatus: handleUnaryCall<
     GetContractOperationalStatusRequest,
     GetContractOperationalStatusResponse
   >;
+  /** GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21). */
+  getAccountStakingSummary: handleUnaryCall<GetAccountStakingSummaryRequest, GetAccountStakingSummaryResponse>;
 }
 
 export interface ContractBackendServiceClient extends Client {
@@ -3056,7 +4284,7 @@ export interface ContractBackendServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
   ): ClientUnaryCall;
-  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  /** GetContractOperationalStatus fetches read-only pause flags, finalized chain sync height, and global token/staking metrics for Gateway Admin (ADM-R22, ADM-R23, XCT-R11). */
   getContractOperationalStatus(
     request: GetContractOperationalStatusRequest,
     callback: (error: ServiceError | null, response: GetContractOperationalStatusResponse) => void,
@@ -3071,6 +4299,22 @@ export interface ContractBackendServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: GetContractOperationalStatusResponse) => void,
+  ): ClientUnaryCall;
+  /** GetAccountStakingSummary fetches per-account, per-term/boundary eligible AIT-wei-seconds, cumulative entitlements, and lock positions (ADM-R20, ADM-R21). */
+  getAccountStakingSummary(
+    request: GetAccountStakingSummaryRequest,
+    callback: (error: ServiceError | null, response: GetAccountStakingSummaryResponse) => void,
+  ): ClientUnaryCall;
+  getAccountStakingSummary(
+    request: GetAccountStakingSummaryRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetAccountStakingSummaryResponse) => void,
+  ): ClientUnaryCall;
+  getAccountStakingSummary(
+    request: GetAccountStakingSummaryRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetAccountStakingSummaryResponse) => void,
   ): ClientUnaryCall;
 }
 

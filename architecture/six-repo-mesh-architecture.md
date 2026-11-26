@@ -220,8 +220,9 @@ service ProviderSyncService { // Server: Provider 后端
   rpc SyncProviderStatements(SyncProviderStatementsRequest) returns (SyncProviderStatementsResponse);
 }
 
-service GatewayReconciliationService { // Server: Gateway 计费服务（供 Provider 对账争议按需分页查脱敏明细）
+service GatewayReconciliationService { // Server: Gateway 计费服务（供 Provider 对账争议查明细与回写差异账本）
   rpc ListOfferingAttemptRecords(ListOfferingAttemptRecordsRequest) returns (ListOfferingAttemptRecordsResponse);
+  rpc ApplyProviderDisputeAdjustment(ApplyProviderDisputeAdjustmentRequest) returns (ApplyProviderDisputeAdjustmentResponse);
 }
 
 // 2. proto/maxshot/contract_grant/v1/contract_grant.proto (合约后端 <-> Gateway 后端, WireGuard + TLS + HMAC)
@@ -229,6 +230,7 @@ service ContractBackendService { // Server: 合约后端
   rpc PushFundedTerms(PushFundedTermsRequest) returns (PushFundedTermsResponse); // Gateway 为 FundedTerm 主库
   rpc PushWalletEligibility(PushWalletEligibilityRequest) returns (PushWalletEligibilityResponse);
   rpc GetContractOperationalStatus(GetContractOperationalStatusRequest) returns (GetContractOperationalStatusResponse);
+  rpc GetAccountStakingSummary(GetAccountStakingSummaryRequest) returns (GetAccountStakingSummaryResponse);
 }
 
 service AitCreditGrantService { // Server: Gateway 计费服务
@@ -240,6 +242,7 @@ service AitCreditGrantService { // Server: Gateway 计费服务
 // 3. proto/maxshot/gateway_internal/v1/execution.proto (Gateway 同机房全模态统一账本契约)
 service BillingExecutionService { // Server: TS billing-account-service
   rpc ResolvePrincipalScope(ResolvePrincipalScopeRequest) returns (ResolvePrincipalScopeResponse);
+  rpc EvaluateCatalogDiscovery(EvaluateCatalogDiscoveryRequest) returns (EvaluateCatalogDiscoveryResponse);
   rpc PreviewQuote(PreviewQuoteRequest) returns (PreviewQuoteResponse);
   rpc AuthorizeAndHold(AuthorizeAndHoldRequest) returns (AuthorizeAndHoldResponse);
   rpc MarkSending(MarkSendingRequest) returns (MarkSendingResponse);

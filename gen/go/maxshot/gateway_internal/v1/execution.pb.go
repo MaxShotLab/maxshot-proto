@@ -367,6 +367,148 @@ func (UncertainResolutionAction) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{5}
 }
 
+// MediaPricingDimensions carries structured request/result dimensions so BillingExecutionService
+// can deterministically recompute nonlinear Studio pricing rules from CatalogSnapshot (decision 2A).
+type MediaPricingDimensions struct {
+	state                         protoimpl.MessageState `protogen:"open.v1"`
+	Resolution                    string                 `protobuf:"bytes,1,opt,name=resolution,proto3" json:"resolution,omitempty"`
+	AspectRatio                   string                 `protobuf:"bytes,2,opt,name=aspect_ratio,json=aspectRatio,proto3" json:"aspect_ratio,omitempty"`
+	Size                          string                 `protobuf:"bytes,3,opt,name=size,proto3" json:"size,omitempty"`
+	WidthPx                       int32                  `protobuf:"varint,4,opt,name=width_px,json=widthPx,proto3" json:"width_px,omitempty"`
+	HeightPx                      int32                  `protobuf:"varint,5,opt,name=height_px,json=heightPx,proto3" json:"height_px,omitempty"`
+	DurationSeconds               int32                  `protobuf:"varint,6,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
+	DurationMs                    int64                  `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	GenerateAudio                 bool                   `protobuf:"varint,8,opt,name=generate_audio,json=generateAudio,proto3" json:"generate_audio,omitempty"`
+	ReferenceImageCount           int32                  `protobuf:"varint,9,opt,name=reference_image_count,json=referenceImageCount,proto3" json:"reference_image_count,omitempty"`
+	ReferenceVideoCount           int32                  `protobuf:"varint,10,opt,name=reference_video_count,json=referenceVideoCount,proto3" json:"reference_video_count,omitempty"`
+	ReferenceVideoTotalDurationMs int64                  `protobuf:"varint,11,opt,name=reference_video_total_duration_ms,json=referenceVideoTotalDurationMs,proto3" json:"reference_video_total_duration_ms,omitempty"`
+	UpscaleFactor                 int32                  `protobuf:"varint,12,opt,name=upscale_factor,json=upscaleFactor,proto3" json:"upscale_factor,omitempty"`
+	RequestedOutputs              int32                  `protobuf:"varint,13,opt,name=requested_outputs,json=requestedOutputs,proto3" json:"requested_outputs,omitempty"`
+	unknownFields                 protoimpl.UnknownFields
+	sizeCache                     protoimpl.SizeCache
+}
+
+func (x *MediaPricingDimensions) Reset() {
+	*x = MediaPricingDimensions{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MediaPricingDimensions) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MediaPricingDimensions) ProtoMessage() {}
+
+func (x *MediaPricingDimensions) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MediaPricingDimensions.ProtoReflect.Descriptor instead.
+func (*MediaPricingDimensions) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *MediaPricingDimensions) GetResolution() string {
+	if x != nil {
+		return x.Resolution
+	}
+	return ""
+}
+
+func (x *MediaPricingDimensions) GetAspectRatio() string {
+	if x != nil {
+		return x.AspectRatio
+	}
+	return ""
+}
+
+func (x *MediaPricingDimensions) GetSize() string {
+	if x != nil {
+		return x.Size
+	}
+	return ""
+}
+
+func (x *MediaPricingDimensions) GetWidthPx() int32 {
+	if x != nil {
+		return x.WidthPx
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetHeightPx() int32 {
+	if x != nil {
+		return x.HeightPx
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetDurationSeconds() int32 {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetGenerateAudio() bool {
+	if x != nil {
+		return x.GenerateAudio
+	}
+	return false
+}
+
+func (x *MediaPricingDimensions) GetReferenceImageCount() int32 {
+	if x != nil {
+		return x.ReferenceImageCount
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetReferenceVideoCount() int32 {
+	if x != nil {
+		return x.ReferenceVideoCount
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetReferenceVideoTotalDurationMs() int64 {
+	if x != nil {
+		return x.ReferenceVideoTotalDurationMs
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetUpscaleFactor() int32 {
+	if x != nil {
+		return x.UpscaleFactor
+	}
+	return 0
+}
+
+func (x *MediaPricingDimensions) GetRequestedOutputs() int32 {
+	if x != nil {
+		return x.RequestedOutputs
+	}
+	return 0
+}
+
 // UsageBound unifies multi-dimensional LLM token bounds/meters and Studio/API media generation units.
 type UsageBound struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
@@ -390,13 +532,14 @@ type UsageBound struct {
 	MediaHasAudio        bool                    `protobuf:"varint,17,opt,name=media_has_audio,json=mediaHasAudio,proto3" json:"media_has_audio,omitempty"`
 	MediaCharacterCount  int64                   `protobuf:"varint,18,opt,name=media_character_count,json=mediaCharacterCount,proto3" json:"media_character_count,omitempty"`
 	MediaAttributes      []*v1.KeyValueAttribute `protobuf:"bytes,19,rep,name=media_attributes,json=mediaAttributes,proto3" json:"media_attributes,omitempty"` // e.g. path=i2v, resolution=1080p, edit_tool=inpaint
+	MediaDimensions      *MediaPricingDimensions `protobuf:"bytes,20,opt,name=media_dimensions,json=mediaDimensions,proto3" json:"media_dimensions,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
 func (x *UsageBound) Reset() {
 	*x = UsageBound{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[0]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +551,7 @@ func (x *UsageBound) String() string {
 func (*UsageBound) ProtoMessage() {}
 
 func (x *UsageBound) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[0]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +564,7 @@ func (x *UsageBound) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsageBound.ProtoReflect.Descriptor instead.
 func (*UsageBound) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{0}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UsageBound) GetInputTokens() int64 {
@@ -557,6 +700,13 @@ func (x *UsageBound) GetMediaAttributes() []*v1.KeyValueAttribute {
 	return nil
 }
 
+func (x *UsageBound) GetMediaDimensions() *MediaPricingDimensions {
+	if x != nil {
+		return x.MediaDimensions
+	}
+	return nil
+}
+
 type QuoteComponentLine struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Item             string                 `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
@@ -568,7 +718,7 @@ type QuoteComponentLine struct {
 
 func (x *QuoteComponentLine) Reset() {
 	*x = QuoteComponentLine{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[1]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -580,7 +730,7 @@ func (x *QuoteComponentLine) String() string {
 func (*QuoteComponentLine) ProtoMessage() {}
 
 func (x *QuoteComponentLine) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[1]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -593,7 +743,7 @@ func (x *QuoteComponentLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuoteComponentLine.ProtoReflect.Descriptor instead.
 func (*QuoteComponentLine) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{1}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *QuoteComponentLine) GetItem() string {
@@ -630,7 +780,7 @@ type BucketAllocationLine struct {
 
 func (x *BucketAllocationLine) Reset() {
 	*x = BucketAllocationLine{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[2]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -642,7 +792,7 @@ func (x *BucketAllocationLine) String() string {
 func (*BucketAllocationLine) ProtoMessage() {}
 
 func (x *BucketAllocationLine) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[2]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -655,7 +805,7 @@ func (x *BucketAllocationLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BucketAllocationLine.ProtoReflect.Descriptor instead.
 func (*BucketAllocationLine) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{2}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BucketAllocationLine) GetBucket() v1.FundingBucket {
@@ -712,7 +862,7 @@ type SpendingLimitDiagnostic struct {
 
 func (x *SpendingLimitDiagnostic) Reset() {
 	*x = SpendingLimitDiagnostic{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[3]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -724,7 +874,7 @@ func (x *SpendingLimitDiagnostic) String() string {
 func (*SpendingLimitDiagnostic) ProtoMessage() {}
 
 func (x *SpendingLimitDiagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[3]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -737,7 +887,7 @@ func (x *SpendingLimitDiagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpendingLimitDiagnostic.ProtoReflect.Descriptor instead.
 func (*SpendingLimitDiagnostic) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{3}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SpendingLimitDiagnostic) GetScope() string {
@@ -823,7 +973,7 @@ type CreditShortfallDiagnostic struct {
 
 func (x *CreditShortfallDiagnostic) Reset() {
 	*x = CreditShortfallDiagnostic{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[4]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -835,7 +985,7 @@ func (x *CreditShortfallDiagnostic) String() string {
 func (*CreditShortfallDiagnostic) ProtoMessage() {}
 
 func (x *CreditShortfallDiagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[4]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -848,7 +998,7 @@ func (x *CreditShortfallDiagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreditShortfallDiagnostic.ProtoReflect.Descriptor instead.
 func (*CreditShortfallDiagnostic) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{4}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreditShortfallDiagnostic) GetRequiredReservationCredits() int64 {
@@ -890,7 +1040,7 @@ type ThresholdWarning struct {
 
 func (x *ThresholdWarning) Reset() {
 	*x = ThresholdWarning{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[5]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -902,7 +1052,7 @@ func (x *ThresholdWarning) String() string {
 func (*ThresholdWarning) ProtoMessage() {}
 
 func (x *ThresholdWarning) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[5]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -915,7 +1065,7 @@ func (x *ThresholdWarning) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ThresholdWarning.ProtoReflect.Descriptor instead.
 func (*ThresholdWarning) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{5}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ThresholdWarning) GetWarningKind() string {
@@ -952,7 +1102,7 @@ type LockedVersionSet struct {
 
 func (x *LockedVersionSet) Reset() {
 	*x = LockedVersionSet{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[6]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1114,7 @@ func (x *LockedVersionSet) String() string {
 func (*LockedVersionSet) ProtoMessage() {}
 
 func (x *LockedVersionSet) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[6]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1127,7 @@ func (x *LockedVersionSet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LockedVersionSet.ProtoReflect.Descriptor instead.
 func (*LockedVersionSet) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{6}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LockedVersionSet) GetCatalogVersion() string {
@@ -1015,6 +1165,242 @@ func (x *LockedVersionSet) GetFxVersion() string {
 	return ""
 }
 
+type BucketBalanceView struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Bucket                   v1.FundingBucket       `protobuf:"varint,1,opt,name=bucket,proto3,enum=maxshot.common.v1.FundingBucket" json:"bucket,omitempty"`
+	AvailableMicroUsd        int64                  `protobuf:"varint,2,opt,name=available_micro_usd,json=availableMicroUsd,proto3" json:"available_micro_usd,omitempty"`
+	HeldMicroUsd             int64                  `protobuf:"varint,3,opt,name=held_micro_usd,json=heldMicroUsd,proto3" json:"held_micro_usd,omitempty"`
+	AvailableCredits         int64                  `protobuf:"varint,4,opt,name=available_credits,json=availableCredits,proto3" json:"available_credits,omitempty"`
+	EarliestExpiresAtUnixSec int64                  `protobuf:"varint,5,opt,name=earliest_expires_at_unix_sec,json=earliestExpiresAtUnixSec,proto3" json:"earliest_expires_at_unix_sec,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *BucketBalanceView) Reset() {
+	*x = BucketBalanceView{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BucketBalanceView) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BucketBalanceView) ProtoMessage() {}
+
+func (x *BucketBalanceView) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BucketBalanceView.ProtoReflect.Descriptor instead.
+func (*BucketBalanceView) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *BucketBalanceView) GetBucket() v1.FundingBucket {
+	if x != nil {
+		return x.Bucket
+	}
+	return v1.FundingBucket(0)
+}
+
+func (x *BucketBalanceView) GetAvailableMicroUsd() int64 {
+	if x != nil {
+		return x.AvailableMicroUsd
+	}
+	return 0
+}
+
+func (x *BucketBalanceView) GetHeldMicroUsd() int64 {
+	if x != nil {
+		return x.HeldMicroUsd
+	}
+	return 0
+}
+
+func (x *BucketBalanceView) GetAvailableCredits() int64 {
+	if x != nil {
+		return x.AvailableCredits
+	}
+	return 0
+}
+
+func (x *BucketBalanceView) GetEarliestExpiresAtUnixSec() int64 {
+	if x != nil {
+		return x.EarliestExpiresAtUnixSec
+	}
+	return 0
+}
+
+type FundingWindowStatus struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	WindowKind        string                 `protobuf:"bytes,1,opt,name=window_kind,json=windowKind,proto3" json:"window_kind,omitempty"` // "5h" | "7d"
+	LimitMicroUsd     int64                  `protobuf:"varint,2,opt,name=limit_micro_usd,json=limitMicroUsd,proto3" json:"limit_micro_usd,omitempty"`
+	UsedMicroUsd      int64                  `protobuf:"varint,3,opt,name=used_micro_usd,json=usedMicroUsd,proto3" json:"used_micro_usd,omitempty"`
+	HeldMicroUsd      int64                  `protobuf:"varint,4,opt,name=held_micro_usd,json=heldMicroUsd,proto3" json:"held_micro_usd,omitempty"`
+	RemainingMicroUsd int64                  `protobuf:"varint,5,opt,name=remaining_micro_usd,json=remainingMicroUsd,proto3" json:"remaining_micro_usd,omitempty"`
+	ResetsAtUnixSec   int64                  `protobuf:"varint,6,opt,name=resets_at_unix_sec,json=resetsAtUnixSec,proto3" json:"resets_at_unix_sec,omitempty"`
+	AppliesToRequest  bool                   `protobuf:"varint,7,opt,name=applies_to_request,json=appliesToRequest,proto3" json:"applies_to_request,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *FundingWindowStatus) Reset() {
+	*x = FundingWindowStatus{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FundingWindowStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FundingWindowStatus) ProtoMessage() {}
+
+func (x *FundingWindowStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FundingWindowStatus.ProtoReflect.Descriptor instead.
+func (*FundingWindowStatus) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *FundingWindowStatus) GetWindowKind() string {
+	if x != nil {
+		return x.WindowKind
+	}
+	return ""
+}
+
+func (x *FundingWindowStatus) GetLimitMicroUsd() int64 {
+	if x != nil {
+		return x.LimitMicroUsd
+	}
+	return 0
+}
+
+func (x *FundingWindowStatus) GetUsedMicroUsd() int64 {
+	if x != nil {
+		return x.UsedMicroUsd
+	}
+	return 0
+}
+
+func (x *FundingWindowStatus) GetHeldMicroUsd() int64 {
+	if x != nil {
+		return x.HeldMicroUsd
+	}
+	return 0
+}
+
+func (x *FundingWindowStatus) GetRemainingMicroUsd() int64 {
+	if x != nil {
+		return x.RemainingMicroUsd
+	}
+	return 0
+}
+
+func (x *FundingWindowStatus) GetResetsAtUnixSec() int64 {
+	if x != nil {
+		return x.ResetsAtUnixSec
+	}
+	return 0
+}
+
+func (x *FundingWindowStatus) GetAppliesToRequest() bool {
+	if x != nil {
+		return x.AppliesToRequest
+	}
+	return false
+}
+
+type KeyGrossWindowStatus struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	DailyLimitMicroUsd   int64                  `protobuf:"varint,1,opt,name=daily_limit_micro_usd,json=dailyLimitMicroUsd,proto3" json:"daily_limit_micro_usd,omitempty"`
+	DailyUsedMicroUsd    int64                  `protobuf:"varint,2,opt,name=daily_used_micro_usd,json=dailyUsedMicroUsd,proto3" json:"daily_used_micro_usd,omitempty"`
+	MonthlyLimitMicroUsd int64                  `protobuf:"varint,3,opt,name=monthly_limit_micro_usd,json=monthlyLimitMicroUsd,proto3" json:"monthly_limit_micro_usd,omitempty"`
+	MonthlyUsedMicroUsd  int64                  `protobuf:"varint,4,opt,name=monthly_used_micro_usd,json=monthlyUsedMicroUsd,proto3" json:"monthly_used_micro_usd,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *KeyGrossWindowStatus) Reset() {
+	*x = KeyGrossWindowStatus{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeyGrossWindowStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeyGrossWindowStatus) ProtoMessage() {}
+
+func (x *KeyGrossWindowStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeyGrossWindowStatus.ProtoReflect.Descriptor instead.
+func (*KeyGrossWindowStatus) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *KeyGrossWindowStatus) GetDailyLimitMicroUsd() int64 {
+	if x != nil {
+		return x.DailyLimitMicroUsd
+	}
+	return 0
+}
+
+func (x *KeyGrossWindowStatus) GetDailyUsedMicroUsd() int64 {
+	if x != nil {
+		return x.DailyUsedMicroUsd
+	}
+	return 0
+}
+
+func (x *KeyGrossWindowStatus) GetMonthlyLimitMicroUsd() int64 {
+	if x != nil {
+		return x.MonthlyLimitMicroUsd
+	}
+	return 0
+}
+
+func (x *KeyGrossWindowStatus) GetMonthlyUsedMicroUsd() int64 {
+	if x != nil {
+		return x.MonthlyUsedMicroUsd
+	}
+	return 0
+}
+
 type ResolvePrincipalScopeRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ApiKeySha256      string                 `protobuf:"bytes,1,opt,name=api_key_sha256,json=apiKeySha256,proto3" json:"api_key_sha256,omitempty"`
@@ -1026,7 +1412,7 @@ type ResolvePrincipalScopeRequest struct {
 
 func (x *ResolvePrincipalScopeRequest) Reset() {
 	*x = ResolvePrincipalScopeRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[7]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1038,7 +1424,7 @@ func (x *ResolvePrincipalScopeRequest) String() string {
 func (*ResolvePrincipalScopeRequest) ProtoMessage() {}
 
 func (x *ResolvePrincipalScopeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[7]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1051,7 +1437,7 @@ func (x *ResolvePrincipalScopeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvePrincipalScopeRequest.ProtoReflect.Descriptor instead.
 func (*ResolvePrincipalScopeRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{7}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ResolvePrincipalScopeRequest) GetApiKeySha256() string {
@@ -1076,28 +1462,36 @@ func (x *ResolvePrincipalScopeRequest) GetClientRegion() string {
 }
 
 type ResolvePrincipalScopeResponse struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Authenticated        bool                   `protobuf:"varint,1,opt,name=authenticated,proto3" json:"authenticated,omitempty"`
-	RejectCode           v1.RejectCode          `protobuf:"varint,2,opt,name=reject_code,json=rejectCode,proto3,enum=maxshot.common.v1.RejectCode" json:"reject_code,omitempty"`
-	RejectMessage        string                 `protobuf:"bytes,3,opt,name=reject_message,json=rejectMessage,proto3" json:"reject_message,omitempty"`
-	AccountId            string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	ApiKeyId             string                 `protobuf:"bytes,5,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
-	KeyFundingStrategy   v1.KeyFundingStrategy  `protobuf:"varint,6,opt,name=key_funding_strategy,json=keyFundingStrategy,proto3,enum=maxshot.common.v1.KeyFundingStrategy" json:"key_funding_strategy,omitempty"`
-	AllowAitEarnedCredit bool                   `protobuf:"varint,7,opt,name=allow_ait_earned_credit,json=allowAitEarnedCredit,proto3" json:"allow_ait_earned_credit,omitempty"` // independent key toggle (default true)
-	DollarRelayEnabled   bool                   `protobuf:"varint,8,opt,name=dollar_relay_enabled,json=dollarRelayEnabled,proto3" json:"dollar_relay_enabled,omitempty"`         // on SUBSCRIPTION_FIRST keys, false blocks Free + Referral + Dollar
-	AllowBasicToPremium  bool                   `protobuf:"varint,9,opt,name=allow_basic_to_premium,json=allowBasicToPremium,proto3" json:"allow_basic_to_premium,omitempty"`    // account setting "Continue with Premium when Basic is not enough"
-	AllowedCatalogIds    []string               `protobuf:"bytes,10,rep,name=allowed_catalog_ids,json=allowedCatalogIds,proto3" json:"allowed_catalog_ids,omitempty"`
-	ModelAllowlist       []string               `protobuf:"bytes,11,rep,name=model_allowlist,json=modelAllowlist,proto3" json:"model_allowlist,omitempty"`
-	ActivePlanId         string                 `protobuf:"bytes,12,opt,name=active_plan_id,json=activePlanId,proto3" json:"active_plan_id,omitempty"`
-	PlanBasicGroupIds    []string               `protobuf:"bytes,13,rep,name=plan_basic_group_ids,json=planBasicGroupIds,proto3" json:"plan_basic_group_ids,omitempty"`
-	PlanPremiumGroupIds  []string               `protobuf:"bytes,14,rep,name=plan_premium_group_ids,json=planPremiumGroupIds,proto3" json:"plan_premium_group_ids,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state                          protoimpl.MessageState `protogen:"open.v1"`
+	Authenticated                  bool                   `protobuf:"varint,1,opt,name=authenticated,proto3" json:"authenticated,omitempty"`
+	RejectCode                     v1.RejectCode          `protobuf:"varint,2,opt,name=reject_code,json=rejectCode,proto3,enum=maxshot.common.v1.RejectCode" json:"reject_code,omitempty"`
+	RejectMessage                  string                 `protobuf:"bytes,3,opt,name=reject_message,json=rejectMessage,proto3" json:"reject_message,omitempty"`
+	AccountId                      string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ApiKeyId                       string                 `protobuf:"bytes,5,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	KeyFundingStrategy             v1.KeyFundingStrategy  `protobuf:"varint,6,opt,name=key_funding_strategy,json=keyFundingStrategy,proto3,enum=maxshot.common.v1.KeyFundingStrategy" json:"key_funding_strategy,omitempty"`
+	AllowAitEarnedCredit           bool                   `protobuf:"varint,7,opt,name=allow_ait_earned_credit,json=allowAitEarnedCredit,proto3" json:"allow_ait_earned_credit,omitempty"` // independent key toggle (default true)
+	DollarRelayEnabled             bool                   `protobuf:"varint,8,opt,name=dollar_relay_enabled,json=dollarRelayEnabled,proto3" json:"dollar_relay_enabled,omitempty"`         // when subscription active, false blocks Free + Referral + Dollar; #154 falls back when no active subscription
+	AllowBasicToPremium            bool                   `protobuf:"varint,9,opt,name=allow_basic_to_premium,json=allowBasicToPremium,proto3" json:"allow_basic_to_premium,omitempty"`    // account setting "Continue with Premium when Basic is not enough"
+	AllowedCatalogIds              []string               `protobuf:"bytes,10,rep,name=allowed_catalog_ids,json=allowedCatalogIds,proto3" json:"allowed_catalog_ids,omitempty"`
+	ModelAllowlist                 []string               `protobuf:"bytes,11,rep,name=model_allowlist,json=modelAllowlist,proto3" json:"model_allowlist,omitempty"`
+	ActivePlanId                   string                 `protobuf:"bytes,12,opt,name=active_plan_id,json=activePlanId,proto3" json:"active_plan_id,omitempty"`
+	PlanBasicGroupIds              []string               `protobuf:"bytes,13,rep,name=plan_basic_group_ids,json=planBasicGroupIds,proto3" json:"plan_basic_group_ids,omitempty"`
+	PlanPremiumGroupIds            []string               `protobuf:"bytes,14,rep,name=plan_premium_group_ids,json=planPremiumGroupIds,proto3" json:"plan_premium_group_ids,omitempty"`
+	MaxConcurrentStreams           int32                  `protobuf:"varint,15,opt,name=max_concurrent_streams,json=maxConcurrentStreams,proto3" json:"max_concurrent_streams,omitempty"`
+	RpmLimit                       int32                  `protobuf:"varint,16,opt,name=rpm_limit,json=rpmLimit,proto3" json:"rpm_limit,omitempty"`
+	TpmLimit                       int64                  `protobuf:"varint,17,opt,name=tpm_limit,json=tpmLimit,proto3" json:"tpm_limit,omitempty"`
+	SpendingLocked                 bool                   `protobuf:"varint,18,opt,name=spending_locked,json=spendingLocked,proto3" json:"spending_locked,omitempty"`
+	KeyExpiresAtUnixMs             int64                  `protobuf:"varint,19,opt,name=key_expires_at_unix_ms,json=keyExpiresAtUnixMs,proto3" json:"key_expires_at_unix_ms,omitempty"`
+	SearchPolicy                   v1.SearchPolicy        `protobuf:"varint,20,opt,name=search_policy,json=searchPolicy,proto3,enum=maxshot.common.v1.SearchPolicy" json:"search_policy,omitempty"`
+	MediaSharesSubscriptionWindows bool                   `protobuf:"varint,21,opt,name=media_shares_subscription_windows,json=mediaSharesSubscriptionWindows,proto3" json:"media_shares_subscription_windows,omitempty"` // true under switched qualification policy (decision 5A)
+	AitCoverageThrottledModelIds   []string               `protobuf:"bytes,22,rep,name=ait_coverage_throttled_model_ids,json=aitCoverageThrottledModelIds,proto3" json:"ait_coverage_throttled_model_ids,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
 }
 
 func (x *ResolvePrincipalScopeResponse) Reset() {
 	*x = ResolvePrincipalScopeResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[8]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1109,7 +1503,7 @@ func (x *ResolvePrincipalScopeResponse) String() string {
 func (*ResolvePrincipalScopeResponse) ProtoMessage() {}
 
 func (x *ResolvePrincipalScopeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[8]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1122,7 +1516,7 @@ func (x *ResolvePrincipalScopeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolvePrincipalScopeResponse.ProtoReflect.Descriptor instead.
 func (*ResolvePrincipalScopeResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{8}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResolvePrincipalScopeResponse) GetAuthenticated() bool {
@@ -1223,6 +1617,322 @@ func (x *ResolvePrincipalScopeResponse) GetPlanPremiumGroupIds() []string {
 	return nil
 }
 
+func (x *ResolvePrincipalScopeResponse) GetMaxConcurrentStreams() int32 {
+	if x != nil {
+		return x.MaxConcurrentStreams
+	}
+	return 0
+}
+
+func (x *ResolvePrincipalScopeResponse) GetRpmLimit() int32 {
+	if x != nil {
+		return x.RpmLimit
+	}
+	return 0
+}
+
+func (x *ResolvePrincipalScopeResponse) GetTpmLimit() int64 {
+	if x != nil {
+		return x.TpmLimit
+	}
+	return 0
+}
+
+func (x *ResolvePrincipalScopeResponse) GetSpendingLocked() bool {
+	if x != nil {
+		return x.SpendingLocked
+	}
+	return false
+}
+
+func (x *ResolvePrincipalScopeResponse) GetKeyExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.KeyExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *ResolvePrincipalScopeResponse) GetSearchPolicy() v1.SearchPolicy {
+	if x != nil {
+		return x.SearchPolicy
+	}
+	return v1.SearchPolicy(0)
+}
+
+func (x *ResolvePrincipalScopeResponse) GetMediaSharesSubscriptionWindows() bool {
+	if x != nil {
+		return x.MediaSharesSubscriptionWindows
+	}
+	return false
+}
+
+func (x *ResolvePrincipalScopeResponse) GetAitCoverageThrottledModelIds() []string {
+	if x != nil {
+		return x.AitCoverageThrottledModelIds
+	}
+	return nil
+}
+
+type EvaluateCatalogDiscoveryRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AccountId        string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	KeyId            string                 `protobuf:"bytes,2,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	Channel          ExecutionChannel       `protobuf:"varint,3,opt,name=channel,proto3,enum=maxshot.gateway_internal.v1.ExecutionChannel" json:"channel,omitempty"`
+	CustomerModelIds []string               `protobuf:"bytes,4,rep,name=customer_model_ids,json=customerModelIds,proto3" json:"customer_model_ids,omitempty"` // empty evaluates all published models in current CatalogSnapshot
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) Reset() {
+	*x = EvaluateCatalogDiscoveryRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluateCatalogDiscoveryRequest) ProtoMessage() {}
+
+func (x *EvaluateCatalogDiscoveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluateCatalogDiscoveryRequest.ProtoReflect.Descriptor instead.
+func (*EvaluateCatalogDiscoveryRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) GetChannel() ExecutionChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return ExecutionChannel_EXECUTION_CHANNEL_UNSPECIFIED
+}
+
+func (x *EvaluateCatalogDiscoveryRequest) GetCustomerModelIds() []string {
+	if x != nil {
+		return x.CustomerModelIds
+	}
+	return nil
+}
+
+type ModelDiscoveryEvaluation struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	CustomerModelId             string                 `protobuf:"bytes,1,opt,name=customer_model_id,json=customerModelId,proto3" json:"customer_model_id,omitempty"`
+	KeyScopeAllowed             bool                   `protobuf:"varint,2,opt,name=key_scope_allowed,json=keyScopeAllowed,proto3" json:"key_scope_allowed,omitempty"`
+	SubscriptionBasicEligible   bool                   `protobuf:"varint,3,opt,name=subscription_basic_eligible,json=subscriptionBasicEligible,proto3" json:"subscription_basic_eligible,omitempty"`
+	SubscriptionPremiumEligible bool                   `protobuf:"varint,4,opt,name=subscription_premium_eligible,json=subscriptionPremiumEligible,proto3" json:"subscription_premium_eligible,omitempty"`
+	AitEarnedCreditEligible     bool                   `protobuf:"varint,5,opt,name=ait_earned_credit_eligible,json=aitEarnedCreditEligible,proto3" json:"ait_earned_credit_eligible,omitempty"`
+	AitCoverageThrottled        bool                   `protobuf:"varint,6,opt,name=ait_coverage_throttled,json=aitCoverageThrottled,proto3" json:"ait_coverage_throttled,omitempty"`
+	SearchSubscriptionEligible  bool                   `protobuf:"varint,7,opt,name=search_subscription_eligible,json=searchSubscriptionEligible,proto3" json:"search_subscription_eligible,omitempty"`
+	SpendableBuckets            []v1.FundingBucket     `protobuf:"varint,8,rep,packed,name=spendable_buckets,json=spendableBuckets,proto3,enum=maxshot.common.v1.FundingBucket" json:"spendable_buckets,omitempty"`
+	BlockReason                 v1.RejectCode          `protobuf:"varint,9,opt,name=block_reason,json=blockReason,proto3,enum=maxshot.common.v1.RejectCode" json:"block_reason,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *ModelDiscoveryEvaluation) Reset() {
+	*x = ModelDiscoveryEvaluation{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelDiscoveryEvaluation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelDiscoveryEvaluation) ProtoMessage() {}
+
+func (x *ModelDiscoveryEvaluation) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelDiscoveryEvaluation.ProtoReflect.Descriptor instead.
+func (*ModelDiscoveryEvaluation) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ModelDiscoveryEvaluation) GetCustomerModelId() string {
+	if x != nil {
+		return x.CustomerModelId
+	}
+	return ""
+}
+
+func (x *ModelDiscoveryEvaluation) GetKeyScopeAllowed() bool {
+	if x != nil {
+		return x.KeyScopeAllowed
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetSubscriptionBasicEligible() bool {
+	if x != nil {
+		return x.SubscriptionBasicEligible
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetSubscriptionPremiumEligible() bool {
+	if x != nil {
+		return x.SubscriptionPremiumEligible
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetAitEarnedCreditEligible() bool {
+	if x != nil {
+		return x.AitEarnedCreditEligible
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetAitCoverageThrottled() bool {
+	if x != nil {
+		return x.AitCoverageThrottled
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetSearchSubscriptionEligible() bool {
+	if x != nil {
+		return x.SearchSubscriptionEligible
+	}
+	return false
+}
+
+func (x *ModelDiscoveryEvaluation) GetSpendableBuckets() []v1.FundingBucket {
+	if x != nil {
+		return x.SpendableBuckets
+	}
+	return nil
+}
+
+func (x *ModelDiscoveryEvaluation) GetBlockReason() v1.RejectCode {
+	if x != nil {
+		return x.BlockReason
+	}
+	return v1.RejectCode(0)
+}
+
+type EvaluateCatalogDiscoveryResponse struct {
+	state           protoimpl.MessageState      `protogen:"open.v1"`
+	CatalogVersion  string                      `protobuf:"bytes,1,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	FundingScenario string                      `protobuf:"bytes,2,opt,name=funding_scenario,json=fundingScenario,proto3" json:"funding_scenario,omitempty"`
+	BucketBalances  []*BucketBalanceView        `protobuf:"bytes,3,rep,name=bucket_balances,json=bucketBalances,proto3" json:"bucket_balances,omitempty"`
+	Windows         []*FundingWindowStatus      `protobuf:"bytes,4,rep,name=windows,proto3" json:"windows,omitempty"`
+	KeyGrossWindow  *KeyGrossWindowStatus       `protobuf:"bytes,5,opt,name=key_gross_window,json=keyGrossWindow,proto3" json:"key_gross_window,omitempty"`
+	Models          []*ModelDiscoveryEvaluation `protobuf:"bytes,6,rep,name=models,proto3" json:"models,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) Reset() {
+	*x = EvaluateCatalogDiscoveryResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvaluateCatalogDiscoveryResponse) ProtoMessage() {}
+
+func (x *EvaluateCatalogDiscoveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvaluateCatalogDiscoveryResponse.ProtoReflect.Descriptor instead.
+func (*EvaluateCatalogDiscoveryResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetCatalogVersion() string {
+	if x != nil {
+		return x.CatalogVersion
+	}
+	return ""
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetFundingScenario() string {
+	if x != nil {
+		return x.FundingScenario
+	}
+	return ""
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetBucketBalances() []*BucketBalanceView {
+	if x != nil {
+		return x.BucketBalances
+	}
+	return nil
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetWindows() []*FundingWindowStatus {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetKeyGrossWindow() *KeyGrossWindowStatus {
+	if x != nil {
+		return x.KeyGrossWindow
+	}
+	return nil
+}
+
+func (x *EvaluateCatalogDiscoveryResponse) GetModels() []*ModelDiscoveryEvaluation {
+	if x != nil {
+		return x.Models
+	}
+	return nil
+}
+
 type PreviewQuoteRequest struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	ApiKeySha256          string                 `protobuf:"bytes,1,opt,name=api_key_sha256,json=apiKeySha256,proto3" json:"api_key_sha256,omitempty"`
@@ -1239,13 +1949,16 @@ type PreviewQuoteRequest struct {
 	CallerCeilingMicroUsd int64                  `protobuf:"varint,12,opt,name=caller_ceiling_micro_usd,json=callerCeilingMicroUsd,proto3" json:"caller_ceiling_micro_usd,omitempty"`
 	ZeroRetention         bool                   `protobuf:"varint,13,opt,name=zero_retention,json=zeroRetention,proto3" json:"zero_retention,omitempty"`
 	ClientRegion          string                 `protobuf:"bytes,14,opt,name=client_region,json=clientRegion,proto3" json:"client_region,omitempty"`
+	IssueQuoteLock        bool                   `protobuf:"varint,15,opt,name=issue_quote_lock,json=issueQuoteLock,proto3" json:"issue_quote_lock,omitempty"` // true issues a 5-minute TTL locked quote_id for two-step Studio submission (BIL-R22)
+	RequestHash           string                 `protobuf:"bytes,16,opt,name=request_hash,json=requestHash,proto3" json:"request_hash,omitempty"`             // normalized generation parameter digest bound to quote_id
+	EffectiveChannel      string                 `protobuf:"bytes,17,opt,name=effective_channel,json=effectiveChannel,proto3" json:"effective_channel,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *PreviewQuoteRequest) Reset() {
 	*x = PreviewQuoteRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[9]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1257,7 +1970,7 @@ func (x *PreviewQuoteRequest) String() string {
 func (*PreviewQuoteRequest) ProtoMessage() {}
 
 func (x *PreviewQuoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[9]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1270,7 +1983,7 @@ func (x *PreviewQuoteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewQuoteRequest.ProtoReflect.Descriptor instead.
 func (*PreviewQuoteRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{9}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PreviewQuoteRequest) GetApiKeySha256() string {
@@ -1371,6 +2084,27 @@ func (x *PreviewQuoteRequest) GetClientRegion() string {
 	return ""
 }
 
+func (x *PreviewQuoteRequest) GetIssueQuoteLock() bool {
+	if x != nil {
+		return x.IssueQuoteLock
+	}
+	return false
+}
+
+func (x *PreviewQuoteRequest) GetRequestHash() string {
+	if x != nil {
+		return x.RequestHash
+	}
+	return ""
+}
+
+func (x *PreviewQuoteRequest) GetEffectiveChannel() string {
+	if x != nil {
+		return x.EffectiveChannel
+	}
+	return ""
+}
+
 type PreviewQuoteResponse struct {
 	state                           protoimpl.MessageState     `protogen:"open.v1"`
 	Eligible                        bool                       `protobuf:"varint,1,opt,name=eligible,proto3" json:"eligible,omitempty"`
@@ -1388,13 +2122,23 @@ type PreviewQuoteResponse struct {
 	ProjectedHoldBuckets            []*BucketAllocationLine    `protobuf:"bytes,13,rep,name=projected_hold_buckets,json=projectedHoldBuckets,proto3" json:"projected_hold_buckets,omitempty"`
 	BudgetDiagnostic                *SpendingLimitDiagnostic   `protobuf:"bytes,14,opt,name=budget_diagnostic,json=budgetDiagnostic,proto3" json:"budget_diagnostic,omitempty"`
 	CreditDiagnostic                *CreditShortfallDiagnostic `protobuf:"bytes,15,opt,name=credit_diagnostic,json=creditDiagnostic,proto3" json:"credit_diagnostic,omitempty"`
+	QuoteId                         string                     `protobuf:"bytes,16,opt,name=quote_id,json=quoteId,proto3" json:"quote_id,omitempty"`
+	QuoteExpiresAtUnixMs            int64                      `protobuf:"varint,17,opt,name=quote_expires_at_unix_ms,json=quoteExpiresAtUnixMs,proto3" json:"quote_expires_at_unix_ms,omitempty"`
+	CatalogVersion                  string                     `protobuf:"bytes,18,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	RateCardVersion                 string                     `protobuf:"bytes,19,opt,name=rate_card_version,json=rateCardVersion,proto3" json:"rate_card_version,omitempty"`
+	ReservedCredits                 int64                      `protobuf:"varint,20,opt,name=reserved_credits,json=reservedCredits,proto3" json:"reserved_credits,omitempty"`
+	FundingScenario                 string                     `protobuf:"bytes,21,opt,name=funding_scenario,json=fundingScenario,proto3" json:"funding_scenario,omitempty"`
+	BucketBalances                  []*BucketBalanceView       `protobuf:"bytes,22,rep,name=bucket_balances,json=bucketBalances,proto3" json:"bucket_balances,omitempty"`
+	Windows                         []*FundingWindowStatus     `protobuf:"bytes,23,rep,name=windows,proto3" json:"windows,omitempty"`
+	KeyGrossWindow                  *KeyGrossWindowStatus      `protobuf:"bytes,24,opt,name=key_gross_window,json=keyGrossWindow,proto3" json:"key_gross_window,omitempty"`
+	MediaSharesSubscriptionWindows  bool                       `protobuf:"varint,25,opt,name=media_shares_subscription_windows,json=mediaSharesSubscriptionWindows,proto3" json:"media_shares_subscription_windows,omitempty"`
 	unknownFields                   protoimpl.UnknownFields
 	sizeCache                       protoimpl.SizeCache
 }
 
 func (x *PreviewQuoteResponse) Reset() {
 	*x = PreviewQuoteResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[10]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1406,7 +2150,7 @@ func (x *PreviewQuoteResponse) String() string {
 func (*PreviewQuoteResponse) ProtoMessage() {}
 
 func (x *PreviewQuoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[10]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1419,7 +2163,7 @@ func (x *PreviewQuoteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewQuoteResponse.ProtoReflect.Descriptor instead.
 func (*PreviewQuoteResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{10}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PreviewQuoteResponse) GetEligible() bool {
@@ -1527,38 +2271,112 @@ func (x *PreviewQuoteResponse) GetCreditDiagnostic() *CreditShortfallDiagnostic 
 	return nil
 }
 
+func (x *PreviewQuoteResponse) GetQuoteId() string {
+	if x != nil {
+		return x.QuoteId
+	}
+	return ""
+}
+
+func (x *PreviewQuoteResponse) GetQuoteExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.QuoteExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *PreviewQuoteResponse) GetCatalogVersion() string {
+	if x != nil {
+		return x.CatalogVersion
+	}
+	return ""
+}
+
+func (x *PreviewQuoteResponse) GetRateCardVersion() string {
+	if x != nil {
+		return x.RateCardVersion
+	}
+	return ""
+}
+
+func (x *PreviewQuoteResponse) GetReservedCredits() int64 {
+	if x != nil {
+		return x.ReservedCredits
+	}
+	return 0
+}
+
+func (x *PreviewQuoteResponse) GetFundingScenario() string {
+	if x != nil {
+		return x.FundingScenario
+	}
+	return ""
+}
+
+func (x *PreviewQuoteResponse) GetBucketBalances() []*BucketBalanceView {
+	if x != nil {
+		return x.BucketBalances
+	}
+	return nil
+}
+
+func (x *PreviewQuoteResponse) GetWindows() []*FundingWindowStatus {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+func (x *PreviewQuoteResponse) GetKeyGrossWindow() *KeyGrossWindowStatus {
+	if x != nil {
+		return x.KeyGrossWindow
+	}
+	return nil
+}
+
+func (x *PreviewQuoteResponse) GetMediaSharesSubscriptionWindows() bool {
+	if x != nil {
+		return x.MediaSharesSubscriptionWindows
+	}
+	return false
+}
+
 type AuthorizeAndHoldRequest struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	TraceId               string                 `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	IdempotencyScope      string                 `protobuf:"bytes,2,opt,name=idempotency_scope,json=idempotencyScope,proto3" json:"idempotency_scope,omitempty"`
-	IdempotencyKey        string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
-	RequestBodySha256     string                 `protobuf:"bytes,4,opt,name=request_body_sha256,json=requestBodySha256,proto3" json:"request_body_sha256,omitempty"`
-	ApiKeySha256          string                 `protobuf:"bytes,5,opt,name=api_key_sha256,json=apiKeySha256,proto3" json:"api_key_sha256,omitempty"`                // populated when channel == EXECUTION_CHANNEL_API or API Studio
-	InternalAccountId     string                 `protobuf:"bytes,6,opt,name=internal_account_id,json=internalAccountId,proto3" json:"internal_account_id,omitempty"` // populated when authenticated via Web session JWT
-	Channel               ExecutionChannel       `protobuf:"varint,7,opt,name=channel,proto3,enum=maxshot.gateway_internal.v1.ExecutionChannel" json:"channel,omitempty"`
-	Modality              v1.Modality            `protobuf:"varint,8,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
-	SelectionMode         RouteSelectionMode     `protobuf:"varint,9,opt,name=selection_mode,json=selectionMode,proto3,enum=maxshot.gateway_internal.v1.RouteSelectionMode" json:"selection_mode,omitempty"`
-	RequestedModelId      string                 `protobuf:"bytes,10,opt,name=requested_model_id,json=requestedModelId,proto3" json:"requested_model_id,omitempty"` // e.g. "maxshot/auto" or concrete model_id
-	ModelId               string                 `protobuf:"bytes,11,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`                              // resolved concrete customer model_id
-	AutoTaskLabel         string                 `protobuf:"bytes,12,opt,name=auto_task_label,json=autoTaskLabel,proto3" json:"auto_task_label,omitempty"`
-	CatalogVersion        string                 `protobuf:"bytes,13,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
-	PrimaryOfferingId     string                 `protobuf:"bytes,14,opt,name=primary_offering_id,json=primaryOfferingId,proto3" json:"primary_offering_id,omitempty"`
-	BackupOfferingId      string                 `protobuf:"bytes,15,opt,name=backup_offering_id,json=backupOfferingId,proto3" json:"backup_offering_id,omitempty"`
-	EstimateBound         *UsageBound            `protobuf:"bytes,16,opt,name=estimate_bound,json=estimateBound,proto3" json:"estimate_bound,omitempty"`
-	HardMaxBound          *UsageBound            `protobuf:"bytes,17,opt,name=hard_max_bound,json=hardMaxBound,proto3" json:"hard_max_bound,omitempty"`
-	CallerCeilingMicroUsd int64                  `protobuf:"varint,18,opt,name=caller_ceiling_micro_usd,json=callerCeilingMicroUsd,proto3" json:"caller_ceiling_micro_usd,omitempty"`
-	DollarConfirmed       bool                   `protobuf:"varint,19,opt,name=dollar_confirmed,json=dollarConfirmed,proto3" json:"dollar_confirmed,omitempty"`
-	ZeroRetention         bool                   `protobuf:"varint,20,opt,name=zero_retention,json=zeroRetention,proto3" json:"zero_retention,omitempty"`
-	ClientRegion          string                 `protobuf:"bytes,21,opt,name=client_region,json=clientRegion,proto3" json:"client_region,omitempty"`
-	StudioOperationId     string                 `protobuf:"bytes,22,opt,name=studio_operation_id,json=studioOperationId,proto3" json:"studio_operation_id,omitempty"` // links Studio async job record (BIL-R41)
-	InitialLeaseTtlMs     int64                  `protobuf:"varint,23,opt,name=initial_lease_ttl_ms,json=initialLeaseTtlMs,proto3" json:"initial_lease_ttl_ms,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	TraceId                    string                 `protobuf:"bytes,1,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	IdempotencyScope           string                 `protobuf:"bytes,2,opt,name=idempotency_scope,json=idempotencyScope,proto3" json:"idempotency_scope,omitempty"`
+	IdempotencyKey             string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	RequestBodySha256          string                 `protobuf:"bytes,4,opt,name=request_body_sha256,json=requestBodySha256,proto3" json:"request_body_sha256,omitempty"`
+	ApiKeySha256               string                 `protobuf:"bytes,5,opt,name=api_key_sha256,json=apiKeySha256,proto3" json:"api_key_sha256,omitempty"`                // populated when channel == EXECUTION_CHANNEL_API or API Studio
+	InternalAccountId          string                 `protobuf:"bytes,6,opt,name=internal_account_id,json=internalAccountId,proto3" json:"internal_account_id,omitempty"` // populated when authenticated via Web session JWT
+	Channel                    ExecutionChannel       `protobuf:"varint,7,opt,name=channel,proto3,enum=maxshot.gateway_internal.v1.ExecutionChannel" json:"channel,omitempty"`
+	Modality                   v1.Modality            `protobuf:"varint,8,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
+	SelectionMode              RouteSelectionMode     `protobuf:"varint,9,opt,name=selection_mode,json=selectionMode,proto3,enum=maxshot.gateway_internal.v1.RouteSelectionMode" json:"selection_mode,omitempty"`
+	RequestedModelId           string                 `protobuf:"bytes,10,opt,name=requested_model_id,json=requestedModelId,proto3" json:"requested_model_id,omitempty"` // e.g. "maxshot/auto" or concrete model_id
+	ModelId                    string                 `protobuf:"bytes,11,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`                              // resolved concrete customer model_id
+	AutoTaskLabel              string                 `protobuf:"bytes,12,opt,name=auto_task_label,json=autoTaskLabel,proto3" json:"auto_task_label,omitempty"`
+	CatalogVersion             string                 `protobuf:"bytes,13,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	PrimaryOfferingId          string                 `protobuf:"bytes,14,opt,name=primary_offering_id,json=primaryOfferingId,proto3" json:"primary_offering_id,omitempty"`
+	BackupOfferingId           string                 `protobuf:"bytes,15,opt,name=backup_offering_id,json=backupOfferingId,proto3" json:"backup_offering_id,omitempty"`
+	EstimateBound              *UsageBound            `protobuf:"bytes,16,opt,name=estimate_bound,json=estimateBound,proto3" json:"estimate_bound,omitempty"`
+	HardMaxBound               *UsageBound            `protobuf:"bytes,17,opt,name=hard_max_bound,json=hardMaxBound,proto3" json:"hard_max_bound,omitempty"`
+	CallerCeilingMicroUsd      int64                  `protobuf:"varint,18,opt,name=caller_ceiling_micro_usd,json=callerCeilingMicroUsd,proto3" json:"caller_ceiling_micro_usd,omitempty"`
+	DollarConfirmed            bool                   `protobuf:"varint,19,opt,name=dollar_confirmed,json=dollarConfirmed,proto3" json:"dollar_confirmed,omitempty"`
+	ZeroRetention              bool                   `protobuf:"varint,20,opt,name=zero_retention,json=zeroRetention,proto3" json:"zero_retention,omitempty"`
+	ClientRegion               string                 `protobuf:"bytes,21,opt,name=client_region,json=clientRegion,proto3" json:"client_region,omitempty"`
+	StudioOperationId          string                 `protobuf:"bytes,22,opt,name=studio_operation_id,json=studioOperationId,proto3" json:"studio_operation_id,omitempty"` // links Studio async job record (BIL-R41)
+	InitialLeaseTtlMs          int64                  `protobuf:"varint,23,opt,name=initial_lease_ttl_ms,json=initialLeaseTtlMs,proto3" json:"initial_lease_ttl_ms,omitempty"`
+	QuoteId                    string                 `protobuf:"bytes,24,opt,name=quote_id,json=quoteId,proto3" json:"quote_id,omitempty"`             // optional 5-minute locked quote from PreviewQuote
+	RequestHash                string                 `protobuf:"bytes,25,opt,name=request_hash,json=requestHash,proto3" json:"request_hash,omitempty"` // verified against locked quote when quote_id is supplied
+	CustomerChargeModeOverride v1.CustomerChargeMode  `protobuf:"varint,26,opt,name=customer_charge_mode_override,json=customerChargeModeOverride,proto3,enum=maxshot.common.v1.CustomerChargeMode" json:"customer_charge_mode_override,omitempty"`
+	EffectiveChannel           string                 `protobuf:"bytes,27,opt,name=effective_channel,json=effectiveChannel,proto3" json:"effective_channel,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *AuthorizeAndHoldRequest) Reset() {
 	*x = AuthorizeAndHoldRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[11]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1570,7 +2388,7 @@ func (x *AuthorizeAndHoldRequest) String() string {
 func (*AuthorizeAndHoldRequest) ProtoMessage() {}
 
 func (x *AuthorizeAndHoldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[11]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1583,7 +2401,7 @@ func (x *AuthorizeAndHoldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeAndHoldRequest.ProtoReflect.Descriptor instead.
 func (*AuthorizeAndHoldRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{11}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *AuthorizeAndHoldRequest) GetTraceId() string {
@@ -1747,13 +2565,41 @@ func (x *AuthorizeAndHoldRequest) GetInitialLeaseTtlMs() int64 {
 	return 0
 }
 
+func (x *AuthorizeAndHoldRequest) GetQuoteId() string {
+	if x != nil {
+		return x.QuoteId
+	}
+	return ""
+}
+
+func (x *AuthorizeAndHoldRequest) GetRequestHash() string {
+	if x != nil {
+		return x.RequestHash
+	}
+	return ""
+}
+
+func (x *AuthorizeAndHoldRequest) GetCustomerChargeModeOverride() v1.CustomerChargeMode {
+	if x != nil {
+		return x.CustomerChargeModeOverride
+	}
+	return v1.CustomerChargeMode(0)
+}
+
+func (x *AuthorizeAndHoldRequest) GetEffectiveChannel() string {
+	if x != nil {
+		return x.EffectiveChannel
+	}
+	return ""
+}
+
 type AuthorizeAndHoldResponse struct {
 	state                       protoimpl.MessageState     `protogen:"open.v1"`
 	Status                      HoldDecisionStatus         `protobuf:"varint,1,opt,name=status,proto3,enum=maxshot.gateway_internal.v1.HoldDecisionStatus" json:"status,omitempty"`
 	Admitted                    bool                       `protobuf:"varint,2,opt,name=admitted,proto3" json:"admitted,omitempty"`
 	RejectCode                  v1.RejectCode              `protobuf:"varint,3,opt,name=reject_code,json=rejectCode,proto3,enum=maxshot.common.v1.RejectCode" json:"reject_code,omitempty"`
 	RejectMessage               string                     `protobuf:"bytes,4,opt,name=reject_message,json=rejectMessage,proto3" json:"reject_message,omitempty"`
-	RequestId                   string                     `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // ULID, generated only when admitted (BIL-R24)
+	RequestId                   string                     `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // ULID, generated when admitted and returned on IDEMPOTENT_IN_PROGRESS/COMPLETED replays (BIL-R24, BIL-R36)
 	HoldId                      string                     `protobuf:"bytes,6,opt,name=hold_id,json=holdId,proto3" json:"hold_id,omitempty"`
 	LeaseToken                  string                     `protobuf:"bytes,7,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
 	LeaseExpiresAtUnixMs        int64                      `protobuf:"varint,8,opt,name=lease_expires_at_unix_ms,json=leaseExpiresAtUnixMs,proto3" json:"lease_expires_at_unix_ms,omitempty"`
@@ -1775,7 +2621,7 @@ type AuthorizeAndHoldResponse struct {
 
 func (x *AuthorizeAndHoldResponse) Reset() {
 	*x = AuthorizeAndHoldResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[12]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1787,7 +2633,7 @@ func (x *AuthorizeAndHoldResponse) String() string {
 func (*AuthorizeAndHoldResponse) ProtoMessage() {}
 
 func (x *AuthorizeAndHoldResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[12]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1800,7 +2646,7 @@ func (x *AuthorizeAndHoldResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeAndHoldResponse.ProtoReflect.Descriptor instead.
 func (*AuthorizeAndHoldResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{12}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AuthorizeAndHoldResponse) GetStatus() HoldDecisionStatus {
@@ -1957,7 +2803,7 @@ type MarkSendingRequest struct {
 
 func (x *MarkSendingRequest) Reset() {
 	*x = MarkSendingRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[13]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1969,7 +2815,7 @@ func (x *MarkSendingRequest) String() string {
 func (*MarkSendingRequest) ProtoMessage() {}
 
 func (x *MarkSendingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[13]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1982,7 +2828,7 @@ func (x *MarkSendingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkSendingRequest.ProtoReflect.Descriptor instead.
 func (*MarkSendingRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{13}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *MarkSendingRequest) GetRequestId() string {
@@ -2038,7 +2884,7 @@ type MarkSendingResponse struct {
 
 func (x *MarkSendingResponse) Reset() {
 	*x = MarkSendingResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[14]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2050,7 +2896,7 @@ func (x *MarkSendingResponse) String() string {
 func (*MarkSendingResponse) ProtoMessage() {}
 
 func (x *MarkSendingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[14]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2063,7 +2909,7 @@ func (x *MarkSendingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkSendingResponse.ProtoReflect.Descriptor instead.
 func (*MarkSendingResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{14}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *MarkSendingResponse) GetAccepted() bool {
@@ -2098,7 +2944,7 @@ type ExtendExecutionLeaseRequest struct {
 
 func (x *ExtendExecutionLeaseRequest) Reset() {
 	*x = ExtendExecutionLeaseRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[15]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2110,7 +2956,7 @@ func (x *ExtendExecutionLeaseRequest) String() string {
 func (*ExtendExecutionLeaseRequest) ProtoMessage() {}
 
 func (x *ExtendExecutionLeaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[15]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2123,7 +2969,7 @@ func (x *ExtendExecutionLeaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtendExecutionLeaseRequest.ProtoReflect.Descriptor instead.
 func (*ExtendExecutionLeaseRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{15}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ExtendExecutionLeaseRequest) GetRequestId() string {
@@ -2157,7 +3003,7 @@ type ExtendExecutionLeaseResponse struct {
 
 func (x *ExtendExecutionLeaseResponse) Reset() {
 	*x = ExtendExecutionLeaseResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[16]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2169,7 +3015,7 @@ func (x *ExtendExecutionLeaseResponse) String() string {
 func (*ExtendExecutionLeaseResponse) ProtoMessage() {}
 
 func (x *ExtendExecutionLeaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[16]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2182,7 +3028,7 @@ func (x *ExtendExecutionLeaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExtendExecutionLeaseResponse.ProtoReflect.Descriptor instead.
 func (*ExtendExecutionLeaseResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{16}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ExtendExecutionLeaseResponse) GetAccepted() bool {
@@ -2215,7 +3061,7 @@ type MediaOutputSettlementItem struct {
 
 func (x *MediaOutputSettlementItem) Reset() {
 	*x = MediaOutputSettlementItem{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[17]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2227,7 +3073,7 @@ func (x *MediaOutputSettlementItem) String() string {
 func (*MediaOutputSettlementItem) ProtoMessage() {}
 
 func (x *MediaOutputSettlementItem) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[17]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2240,7 +3086,7 @@ func (x *MediaOutputSettlementItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MediaOutputSettlementItem.ProtoReflect.Descriptor instead.
 func (*MediaOutputSettlementItem) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{17}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *MediaOutputSettlementItem) GetOutputId() string {
@@ -2312,13 +3158,16 @@ type AttemptCostRecord struct {
 	DispatchedAtUnixMs         int64                  `protobuf:"varint,9,opt,name=dispatched_at_unix_ms,json=dispatchedAtUnixMs,proto3" json:"dispatched_at_unix_ms,omitempty"`
 	FirstTokenAtUnixMs         int64                  `protobuf:"varint,10,opt,name=first_token_at_unix_ms,json=firstTokenAtUnixMs,proto3" json:"first_token_at_unix_ms,omitempty"`
 	CompletedAtUnixMs          int64                  `protobuf:"varint,11,opt,name=completed_at_unix_ms,json=completedAtUnixMs,proto3" json:"completed_at_unix_ms,omitempty"`
+	AttemptNumber              int32                  `protobuf:"varint,12,opt,name=attempt_number,json=attemptNumber,proto3" json:"attempt_number,omitempty"`
+	ProviderGenerationId       string                 `protobuf:"bytes,13,opt,name=provider_generation_id,json=providerGenerationId,proto3" json:"provider_generation_id,omitempty"` // OpenRouter gen-... or Ark async task ID
+	HttpStatus                 int32                  `protobuf:"varint,14,opt,name=http_status,json=httpStatus,proto3" json:"http_status,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *AttemptCostRecord) Reset() {
 	*x = AttemptCostRecord{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[18]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2330,7 +3179,7 @@ func (x *AttemptCostRecord) String() string {
 func (*AttemptCostRecord) ProtoMessage() {}
 
 func (x *AttemptCostRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[18]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2343,7 +3192,7 @@ func (x *AttemptCostRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttemptCostRecord.ProtoReflect.Descriptor instead.
 func (*AttemptCostRecord) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{18}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *AttemptCostRecord) GetAttemptId() string {
@@ -2423,28 +3272,51 @@ func (x *AttemptCostRecord) GetCompletedAtUnixMs() int64 {
 	return 0
 }
 
+func (x *AttemptCostRecord) GetAttemptNumber() int32 {
+	if x != nil {
+		return x.AttemptNumber
+	}
+	return 0
+}
+
+func (x *AttemptCostRecord) GetProviderGenerationId() string {
+	if x != nil {
+		return x.ProviderGenerationId
+	}
+	return ""
+}
+
+func (x *AttemptCostRecord) GetHttpStatus() int32 {
+	if x != nil {
+		return x.HttpStatus
+	}
+	return 0
+}
+
 type SettleRequest struct {
-	state                         protoimpl.MessageState       `protogen:"open.v1"`
-	RequestId                     string                       `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	SettlementIdempotencyKey      string                       `protobuf:"bytes,2,opt,name=settlement_idempotency_key,json=settlementIdempotencyKey,proto3" json:"settlement_idempotency_key,omitempty"`
-	LeaseToken                    string                       `protobuf:"bytes,3,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
-	Outcome                       SettlementOutcome            `protobuf:"varint,4,opt,name=outcome,proto3,enum=maxshot.gateway_internal.v1.SettlementOutcome" json:"outcome,omitempty"`
-	ServingOfferingId             string                       `protobuf:"bytes,5,opt,name=serving_offering_id,json=servingOfferingId,proto3" json:"serving_offering_id,omitempty"`
-	NativeRequestId               string                       `protobuf:"bytes,6,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
-	ReportedServingEndpoint       string                       `protobuf:"bytes,7,opt,name=reported_serving_endpoint,json=reportedServingEndpoint,proto3" json:"reported_serving_endpoint,omitempty"`
-	FallbackUsed                  bool                         `protobuf:"varint,8,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
-	FallbackReason                string                       `protobuf:"bytes,9,opt,name=fallback_reason,json=fallbackReason,proto3" json:"fallback_reason,omitempty"`
-	VerifiedUsage                 *UsageBound                  `protobuf:"bytes,10,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"`
-	EstimatedStreamedOutputTokens int64                        `protobuf:"varint,11,opt,name=estimated_streamed_output_tokens,json=estimatedStreamedOutputTokens,proto3" json:"estimated_streamed_output_tokens,omitempty"` // audit evidence only when PENDING_RECONCILIATION (never billed as invented usage)
-	MediaOutputs                  []*MediaOutputSettlementItem `protobuf:"bytes,12,rep,name=media_outputs,json=mediaOutputs,proto3" json:"media_outputs,omitempty"`
-	Attempts                      []*AttemptCostRecord         `protobuf:"bytes,13,rep,name=attempts,proto3" json:"attempts,omitempty"`
-	unknownFields                 protoimpl.UnknownFields
-	sizeCache                     protoimpl.SizeCache
+	state                                  protoimpl.MessageState       `protogen:"open.v1"`
+	RequestId                              string                       `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SettlementIdempotencyKey               string                       `protobuf:"bytes,2,opt,name=settlement_idempotency_key,json=settlementIdempotencyKey,proto3" json:"settlement_idempotency_key,omitempty"`
+	LeaseToken                             string                       `protobuf:"bytes,3,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+	Outcome                                SettlementOutcome            `protobuf:"varint,4,opt,name=outcome,proto3,enum=maxshot.gateway_internal.v1.SettlementOutcome" json:"outcome,omitempty"`
+	ServingOfferingId                      string                       `protobuf:"bytes,5,opt,name=serving_offering_id,json=servingOfferingId,proto3" json:"serving_offering_id,omitempty"`
+	NativeRequestId                        string                       `protobuf:"bytes,6,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
+	ReportedServingEndpoint                string                       `protobuf:"bytes,7,opt,name=reported_serving_endpoint,json=reportedServingEndpoint,proto3" json:"reported_serving_endpoint,omitempty"`
+	FallbackUsed                           bool                         `protobuf:"varint,8,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
+	FallbackReason                         string                       `protobuf:"bytes,9,opt,name=fallback_reason,json=fallbackReason,proto3" json:"fallback_reason,omitempty"`
+	VerifiedUsage                          *UsageBound                  `protobuf:"bytes,10,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"`
+	EstimatedStreamedOutputTokens          int64                        `protobuf:"varint,11,opt,name=estimated_streamed_output_tokens,json=estimatedStreamedOutputTokens,proto3" json:"estimated_streamed_output_tokens,omitempty"` // audit evidence only when PENDING_RECONCILIATION (never billed as invented usage)
+	MediaOutputs                           []*MediaOutputSettlementItem `protobuf:"bytes,12,rep,name=media_outputs,json=mediaOutputs,proto3" json:"media_outputs,omitempty"`
+	Attempts                               []*AttemptCostRecord         `protobuf:"bytes,13,rep,name=attempts,proto3" json:"attempts,omitempty"`
+	CustomerChargeMode                     v1.CustomerChargeMode        `protobuf:"varint,14,opt,name=customer_charge_mode,json=customerChargeMode,proto3,enum=maxshot.common.v1.CustomerChargeMode" json:"customer_charge_mode,omitempty"`
+	ProviderReportedCustomerBaseCostUsdDec string                       `protobuf:"bytes,15,opt,name=provider_reported_customer_base_cost_usd_dec,json=providerReportedCustomerBaseCostUsdDec,proto3" json:"provider_reported_customer_base_cost_usd_dec,omitempty"` // base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies
+	unknownFields                          protoimpl.UnknownFields
+	sizeCache                              protoimpl.SizeCache
 }
 
 func (x *SettleRequest) Reset() {
 	*x = SettleRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[19]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2456,7 +3328,7 @@ func (x *SettleRequest) String() string {
 func (*SettleRequest) ProtoMessage() {}
 
 func (x *SettleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[19]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2469,7 +3341,7 @@ func (x *SettleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleRequest.ProtoReflect.Descriptor instead.
 func (*SettleRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{19}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SettleRequest) GetRequestId() string {
@@ -2563,6 +3435,20 @@ func (x *SettleRequest) GetAttempts() []*AttemptCostRecord {
 	return nil
 }
 
+func (x *SettleRequest) GetCustomerChargeMode() v1.CustomerChargeMode {
+	if x != nil {
+		return x.CustomerChargeMode
+	}
+	return v1.CustomerChargeMode(0)
+}
+
+func (x *SettleRequest) GetProviderReportedCustomerBaseCostUsdDec() string {
+	if x != nil {
+		return x.ProviderReportedCustomerBaseCostUsdDec
+	}
+	return ""
+}
+
 type SettleResponse struct {
 	state                            protoimpl.MessageState  `protogen:"open.v1"`
 	Settled                          bool                    `protobuf:"varint,1,opt,name=settled,proto3" json:"settled,omitempty"`
@@ -2582,7 +3468,7 @@ type SettleResponse struct {
 
 func (x *SettleResponse) Reset() {
 	*x = SettleResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[20]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2594,7 +3480,7 @@ func (x *SettleResponse) String() string {
 func (*SettleResponse) ProtoMessage() {}
 
 func (x *SettleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[20]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2607,7 +3493,7 @@ func (x *SettleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleResponse.ProtoReflect.Descriptor instead.
 func (*SettleResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{20}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SettleResponse) GetSettled() bool {
@@ -2700,7 +3586,7 @@ type MarkUncertainRequest struct {
 
 func (x *MarkUncertainRequest) Reset() {
 	*x = MarkUncertainRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[21]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2712,7 +3598,7 @@ func (x *MarkUncertainRequest) String() string {
 func (*MarkUncertainRequest) ProtoMessage() {}
 
 func (x *MarkUncertainRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[21]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2725,7 +3611,7 @@ func (x *MarkUncertainRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkUncertainRequest.ProtoReflect.Descriptor instead.
 func (*MarkUncertainRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{21}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *MarkUncertainRequest) GetRequestId() string {
@@ -2773,7 +3659,7 @@ type MarkUncertainResponse struct {
 
 func (x *MarkUncertainResponse) Reset() {
 	*x = MarkUncertainResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[22]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2785,7 +3671,7 @@ func (x *MarkUncertainResponse) String() string {
 func (*MarkUncertainResponse) ProtoMessage() {}
 
 func (x *MarkUncertainResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[22]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2798,7 +3684,7 @@ func (x *MarkUncertainResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkUncertainResponse.ProtoReflect.Descriptor instead.
 func (*MarkUncertainResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{22}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *MarkUncertainResponse) GetMarked() bool {
@@ -2824,16 +3710,19 @@ type ResolveUncertainRequest struct {
 	Reason                   string                       `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	ServingOfferingId        string                       `protobuf:"bytes,6,opt,name=serving_offering_id,json=servingOfferingId,proto3" json:"serving_offering_id,omitempty"`
 	NativeRequestId          string                       `protobuf:"bytes,7,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
-	VerifiedUsage            *UsageBound                  `protobuf:"bytes,8,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"` // populated when action == UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED
+	VerifiedUsage            *UsageBound                  `protobuf:"bytes,8,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"` // populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery
 	MediaOutputs             []*MediaOutputSettlementItem `protobuf:"bytes,9,rep,name=media_outputs,json=mediaOutputs,proto3" json:"media_outputs,omitempty"`
 	LateProviderCostUsdDec   string                       `protobuf:"bytes,10,opt,name=late_provider_cost_usd_dec,json=lateProviderCostUsdDec,proto3" json:"late_provider_cost_usd_dec,omitempty"` // recorded into discrepancy ledger if already auto-released (BIL-R36)
+	AttemptId                string                       `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	ProviderGenerationId     string                       `protobuf:"bytes,12,opt,name=provider_generation_id,json=providerGenerationId,proto3" json:"provider_generation_id,omitempty"`
+	OfferingId               string                       `protobuf:"bytes,13,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ResolveUncertainRequest) Reset() {
 	*x = ResolveUncertainRequest{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[23]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2845,7 +3734,7 @@ func (x *ResolveUncertainRequest) String() string {
 func (*ResolveUncertainRequest) ProtoMessage() {}
 
 func (x *ResolveUncertainRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[23]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2858,7 +3747,7 @@ func (x *ResolveUncertainRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveUncertainRequest.ProtoReflect.Descriptor instead.
 func (*ResolveUncertainRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{23}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ResolveUncertainRequest) GetRequestId() string {
@@ -2931,6 +3820,27 @@ func (x *ResolveUncertainRequest) GetLateProviderCostUsdDec() string {
 	return ""
 }
 
+func (x *ResolveUncertainRequest) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *ResolveUncertainRequest) GetProviderGenerationId() string {
+	if x != nil {
+		return x.ProviderGenerationId
+	}
+	return ""
+}
+
+func (x *ResolveUncertainRequest) GetOfferingId() string {
+	if x != nil {
+		return x.OfferingId
+	}
+	return ""
+}
+
 type ResolveUncertainResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resolved      bool                   `protobuf:"varint,1,opt,name=resolved,proto3" json:"resolved,omitempty"`
@@ -2941,7 +3851,7 @@ type ResolveUncertainResponse struct {
 
 func (x *ResolveUncertainResponse) Reset() {
 	*x = ResolveUncertainResponse{}
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[24]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2953,7 +3863,7 @@ func (x *ResolveUncertainResponse) String() string {
 func (*ResolveUncertainResponse) ProtoMessage() {}
 
 func (x *ResolveUncertainResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[24]
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2966,7 +3876,7 @@ func (x *ResolveUncertainResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveUncertainResponse.ProtoReflect.Descriptor instead.
 func (*ResolveUncertainResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{24}
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ResolveUncertainResponse) GetResolved() bool {
@@ -2987,7 +3897,25 @@ var File_maxshot_gateway_internal_v1_execution_proto protoreflect.FileDescriptor
 
 const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\n" +
-	"+maxshot/gateway_internal/v1/execution.proto\x12\x1bmaxshot.gateway_internal.v1\x1a\x1dmaxshot/common/v1/types.proto\"\xf3\x06\n" +
+	"+maxshot/gateway_internal/v1/execution.proto\x12\x1bmaxshot.gateway_internal.v1\x1a\x1dmaxshot/common/v1/types.proto\"\xa0\x04\n" +
+	"\x16MediaPricingDimensions\x12\x1e\n" +
+	"\n" +
+	"resolution\x18\x01 \x01(\tR\n" +
+	"resolution\x12!\n" +
+	"\faspect_ratio\x18\x02 \x01(\tR\vaspectRatio\x12\x12\n" +
+	"\x04size\x18\x03 \x01(\tR\x04size\x12\x19\n" +
+	"\bwidth_px\x18\x04 \x01(\x05R\awidthPx\x12\x1b\n" +
+	"\theight_px\x18\x05 \x01(\x05R\bheightPx\x12)\n" +
+	"\x10duration_seconds\x18\x06 \x01(\x05R\x0fdurationSeconds\x12\x1f\n" +
+	"\vduration_ms\x18\a \x01(\x03R\n" +
+	"durationMs\x12%\n" +
+	"\x0egenerate_audio\x18\b \x01(\bR\rgenerateAudio\x122\n" +
+	"\x15reference_image_count\x18\t \x01(\x05R\x13referenceImageCount\x122\n" +
+	"\x15reference_video_count\x18\n" +
+	" \x01(\x05R\x13referenceVideoCount\x12H\n" +
+	"!reference_video_total_duration_ms\x18\v \x01(\x03R\x1dreferenceVideoTotalDurationMs\x12%\n" +
+	"\x0eupscale_factor\x18\f \x01(\x05R\rupscaleFactor\x12+\n" +
+	"\x11requested_outputs\x18\r \x01(\x05R\x10requestedOutputs\"\xd3\a\n" +
 	"\n" +
 	"UsageBound\x12!\n" +
 	"\finput_tokens\x18\x01 \x01(\x03R\vinputTokens\x12#\n" +
@@ -3010,7 +3938,8 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x14media_megapixels_dec\x18\x10 \x01(\tR\x12mediaMegapixelsDec\x12&\n" +
 	"\x0fmedia_has_audio\x18\x11 \x01(\bR\rmediaHasAudio\x122\n" +
 	"\x15media_character_count\x18\x12 \x01(\x03R\x13mediaCharacterCount\x12O\n" +
-	"\x10media_attributes\x18\x13 \x03(\v2$.maxshot.common.v1.KeyValueAttributeR\x0fmediaAttributes\"\x7f\n" +
+	"\x10media_attributes\x18\x13 \x03(\v2$.maxshot.common.v1.KeyValueAttributeR\x0fmediaAttributes\x12^\n" +
+	"\x10media_dimensions\x18\x14 \x01(\v23.maxshot.gateway_internal.v1.MediaPricingDimensionsR\x0fmediaDimensions\"\x7f\n" +
 	"\x12QuoteComponentLine\x12\x12\n" +
 	"\x04item\x18\x01 \x01(\tR\x04item\x12+\n" +
 	"\x11estimated_credits\x18\x02 \x01(\x03R\x10estimatedCredits\x12(\n" +
@@ -3048,11 +3977,31 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x18backup_rate_card_version\x18\x03 \x01(\tR\x15backupRateCardVersion\x12!\n" +
 	"\fplan_version\x18\x04 \x01(\tR\vplanVersion\x12\x1d\n" +
 	"\n" +
-	"fx_version\x18\x05 \x01(\tR\tfxVersion\"\x99\x01\n" +
+	"fx_version\x18\x05 \x01(\tR\tfxVersion\"\x90\x02\n" +
+	"\x11BucketBalanceView\x128\n" +
+	"\x06bucket\x18\x01 \x01(\x0e2 .maxshot.common.v1.FundingBucketR\x06bucket\x12.\n" +
+	"\x13available_micro_usd\x18\x02 \x01(\x03R\x11availableMicroUsd\x12$\n" +
+	"\x0eheld_micro_usd\x18\x03 \x01(\x03R\fheldMicroUsd\x12+\n" +
+	"\x11available_credits\x18\x04 \x01(\x03R\x10availableCredits\x12>\n" +
+	"\x1cearliest_expires_at_unix_sec\x18\x05 \x01(\x03R\x18earliestExpiresAtUnixSec\"\xb5\x02\n" +
+	"\x13FundingWindowStatus\x12\x1f\n" +
+	"\vwindow_kind\x18\x01 \x01(\tR\n" +
+	"windowKind\x12&\n" +
+	"\x0flimit_micro_usd\x18\x02 \x01(\x03R\rlimitMicroUsd\x12$\n" +
+	"\x0eused_micro_usd\x18\x03 \x01(\x03R\fusedMicroUsd\x12$\n" +
+	"\x0eheld_micro_usd\x18\x04 \x01(\x03R\fheldMicroUsd\x12.\n" +
+	"\x13remaining_micro_usd\x18\x05 \x01(\x03R\x11remainingMicroUsd\x12+\n" +
+	"\x12resets_at_unix_sec\x18\x06 \x01(\x03R\x0fresetsAtUnixSec\x12,\n" +
+	"\x12applies_to_request\x18\a \x01(\bR\x10appliesToRequest\"\xe6\x01\n" +
+	"\x14KeyGrossWindowStatus\x121\n" +
+	"\x15daily_limit_micro_usd\x18\x01 \x01(\x03R\x12dailyLimitMicroUsd\x12/\n" +
+	"\x14daily_used_micro_usd\x18\x02 \x01(\x03R\x11dailyUsedMicroUsd\x125\n" +
+	"\x17monthly_limit_micro_usd\x18\x03 \x01(\x03R\x14monthlyLimitMicroUsd\x123\n" +
+	"\x16monthly_used_micro_usd\x18\x04 \x01(\x03R\x13monthlyUsedMicroUsd\"\x99\x01\n" +
 	"\x1cResolvePrincipalScopeRequest\x12$\n" +
 	"\x0eapi_key_sha256\x18\x01 \x01(\tR\fapiKeySha256\x12.\n" +
 	"\x13internal_account_id\x18\x02 \x01(\tR\x11internalAccountId\x12#\n" +
-	"\rclient_region\x18\x03 \x01(\tR\fclientRegion\"\xc5\x05\n" +
+	"\rclient_region\x18\x03 \x01(\tR\fclientRegion\"\xeb\b\n" +
 	"\x1dResolvePrincipalScopeResponse\x12$\n" +
 	"\rauthenticated\x18\x01 \x01(\bR\rauthenticated\x12>\n" +
 	"\vreject_code\x18\x02 \x01(\x0e2\x1d.maxshot.common.v1.RejectCodeR\n" +
@@ -3071,7 +4020,38 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0fmodel_allowlist\x18\v \x03(\tR\x0emodelAllowlist\x12$\n" +
 	"\x0eactive_plan_id\x18\f \x01(\tR\factivePlanId\x12/\n" +
 	"\x14plan_basic_group_ids\x18\r \x03(\tR\x11planBasicGroupIds\x123\n" +
-	"\x16plan_premium_group_ids\x18\x0e \x03(\tR\x13planPremiumGroupIds\"\x8b\x06\n" +
+	"\x16plan_premium_group_ids\x18\x0e \x03(\tR\x13planPremiumGroupIds\x124\n" +
+	"\x16max_concurrent_streams\x18\x0f \x01(\x05R\x14maxConcurrentStreams\x12\x1b\n" +
+	"\trpm_limit\x18\x10 \x01(\x05R\brpmLimit\x12\x1b\n" +
+	"\ttpm_limit\x18\x11 \x01(\x03R\btpmLimit\x12'\n" +
+	"\x0fspending_locked\x18\x12 \x01(\bR\x0espendingLocked\x122\n" +
+	"\x16key_expires_at_unix_ms\x18\x13 \x01(\x03R\x12keyExpiresAtUnixMs\x12D\n" +
+	"\rsearch_policy\x18\x14 \x01(\x0e2\x1f.maxshot.common.v1.SearchPolicyR\fsearchPolicy\x12I\n" +
+	"!media_shares_subscription_windows\x18\x15 \x01(\bR\x1emediaSharesSubscriptionWindows\x12F\n" +
+	" ait_coverage_throttled_model_ids\x18\x16 \x03(\tR\x1caitCoverageThrottledModelIds\"\xce\x01\n" +
+	"\x1fEvaluateCatalogDiscoveryRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06key_id\x18\x02 \x01(\tR\x05keyId\x12G\n" +
+	"\achannel\x18\x03 \x01(\x0e2-.maxshot.gateway_internal.v1.ExecutionChannelR\achannel\x12,\n" +
+	"\x12customer_model_ids\x18\x04 \x03(\tR\x10customerModelIds\"\xbc\x04\n" +
+	"\x18ModelDiscoveryEvaluation\x12*\n" +
+	"\x11customer_model_id\x18\x01 \x01(\tR\x0fcustomerModelId\x12*\n" +
+	"\x11key_scope_allowed\x18\x02 \x01(\bR\x0fkeyScopeAllowed\x12>\n" +
+	"\x1bsubscription_basic_eligible\x18\x03 \x01(\bR\x19subscriptionBasicEligible\x12B\n" +
+	"\x1dsubscription_premium_eligible\x18\x04 \x01(\bR\x1bsubscriptionPremiumEligible\x12;\n" +
+	"\x1aait_earned_credit_eligible\x18\x05 \x01(\bR\x17aitEarnedCreditEligible\x124\n" +
+	"\x16ait_coverage_throttled\x18\x06 \x01(\bR\x14aitCoverageThrottled\x12@\n" +
+	"\x1csearch_subscription_eligible\x18\a \x01(\bR\x1asearchSubscriptionEligible\x12M\n" +
+	"\x11spendable_buckets\x18\b \x03(\x0e2 .maxshot.common.v1.FundingBucketR\x10spendableBuckets\x12@\n" +
+	"\fblock_reason\x18\t \x01(\x0e2\x1d.maxshot.common.v1.RejectCodeR\vblockReason\"\xc7\x03\n" +
+	" EvaluateCatalogDiscoveryResponse\x12'\n" +
+	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\x12)\n" +
+	"\x10funding_scenario\x18\x02 \x01(\tR\x0ffundingScenario\x12W\n" +
+	"\x0fbucket_balances\x18\x03 \x03(\v2..maxshot.gateway_internal.v1.BucketBalanceViewR\x0ebucketBalances\x12J\n" +
+	"\awindows\x18\x04 \x03(\v20.maxshot.gateway_internal.v1.FundingWindowStatusR\awindows\x12[\n" +
+	"\x10key_gross_window\x18\x05 \x01(\v21.maxshot.gateway_internal.v1.KeyGrossWindowStatusR\x0ekeyGrossWindow\x12M\n" +
+	"\x06models\x18\x06 \x03(\v25.maxshot.gateway_internal.v1.ModelDiscoveryEvaluationR\x06models\"\x85\a\n" +
 	"\x13PreviewQuoteRequest\x12$\n" +
 	"\x0eapi_key_sha256\x18\x01 \x01(\tR\fapiKeySha256\x12.\n" +
 	"\x13internal_account_id\x18\x02 \x01(\tR\x11internalAccountId\x12G\n" +
@@ -3087,7 +4067,10 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0ehard_max_bound\x18\v \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\fhardMaxBound\x127\n" +
 	"\x18caller_ceiling_micro_usd\x18\f \x01(\x03R\x15callerCeilingMicroUsd\x12%\n" +
 	"\x0ezero_retention\x18\r \x01(\bR\rzeroRetention\x12#\n" +
-	"\rclient_region\x18\x0e \x01(\tR\fclientRegion\"\xd9\a\n" +
+	"\rclient_region\x18\x0e \x01(\tR\fclientRegion\x12(\n" +
+	"\x10issue_quote_lock\x18\x0f \x01(\bR\x0eissueQuoteLock\x12!\n" +
+	"\frequest_hash\x18\x10 \x01(\tR\vrequestHash\x12+\n" +
+	"\x11effective_channel\x18\x11 \x01(\tR\x10effectiveChannel\"\xa4\f\n" +
 	"\x14PreviewQuoteResponse\x12\x1a\n" +
 	"\beligible\x18\x01 \x01(\bR\beligible\x12>\n" +
 	"\vreject_code\x18\x02 \x01(\x0e2\x1d.maxshot.common.v1.RejectCodeR\n" +
@@ -3105,7 +4088,18 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\tbreakdown\x18\f \x03(\v2/.maxshot.gateway_internal.v1.QuoteComponentLineR\tbreakdown\x12g\n" +
 	"\x16projected_hold_buckets\x18\r \x03(\v21.maxshot.gateway_internal.v1.BucketAllocationLineR\x14projectedHoldBuckets\x12a\n" +
 	"\x11budget_diagnostic\x18\x0e \x01(\v24.maxshot.gateway_internal.v1.SpendingLimitDiagnosticR\x10budgetDiagnostic\x12c\n" +
-	"\x11credit_diagnostic\x18\x0f \x01(\v26.maxshot.gateway_internal.v1.CreditShortfallDiagnosticR\x10creditDiagnostic\"\x92\t\n" +
+	"\x11credit_diagnostic\x18\x0f \x01(\v26.maxshot.gateway_internal.v1.CreditShortfallDiagnosticR\x10creditDiagnostic\x12\x19\n" +
+	"\bquote_id\x18\x10 \x01(\tR\aquoteId\x126\n" +
+	"\x18quote_expires_at_unix_ms\x18\x11 \x01(\x03R\x14quoteExpiresAtUnixMs\x12'\n" +
+	"\x0fcatalog_version\x18\x12 \x01(\tR\x0ecatalogVersion\x12*\n" +
+	"\x11rate_card_version\x18\x13 \x01(\tR\x0frateCardVersion\x12)\n" +
+	"\x10reserved_credits\x18\x14 \x01(\x03R\x0freservedCredits\x12)\n" +
+	"\x10funding_scenario\x18\x15 \x01(\tR\x0ffundingScenario\x12W\n" +
+	"\x0fbucket_balances\x18\x16 \x03(\v2..maxshot.gateway_internal.v1.BucketBalanceViewR\x0ebucketBalances\x12J\n" +
+	"\awindows\x18\x17 \x03(\v20.maxshot.gateway_internal.v1.FundingWindowStatusR\awindows\x12[\n" +
+	"\x10key_gross_window\x18\x18 \x01(\v21.maxshot.gateway_internal.v1.KeyGrossWindowStatusR\x0ekeyGrossWindow\x12I\n" +
+	"!media_shares_subscription_windows\x18\x19 \x01(\bR\x1emediaSharesSubscriptionWindows\"\xe7\n" +
+	"\n" +
 	"\x17AuthorizeAndHoldRequest\x12\x19\n" +
 	"\btrace_id\x18\x01 \x01(\tR\atraceId\x12+\n" +
 	"\x11idempotency_scope\x18\x02 \x01(\tR\x10idempotencyScope\x12'\n" +
@@ -3130,7 +4124,11 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0ezero_retention\x18\x14 \x01(\bR\rzeroRetention\x12#\n" +
 	"\rclient_region\x18\x15 \x01(\tR\fclientRegion\x12.\n" +
 	"\x13studio_operation_id\x18\x16 \x01(\tR\x11studioOperationId\x12/\n" +
-	"\x14initial_lease_ttl_ms\x18\x17 \x01(\x03R\x11initialLeaseTtlMs\"\xe6\t\n" +
+	"\x14initial_lease_ttl_ms\x18\x17 \x01(\x03R\x11initialLeaseTtlMs\x12\x19\n" +
+	"\bquote_id\x18\x18 \x01(\tR\aquoteId\x12!\n" +
+	"\frequest_hash\x18\x19 \x01(\tR\vrequestHash\x12h\n" +
+	"\x1dcustomer_charge_mode_override\x18\x1a \x01(\x0e2%.maxshot.common.v1.CustomerChargeModeR\x1acustomerChargeModeOverride\x12+\n" +
+	"\x11effective_channel\x18\x1b \x01(\tR\x10effectiveChannel\"\xe6\t\n" +
 	"\x18AuthorizeAndHoldResponse\x12G\n" +
 	"\x06status\x18\x01 \x01(\x0e2/.maxshot.gateway_internal.v1.HoldDecisionStatusR\x06status\x12\x1a\n" +
 	"\badmitted\x18\x02 \x01(\bR\badmitted\x12>\n" +
@@ -3190,7 +4188,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\thas_audio\x18\x05 \x01(\bR\bhasAudio\x12\x14\n" +
 	"\x05width\x18\x06 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\a \x01(\x05R\x06height\x12!\n" +
-	"\ffailure_code\x18\b \x01(\tR\vfailureCode\"\xc5\x04\n" +
+	"\ffailure_code\x18\b \x01(\tR\vfailureCode\"\xc3\x05\n" +
 	"\x11AttemptCostRecord\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x1f\n" +
@@ -3206,7 +4204,11 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x15dispatched_at_unix_ms\x18\t \x01(\x03R\x12dispatchedAtUnixMs\x122\n" +
 	"\x16first_token_at_unix_ms\x18\n" +
 	" \x01(\x03R\x12firstTokenAtUnixMs\x12/\n" +
-	"\x14completed_at_unix_ms\x18\v \x01(\x03R\x11completedAtUnixMs\"\xff\x05\n" +
+	"\x14completed_at_unix_ms\x18\v \x01(\x03R\x11completedAtUnixMs\x12%\n" +
+	"\x0eattempt_number\x18\f \x01(\x05R\rattemptNumber\x124\n" +
+	"\x16provider_generation_id\x18\r \x01(\tR\x14providerGenerationId\x12\x1f\n" +
+	"\vhttp_status\x18\x0e \x01(\x05R\n" +
+	"httpStatus\"\xb6\a\n" +
 	"\rSettleRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12<\n" +
@@ -3223,7 +4225,9 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	" \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\rverifiedUsage\x12G\n" +
 	" estimated_streamed_output_tokens\x18\v \x01(\x03R\x1destimatedStreamedOutputTokens\x12[\n" +
 	"\rmedia_outputs\x18\f \x03(\v26.maxshot.gateway_internal.v1.MediaOutputSettlementItemR\fmediaOutputs\x12J\n" +
-	"\battempts\x18\r \x03(\v2..maxshot.gateway_internal.v1.AttemptCostRecordR\battempts\"\xd9\x05\n" +
+	"\battempts\x18\r \x03(\v2..maxshot.gateway_internal.v1.AttemptCostRecordR\battempts\x12W\n" +
+	"\x14customer_charge_mode\x18\x0e \x01(\x0e2%.maxshot.common.v1.CustomerChargeModeR\x12customerChargeMode\x12\\\n" +
+	",provider_reported_customer_base_cost_usd_dec\x18\x0f \x01(\tR&providerReportedCustomerBaseCostUsdDec\"\xd9\x05\n" +
 	"\x0eSettleResponse\x12\x18\n" +
 	"\asettled\x18\x01 \x01(\bR\asettled\x124\n" +
 	"\x16final_customer_credits\x18\x02 \x01(\x03R\x14finalCustomerCredits\x12D\n" +
@@ -3247,7 +4251,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\"e\n" +
 	"\x15MarkUncertainResponse\x12\x16\n" +
 	"\x06marked\x18\x01 \x01(\bR\x06marked\x124\n" +
-	"\x17auto_release_at_unix_ms\x18\x02 \x01(\x03R\x13autoReleaseAtUnixMs\"\xbe\x04\n" +
+	"\x17auto_release_at_unix_ms\x18\x02 \x01(\x03R\x13autoReleaseAtUnixMs\"\xb4\x05\n" +
 	"\x17ResolveUncertainRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12<\n" +
@@ -3260,7 +4264,12 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0everified_usage\x18\b \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\rverifiedUsage\x12[\n" +
 	"\rmedia_outputs\x18\t \x03(\v26.maxshot.gateway_internal.v1.MediaOutputSettlementItemR\fmediaOutputs\x12:\n" +
 	"\x1alate_provider_cost_usd_dec\x18\n" +
-	" \x01(\tR\x16lateProviderCostUsdDec\"\x83\x01\n" +
+	" \x01(\tR\x16lateProviderCostUsdDec\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\v \x01(\tR\tattemptId\x124\n" +
+	"\x16provider_generation_id\x18\f \x01(\tR\x14providerGenerationId\x12\x1f\n" +
+	"\voffering_id\x18\r \x01(\tR\n" +
+	"offeringId\"\x83\x01\n" +
 	"\x18ResolveUncertainResponse\x12\x1a\n" +
 	"\bresolved\x18\x01 \x01(\bR\bresolved\x12K\n" +
 	"\n" +
@@ -3307,9 +4316,10 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"'UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED\x10\x00\x120\n" +
 	",UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED\x10\x01\x12,\n" +
 	"(UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST\x10\x02\x120\n" +
-	",UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H\x10\x032\xfc\a\n" +
+	",UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H\x10\x032\x96\t\n" +
 	"\x17BillingExecutionService\x12\x8e\x01\n" +
-	"\x15ResolvePrincipalScope\x129.maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest\x1a:.maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse\x12s\n" +
+	"\x15ResolvePrincipalScope\x129.maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest\x1a:.maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse\x12\x97\x01\n" +
+	"\x18EvaluateCatalogDiscovery\x12<.maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest\x1a=.maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse\x12s\n" +
 	"\fPreviewQuote\x120.maxshot.gateway_internal.v1.PreviewQuoteRequest\x1a1.maxshot.gateway_internal.v1.PreviewQuoteResponse\x12\x7f\n" +
 	"\x10AuthorizeAndHold\x124.maxshot.gateway_internal.v1.AuthorizeAndHoldRequest\x1a5.maxshot.gateway_internal.v1.AuthorizeAndHoldResponse\x12p\n" +
 	"\vMarkSending\x12/.maxshot.gateway_internal.v1.MarkSendingRequest\x1a0.maxshot.gateway_internal.v1.MarkSendingResponse\x12\x8b\x01\n" +
@@ -3331,108 +4341,134 @@ func file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP() []byte {
 }
 
 var file_maxshot_gateway_internal_v1_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_maxshot_gateway_internal_v1_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_maxshot_gateway_internal_v1_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_maxshot_gateway_internal_v1_execution_proto_goTypes = []any{
-	(ExecutionChannel)(0),                 // 0: maxshot.gateway_internal.v1.ExecutionChannel
-	(RouteSelectionMode)(0),               // 1: maxshot.gateway_internal.v1.RouteSelectionMode
-	(HoldDecisionStatus)(0),               // 2: maxshot.gateway_internal.v1.HoldDecisionStatus
-	(SettlementOutcome)(0),                // 3: maxshot.gateway_internal.v1.SettlementOutcome
-	(AttemptErrorClass)(0),                // 4: maxshot.gateway_internal.v1.AttemptErrorClass
-	(UncertainResolutionAction)(0),        // 5: maxshot.gateway_internal.v1.UncertainResolutionAction
-	(*UsageBound)(nil),                    // 6: maxshot.gateway_internal.v1.UsageBound
-	(*QuoteComponentLine)(nil),            // 7: maxshot.gateway_internal.v1.QuoteComponentLine
-	(*BucketAllocationLine)(nil),          // 8: maxshot.gateway_internal.v1.BucketAllocationLine
-	(*SpendingLimitDiagnostic)(nil),       // 9: maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	(*CreditShortfallDiagnostic)(nil),     // 10: maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	(*ThresholdWarning)(nil),              // 11: maxshot.gateway_internal.v1.ThresholdWarning
-	(*LockedVersionSet)(nil),              // 12: maxshot.gateway_internal.v1.LockedVersionSet
-	(*ResolvePrincipalScopeRequest)(nil),  // 13: maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
-	(*ResolvePrincipalScopeResponse)(nil), // 14: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
-	(*PreviewQuoteRequest)(nil),           // 15: maxshot.gateway_internal.v1.PreviewQuoteRequest
-	(*PreviewQuoteResponse)(nil),          // 16: maxshot.gateway_internal.v1.PreviewQuoteResponse
-	(*AuthorizeAndHoldRequest)(nil),       // 17: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
-	(*AuthorizeAndHoldResponse)(nil),      // 18: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
-	(*MarkSendingRequest)(nil),            // 19: maxshot.gateway_internal.v1.MarkSendingRequest
-	(*MarkSendingResponse)(nil),           // 20: maxshot.gateway_internal.v1.MarkSendingResponse
-	(*ExtendExecutionLeaseRequest)(nil),   // 21: maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
-	(*ExtendExecutionLeaseResponse)(nil),  // 22: maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
-	(*MediaOutputSettlementItem)(nil),     // 23: maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	(*AttemptCostRecord)(nil),             // 24: maxshot.gateway_internal.v1.AttemptCostRecord
-	(*SettleRequest)(nil),                 // 25: maxshot.gateway_internal.v1.SettleRequest
-	(*SettleResponse)(nil),                // 26: maxshot.gateway_internal.v1.SettleResponse
-	(*MarkUncertainRequest)(nil),          // 27: maxshot.gateway_internal.v1.MarkUncertainRequest
-	(*MarkUncertainResponse)(nil),         // 28: maxshot.gateway_internal.v1.MarkUncertainResponse
-	(*ResolveUncertainRequest)(nil),       // 29: maxshot.gateway_internal.v1.ResolveUncertainRequest
-	(*ResolveUncertainResponse)(nil),      // 30: maxshot.gateway_internal.v1.ResolveUncertainResponse
-	(*v1.KeyValueAttribute)(nil),          // 31: maxshot.common.v1.KeyValueAttribute
-	(v1.FundingBucket)(0),                 // 32: maxshot.common.v1.FundingBucket
-	(v1.BudgetPeriodKind)(0),              // 33: maxshot.common.v1.BudgetPeriodKind
-	(v1.RejectCode)(0),                    // 34: maxshot.common.v1.RejectCode
-	(v1.KeyFundingStrategy)(0),            // 35: maxshot.common.v1.KeyFundingStrategy
-	(v1.Modality)(0),                      // 36: maxshot.common.v1.Modality
+	(ExecutionChannel)(0),                    // 0: maxshot.gateway_internal.v1.ExecutionChannel
+	(RouteSelectionMode)(0),                  // 1: maxshot.gateway_internal.v1.RouteSelectionMode
+	(HoldDecisionStatus)(0),                  // 2: maxshot.gateway_internal.v1.HoldDecisionStatus
+	(SettlementOutcome)(0),                   // 3: maxshot.gateway_internal.v1.SettlementOutcome
+	(AttemptErrorClass)(0),                   // 4: maxshot.gateway_internal.v1.AttemptErrorClass
+	(UncertainResolutionAction)(0),           // 5: maxshot.gateway_internal.v1.UncertainResolutionAction
+	(*MediaPricingDimensions)(nil),           // 6: maxshot.gateway_internal.v1.MediaPricingDimensions
+	(*UsageBound)(nil),                       // 7: maxshot.gateway_internal.v1.UsageBound
+	(*QuoteComponentLine)(nil),               // 8: maxshot.gateway_internal.v1.QuoteComponentLine
+	(*BucketAllocationLine)(nil),             // 9: maxshot.gateway_internal.v1.BucketAllocationLine
+	(*SpendingLimitDiagnostic)(nil),          // 10: maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	(*CreditShortfallDiagnostic)(nil),        // 11: maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	(*ThresholdWarning)(nil),                 // 12: maxshot.gateway_internal.v1.ThresholdWarning
+	(*LockedVersionSet)(nil),                 // 13: maxshot.gateway_internal.v1.LockedVersionSet
+	(*BucketBalanceView)(nil),                // 14: maxshot.gateway_internal.v1.BucketBalanceView
+	(*FundingWindowStatus)(nil),              // 15: maxshot.gateway_internal.v1.FundingWindowStatus
+	(*KeyGrossWindowStatus)(nil),             // 16: maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	(*ResolvePrincipalScopeRequest)(nil),     // 17: maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
+	(*ResolvePrincipalScopeResponse)(nil),    // 18: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
+	(*EvaluateCatalogDiscoveryRequest)(nil),  // 19: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
+	(*ModelDiscoveryEvaluation)(nil),         // 20: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
+	(*EvaluateCatalogDiscoveryResponse)(nil), // 21: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
+	(*PreviewQuoteRequest)(nil),              // 22: maxshot.gateway_internal.v1.PreviewQuoteRequest
+	(*PreviewQuoteResponse)(nil),             // 23: maxshot.gateway_internal.v1.PreviewQuoteResponse
+	(*AuthorizeAndHoldRequest)(nil),          // 24: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
+	(*AuthorizeAndHoldResponse)(nil),         // 25: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
+	(*MarkSendingRequest)(nil),               // 26: maxshot.gateway_internal.v1.MarkSendingRequest
+	(*MarkSendingResponse)(nil),              // 27: maxshot.gateway_internal.v1.MarkSendingResponse
+	(*ExtendExecutionLeaseRequest)(nil),      // 28: maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
+	(*ExtendExecutionLeaseResponse)(nil),     // 29: maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
+	(*MediaOutputSettlementItem)(nil),        // 30: maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	(*AttemptCostRecord)(nil),                // 31: maxshot.gateway_internal.v1.AttemptCostRecord
+	(*SettleRequest)(nil),                    // 32: maxshot.gateway_internal.v1.SettleRequest
+	(*SettleResponse)(nil),                   // 33: maxshot.gateway_internal.v1.SettleResponse
+	(*MarkUncertainRequest)(nil),             // 34: maxshot.gateway_internal.v1.MarkUncertainRequest
+	(*MarkUncertainResponse)(nil),            // 35: maxshot.gateway_internal.v1.MarkUncertainResponse
+	(*ResolveUncertainRequest)(nil),          // 36: maxshot.gateway_internal.v1.ResolveUncertainRequest
+	(*ResolveUncertainResponse)(nil),         // 37: maxshot.gateway_internal.v1.ResolveUncertainResponse
+	(*v1.KeyValueAttribute)(nil),             // 38: maxshot.common.v1.KeyValueAttribute
+	(v1.FundingBucket)(0),                    // 39: maxshot.common.v1.FundingBucket
+	(v1.BudgetPeriodKind)(0),                 // 40: maxshot.common.v1.BudgetPeriodKind
+	(v1.RejectCode)(0),                       // 41: maxshot.common.v1.RejectCode
+	(v1.KeyFundingStrategy)(0),               // 42: maxshot.common.v1.KeyFundingStrategy
+	(v1.SearchPolicy)(0),                     // 43: maxshot.common.v1.SearchPolicy
+	(v1.Modality)(0),                         // 44: maxshot.common.v1.Modality
+	(v1.CustomerChargeMode)(0),               // 45: maxshot.common.v1.CustomerChargeMode
 }
 var file_maxshot_gateway_internal_v1_execution_proto_depIdxs = []int32{
-	31, // 0: maxshot.gateway_internal.v1.UsageBound.media_attributes:type_name -> maxshot.common.v1.KeyValueAttribute
-	32, // 1: maxshot.gateway_internal.v1.BucketAllocationLine.bucket:type_name -> maxshot.common.v1.FundingBucket
-	33, // 2: maxshot.gateway_internal.v1.SpendingLimitDiagnostic.period:type_name -> maxshot.common.v1.BudgetPeriodKind
-	34, // 3: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	35, // 4: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.key_funding_strategy:type_name -> maxshot.common.v1.KeyFundingStrategy
-	0,  // 5: maxshot.gateway_internal.v1.PreviewQuoteRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
-	36, // 6: maxshot.gateway_internal.v1.PreviewQuoteRequest.modality:type_name -> maxshot.common.v1.Modality
-	1,  // 7: maxshot.gateway_internal.v1.PreviewQuoteRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
-	6,  // 8: maxshot.gateway_internal.v1.PreviewQuoteRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	6,  // 9: maxshot.gateway_internal.v1.PreviewQuoteRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	34, // 10: maxshot.gateway_internal.v1.PreviewQuoteResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	7,  // 11: maxshot.gateway_internal.v1.PreviewQuoteResponse.breakdown:type_name -> maxshot.gateway_internal.v1.QuoteComponentLine
-	8,  // 12: maxshot.gateway_internal.v1.PreviewQuoteResponse.projected_hold_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	9,  // 13: maxshot.gateway_internal.v1.PreviewQuoteResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	10, // 14: maxshot.gateway_internal.v1.PreviewQuoteResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	0,  // 15: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
-	36, // 16: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.modality:type_name -> maxshot.common.v1.Modality
-	1,  // 17: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
-	6,  // 18: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	6,  // 19: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	2,  // 20: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.status:type_name -> maxshot.gateway_internal.v1.HoldDecisionStatus
-	34, // 21: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	12, // 22: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.locked_versions:type_name -> maxshot.gateway_internal.v1.LockedVersionSet
-	8,  // 23: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.held_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	11, // 24: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.threshold_warnings:type_name -> maxshot.gateway_internal.v1.ThresholdWarning
-	9,  // 25: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	10, // 26: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	26, // 27: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.cached_settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
-	4,  // 28: maxshot.gateway_internal.v1.AttemptCostRecord.error_class:type_name -> maxshot.gateway_internal.v1.AttemptErrorClass
-	6,  // 29: maxshot.gateway_internal.v1.AttemptCostRecord.usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	3,  // 30: maxshot.gateway_internal.v1.SettleRequest.outcome:type_name -> maxshot.gateway_internal.v1.SettlementOutcome
-	6,  // 31: maxshot.gateway_internal.v1.SettleRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	23, // 32: maxshot.gateway_internal.v1.SettleRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	24, // 33: maxshot.gateway_internal.v1.SettleRequest.attempts:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
-	8,  // 34: maxshot.gateway_internal.v1.SettleResponse.settled_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	8,  // 35: maxshot.gateway_internal.v1.SettleResponse.released_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	5,  // 36: maxshot.gateway_internal.v1.ResolveUncertainRequest.action:type_name -> maxshot.gateway_internal.v1.UncertainResolutionAction
-	6,  // 37: maxshot.gateway_internal.v1.ResolveUncertainRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	23, // 38: maxshot.gateway_internal.v1.ResolveUncertainRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	26, // 39: maxshot.gateway_internal.v1.ResolveUncertainResponse.settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
-	13, // 40: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:input_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
-	15, // 41: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:input_type -> maxshot.gateway_internal.v1.PreviewQuoteRequest
-	17, // 42: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:input_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
-	19, // 43: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:input_type -> maxshot.gateway_internal.v1.MarkSendingRequest
-	21, // 44: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:input_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
-	25, // 45: maxshot.gateway_internal.v1.BillingExecutionService.Settle:input_type -> maxshot.gateway_internal.v1.SettleRequest
-	27, // 46: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:input_type -> maxshot.gateway_internal.v1.MarkUncertainRequest
-	29, // 47: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:input_type -> maxshot.gateway_internal.v1.ResolveUncertainRequest
-	14, // 48: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:output_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
-	16, // 49: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:output_type -> maxshot.gateway_internal.v1.PreviewQuoteResponse
-	18, // 50: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:output_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
-	20, // 51: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:output_type -> maxshot.gateway_internal.v1.MarkSendingResponse
-	22, // 52: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:output_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
-	26, // 53: maxshot.gateway_internal.v1.BillingExecutionService.Settle:output_type -> maxshot.gateway_internal.v1.SettleResponse
-	28, // 54: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:output_type -> maxshot.gateway_internal.v1.MarkUncertainResponse
-	30, // 55: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:output_type -> maxshot.gateway_internal.v1.ResolveUncertainResponse
-	48, // [48:56] is the sub-list for method output_type
-	40, // [40:48] is the sub-list for method input_type
-	40, // [40:40] is the sub-list for extension type_name
-	40, // [40:40] is the sub-list for extension extendee
-	0,  // [0:40] is the sub-list for field type_name
+	38, // 0: maxshot.gateway_internal.v1.UsageBound.media_attributes:type_name -> maxshot.common.v1.KeyValueAttribute
+	6,  // 1: maxshot.gateway_internal.v1.UsageBound.media_dimensions:type_name -> maxshot.gateway_internal.v1.MediaPricingDimensions
+	39, // 2: maxshot.gateway_internal.v1.BucketAllocationLine.bucket:type_name -> maxshot.common.v1.FundingBucket
+	40, // 3: maxshot.gateway_internal.v1.SpendingLimitDiagnostic.period:type_name -> maxshot.common.v1.BudgetPeriodKind
+	39, // 4: maxshot.gateway_internal.v1.BucketBalanceView.bucket:type_name -> maxshot.common.v1.FundingBucket
+	41, // 5: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	42, // 6: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.key_funding_strategy:type_name -> maxshot.common.v1.KeyFundingStrategy
+	43, // 7: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.search_policy:type_name -> maxshot.common.v1.SearchPolicy
+	0,  // 8: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	39, // 9: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.spendable_buckets:type_name -> maxshot.common.v1.FundingBucket
+	41, // 10: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.block_reason:type_name -> maxshot.common.v1.RejectCode
+	14, // 11: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	15, // 12: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	16, // 13: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	20, // 14: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.models:type_name -> maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
+	0,  // 15: maxshot.gateway_internal.v1.PreviewQuoteRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	44, // 16: maxshot.gateway_internal.v1.PreviewQuoteRequest.modality:type_name -> maxshot.common.v1.Modality
+	1,  // 17: maxshot.gateway_internal.v1.PreviewQuoteRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
+	7,  // 18: maxshot.gateway_internal.v1.PreviewQuoteRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	7,  // 19: maxshot.gateway_internal.v1.PreviewQuoteRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	41, // 20: maxshot.gateway_internal.v1.PreviewQuoteResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	8,  // 21: maxshot.gateway_internal.v1.PreviewQuoteResponse.breakdown:type_name -> maxshot.gateway_internal.v1.QuoteComponentLine
+	9,  // 22: maxshot.gateway_internal.v1.PreviewQuoteResponse.projected_hold_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	10, // 23: maxshot.gateway_internal.v1.PreviewQuoteResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	11, // 24: maxshot.gateway_internal.v1.PreviewQuoteResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	14, // 25: maxshot.gateway_internal.v1.PreviewQuoteResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	15, // 26: maxshot.gateway_internal.v1.PreviewQuoteResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	16, // 27: maxshot.gateway_internal.v1.PreviewQuoteResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	0,  // 28: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	44, // 29: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.modality:type_name -> maxshot.common.v1.Modality
+	1,  // 30: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
+	7,  // 31: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	7,  // 32: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	45, // 33: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.customer_charge_mode_override:type_name -> maxshot.common.v1.CustomerChargeMode
+	2,  // 34: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.status:type_name -> maxshot.gateway_internal.v1.HoldDecisionStatus
+	41, // 35: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	13, // 36: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.locked_versions:type_name -> maxshot.gateway_internal.v1.LockedVersionSet
+	9,  // 37: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.held_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	12, // 38: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.threshold_warnings:type_name -> maxshot.gateway_internal.v1.ThresholdWarning
+	10, // 39: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	11, // 40: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	33, // 41: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.cached_settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
+	4,  // 42: maxshot.gateway_internal.v1.AttemptCostRecord.error_class:type_name -> maxshot.gateway_internal.v1.AttemptErrorClass
+	7,  // 43: maxshot.gateway_internal.v1.AttemptCostRecord.usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	3,  // 44: maxshot.gateway_internal.v1.SettleRequest.outcome:type_name -> maxshot.gateway_internal.v1.SettlementOutcome
+	7,  // 45: maxshot.gateway_internal.v1.SettleRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	30, // 46: maxshot.gateway_internal.v1.SettleRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	31, // 47: maxshot.gateway_internal.v1.SettleRequest.attempts:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
+	45, // 48: maxshot.gateway_internal.v1.SettleRequest.customer_charge_mode:type_name -> maxshot.common.v1.CustomerChargeMode
+	9,  // 49: maxshot.gateway_internal.v1.SettleResponse.settled_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	9,  // 50: maxshot.gateway_internal.v1.SettleResponse.released_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	5,  // 51: maxshot.gateway_internal.v1.ResolveUncertainRequest.action:type_name -> maxshot.gateway_internal.v1.UncertainResolutionAction
+	7,  // 52: maxshot.gateway_internal.v1.ResolveUncertainRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	30, // 53: maxshot.gateway_internal.v1.ResolveUncertainRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	33, // 54: maxshot.gateway_internal.v1.ResolveUncertainResponse.settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
+	17, // 55: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:input_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
+	19, // 56: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:input_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
+	22, // 57: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:input_type -> maxshot.gateway_internal.v1.PreviewQuoteRequest
+	24, // 58: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:input_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
+	26, // 59: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:input_type -> maxshot.gateway_internal.v1.MarkSendingRequest
+	28, // 60: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:input_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
+	32, // 61: maxshot.gateway_internal.v1.BillingExecutionService.Settle:input_type -> maxshot.gateway_internal.v1.SettleRequest
+	34, // 62: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:input_type -> maxshot.gateway_internal.v1.MarkUncertainRequest
+	36, // 63: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:input_type -> maxshot.gateway_internal.v1.ResolveUncertainRequest
+	18, // 64: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:output_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
+	21, // 65: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:output_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
+	23, // 66: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:output_type -> maxshot.gateway_internal.v1.PreviewQuoteResponse
+	25, // 67: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:output_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
+	27, // 68: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:output_type -> maxshot.gateway_internal.v1.MarkSendingResponse
+	29, // 69: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:output_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
+	33, // 70: maxshot.gateway_internal.v1.BillingExecutionService.Settle:output_type -> maxshot.gateway_internal.v1.SettleResponse
+	35, // 71: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:output_type -> maxshot.gateway_internal.v1.MarkUncertainResponse
+	37, // 72: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:output_type -> maxshot.gateway_internal.v1.ResolveUncertainResponse
+	64, // [64:73] is the sub-list for method output_type
+	55, // [55:64] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_maxshot_gateway_internal_v1_execution_proto_init() }
@@ -3446,7 +4482,7 @@ func file_maxshot_gateway_internal_v1_execution_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_gateway_internal_v1_execution_proto_rawDesc), len(file_maxshot_gateway_internal_v1_execution_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   25,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
