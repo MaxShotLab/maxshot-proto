@@ -111,9 +111,10 @@ type mockProviderSyncServer struct {
 	providersyncv1.UnimplementedProviderSyncServiceServer
 }
 
-func (s *mockProviderSyncServer) WatchCatalogSnapshot(req *providersyncv1.WatchCatalogSnapshotRequest, stream grpc.ServerStreamingServer[providersyncv1.WatchCatalogSnapshotResponse]) error {
-	return stream.Send(&providersyncv1.WatchCatalogSnapshotResponse{
-		Snapshot: &providersyncv1.CatalogSnapshot{CatalogVersion: "cat-v1"},
+func (s *mockProviderSyncServer) WatchSyncEvents(req *providersyncv1.WatchSyncEventsRequest, stream grpc.ServerStreamingServer[providersyncv1.WatchSyncEventsResponse]) error {
+	return stream.Send(&providersyncv1.WatchSyncEventsResponse{
+		EventKind:            providersyncv1.SyncEventKind_SYNC_EVENT_KIND_CATALOG_PUBLISHED,
+		LatestCatalogVersion: "cat-v1",
 	})
 }
 
@@ -207,16 +208,16 @@ func TestLoopbackUnaryStreamACLAndSkew(t *testing.T) {
 		t.Fatalf("expected PermissionDenied for gateway-dp on IssueAitCreditGrants, got: %v", err)
 	}
 
-	// 3. Server-streaming call (gateway-dp calling WatchCatalogSnapshot) succeeds via wildcard ACL
-	stream, err := providersyncv1.NewProviderSyncServiceClient(gwConn).WatchCatalogSnapshot(
+	// 3. Server-streaming call (gateway-dp calling WatchSyncEvents) succeeds via wildcard ACL
+	stream, err := providersyncv1.NewProviderSyncServiceClient(gwConn).WatchSyncEvents(
 		context.Background(),
-		&providersyncv1.WatchCatalogSnapshotRequest{GatewayNodeId: "node-1"},
+		&providersyncv1.WatchSyncEventsRequest{GatewayNodeId: "node-1", NodeRole: "dataplane"},
 	)
 	if err != nil {
 		t.Fatalf("watch stream start: %v", err)
 	}
 	ev, err := stream.Recv()
-	if err != nil || ev.GetSnapshot().GetCatalogVersion() != "cat-v1" {
+	if err != nil || ev.GetLatestCatalogVersion() != "cat-v1" {
 		t.Fatalf("watch stream recv failed: ev=%+v err=%v", ev, err)
 	}
 

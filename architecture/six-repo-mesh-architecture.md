@@ -205,30 +205,48 @@ flowchart LR
 
 ---
 
-## 4. 跨仓核心 Protobuf 契约清单
+## 4. 跨仓与内部核心 Protobuf 契约清单（对齐 `maxshot-proto` 实现）
 
 ```protobuf
-// proto/cross_repo/v1/provider_sync.proto  (Provider 后端 <-> Gateway 后端, gRPC + TLS + HMAC)
-syntax = "proto3";
-package maxshot.crossrepo.v1;
-
-service ProviderGatewaySyncService {
-  // Provider 后端向 Gateway 推送或由 Gateway 拉取最新不可变目录与双层定价快照
-  rpc SyncCatalogSnapshot(CatalogSnapshotPayload) returns (SyncAck);
-  rpc GetLatestCatalogSnapshot(GetSnapshotRequest) returns (CatalogSnapshotPayload);
-  // 专用加密凭证下发（DEK 经 Gateway 公钥加密）
-  rpc SyncEncryptedCredentials(EncryptedCredentialBatch) returns (SyncAck);
-  // Gateway 按分钟级窗口向 Provider 后端批量回传实测 Uptime、p50/p95 延迟与应付汇总
-  rpc ReportOfferingMetrics(OfferingMetricsBatch) returns (SyncAck);
+// 1. proto/maxshot/provider_sync/v1/provider_sync.proto (Provider 后端 <-> Gateway 后端, WireGuard + TLS + HMAC)
+service ProviderSyncService { // Server: Provider 后端
+  rpc WatchSyncEvents(WatchSyncEventsRequest) returns (stream WatchSyncEventsResponse); // 轻量版本号通知流
+  rpc ReportNodeSyncState(ReportNodeSyncStateRequest) returns (ReportNodeSyncStateResponse);
+  rpc GetCatalogSnapshot(GetCatalogSnapshotRequest) returns (GetCatalogSnapshotResponse); // 精确十进制费率 + TierGroup + Curation + 7d性能
+  rpc StreamCatalogSnapshotChunks(StreamCatalogSnapshotChunksRequest) returns (stream StreamCatalogSnapshotChunksResponse);
+  rpc SyncGatewayPublicKeys(SyncGatewayPublicKeysRequest) returns (SyncGatewayPublicKeysResponse);
+  rpc SyncEncryptedCredentials(SyncEncryptedCredentialsRequest) returns (SyncEncryptedCredentialsResponse);
+  rpc ReportOfferingMetrics(ReportOfferingMetricsRequest) returns (ReportOfferingMetricsResponse);
+  rpc SyncProviderStatements(SyncProviderStatementsRequest) returns (SyncProviderStatementsResponse);
 }
 
-// proto/cross_repo/v1/contract_grant.proto  (合约后端 <-> Gateway 后端, gRPC + TLS + HMAC)
-service ContractGatewayGrantService {
-  // Gateway 向合约后端推送钱包绑定与条款签署变更，并提供游标增量拉取兜底
-  rpc SyncWalletEligibility(WalletEligibilityBatch) returns (SyncAck);
-  rpc PullWalletEligibilityUpdates(CursorRequest) returns (WalletEligibilityBatch);
-  // 合约后端按 7 天边界向 Gateway 推送用户 AIT Earned Credit 入账请求
-  rpc IssueAitCreditGrants(IssueAitGrantsRequest) returns (IssueAitGrantsResponse);
+service GatewayReconciliationService { // Server: Gateway 计费服务（供 Provider 对账争议按需分页查脱敏明细）
+  rpc ListOfferingAttemptRecords(ListOfferingAttemptRecordsRequest) returns (ListOfferingAttemptRecordsResponse);
+}
+
+// 2. proto/maxshot/contract_grant/v1/contract_grant.proto (合约后端 <-> Gateway 后端, WireGuard + TLS + HMAC)
+service ContractBackendService { // Server: 合约后端
+  rpc PushFundedTerms(PushFundedTermsRequest) returns (PushFundedTermsResponse); // Gateway 为 FundedTerm 主库
+  rpc PushWalletEligibility(PushWalletEligibilityRequest) returns (PushWalletEligibilityResponse);
+  rpc GetContractOperationalStatus(GetContractOperationalStatusRequest) returns (GetContractOperationalStatusResponse);
+}
+
+service AitCreditGrantService { // Server: Gateway 计费服务
+  rpc ListFundedTerms(ListFundedTermsRequest) returns (ListFundedTermsResponse);
+  rpc PullWalletEligibilityUpdates(PullWalletEligibilityUpdatesRequest) returns (PullWalletEligibilityUpdatesResponse);
+  rpc IssueAitCreditGrants(IssueAitCreditGrantsRequest) returns (IssueAitCreditGrantsResponse);
+}
+
+// 3. proto/maxshot/gateway_internal/v1/execution.proto (Gateway 同机房全模态统一账本契约)
+service BillingExecutionService { // Server: TS billing-account-service
+  rpc ResolvePrincipalScope(ResolvePrincipalScopeRequest) returns (ResolvePrincipalScopeResponse);
+  rpc PreviewQuote(PreviewQuoteRequest) returns (PreviewQuoteResponse);
+  rpc AuthorizeAndHold(AuthorizeAndHoldRequest) returns (AuthorizeAndHoldResponse);
+  rpc MarkSending(MarkSendingRequest) returns (MarkSendingResponse);
+  rpc ExtendExecutionLease(ExtendExecutionLeaseRequest) returns (ExtendExecutionLeaseResponse);
+  rpc Settle(SettleRequest) returns (SettleResponse);
+  rpc MarkUncertain(MarkUncertainRequest) returns (MarkUncertainResponse);
+  rpc ResolveUncertain(ResolveUncertainRequest) returns (ResolveUncertainResponse);
 }
 ```
 

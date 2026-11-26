@@ -19,6 +19,16 @@ import {
   type UntypedServiceImplementation,
 } from "@grpc/grpc-js";
 import {
+  BudgetPeriodKind,
+  budgetPeriodKindFromJSON,
+  budgetPeriodKindToJSON,
+  FundingBucket,
+  fundingBucketFromJSON,
+  fundingBucketToJSON,
+  KeyFundingStrategy,
+  keyFundingStrategyFromJSON,
+  keyFundingStrategyToJSON,
+  KeyValueAttribute,
   Modality,
   modalityFromJSON,
   modalityToJSON,
@@ -76,12 +86,116 @@ export function executionChannelToJSON(object: ExecutionChannel): string {
   }
 }
 
+export enum RouteSelectionMode {
+  ROUTE_SELECTION_MODE_UNSPECIFIED = 0,
+  /** ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER - customer chose modelId, Gateway picked lowest-cost offering */
+  ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER = 1,
+  /** ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING - customer pinned offeringId, zero fallback allowed */
+  ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING = 2,
+  /** ROUTE_SELECTION_MODE_AUTO_MODEL - customer chose maxshot/auto, converged to concrete modelId before hold */
+  ROUTE_SELECTION_MODE_AUTO_MODEL = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function routeSelectionModeFromJSON(object: any): RouteSelectionMode {
+  switch (object) {
+    case 0:
+    case "ROUTE_SELECTION_MODE_UNSPECIFIED":
+      return RouteSelectionMode.ROUTE_SELECTION_MODE_UNSPECIFIED;
+    case 1:
+    case "ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER":
+      return RouteSelectionMode.ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER;
+    case 2:
+    case "ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING":
+      return RouteSelectionMode.ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING;
+    case 3:
+    case "ROUTE_SELECTION_MODE_AUTO_MODEL":
+      return RouteSelectionMode.ROUTE_SELECTION_MODE_AUTO_MODEL;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return RouteSelectionMode.UNRECOGNIZED;
+  }
+}
+
+export function routeSelectionModeToJSON(object: RouteSelectionMode): string {
+  switch (object) {
+    case RouteSelectionMode.ROUTE_SELECTION_MODE_UNSPECIFIED:
+      return "ROUTE_SELECTION_MODE_UNSPECIFIED";
+    case RouteSelectionMode.ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER:
+      return "ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER";
+    case RouteSelectionMode.ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING:
+      return "ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING";
+    case RouteSelectionMode.ROUTE_SELECTION_MODE_AUTO_MODEL:
+      return "ROUTE_SELECTION_MODE_AUTO_MODEL";
+    case RouteSelectionMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum HoldDecisionStatus {
+  HOLD_DECISION_STATUS_UNSPECIFIED = 0,
+  HOLD_DECISION_STATUS_ADMITTED = 1,
+  HOLD_DECISION_STATUS_REJECTED = 2,
+  HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS = 3,
+  HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function holdDecisionStatusFromJSON(object: any): HoldDecisionStatus {
+  switch (object) {
+    case 0:
+    case "HOLD_DECISION_STATUS_UNSPECIFIED":
+      return HoldDecisionStatus.HOLD_DECISION_STATUS_UNSPECIFIED;
+    case 1:
+    case "HOLD_DECISION_STATUS_ADMITTED":
+      return HoldDecisionStatus.HOLD_DECISION_STATUS_ADMITTED;
+    case 2:
+    case "HOLD_DECISION_STATUS_REJECTED":
+      return HoldDecisionStatus.HOLD_DECISION_STATUS_REJECTED;
+    case 3:
+    case "HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS":
+      return HoldDecisionStatus.HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS;
+    case 4:
+    case "HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED":
+      return HoldDecisionStatus.HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return HoldDecisionStatus.UNRECOGNIZED;
+  }
+}
+
+export function holdDecisionStatusToJSON(object: HoldDecisionStatus): string {
+  switch (object) {
+    case HoldDecisionStatus.HOLD_DECISION_STATUS_UNSPECIFIED:
+      return "HOLD_DECISION_STATUS_UNSPECIFIED";
+    case HoldDecisionStatus.HOLD_DECISION_STATUS_ADMITTED:
+      return "HOLD_DECISION_STATUS_ADMITTED";
+    case HoldDecisionStatus.HOLD_DECISION_STATUS_REJECTED:
+      return "HOLD_DECISION_STATUS_REJECTED";
+    case HoldDecisionStatus.HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS:
+      return "HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS";
+    case HoldDecisionStatus.HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED:
+      return "HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED";
+    case HoldDecisionStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum SettlementOutcome {
   SETTLEMENT_OUTCOME_UNSPECIFIED = 0,
   SETTLEMENT_OUTCOME_DELIVERED = 1,
-  SETTLEMENT_OUTCOME_NOT_ACCEPTED = 2,
-  SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 3,
-  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 4,
+  /** SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED - Studio partial outputs / completed preprocessing (BIL-R33) */
+  SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED = 2,
+  SETTLEMENT_OUTCOME_NOT_ACCEPTED = 3,
+  SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 4,
+  /** SETTLEMENT_OUTCOME_CANCELLED - charges completed outputs/components, releases remainder */
+  SETTLEMENT_OUTCOME_CANCELLED = 5,
+  /** SETTLEMENT_OUTCOME_PENDING_RECONCILIATION - missing final usage; 24h auto-release applies */
+  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -94,12 +208,18 @@ export function settlementOutcomeFromJSON(object: any): SettlementOutcome {
     case "SETTLEMENT_OUTCOME_DELIVERED":
       return SettlementOutcome.SETTLEMENT_OUTCOME_DELIVERED;
     case 2:
+    case "SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED":
+      return SettlementOutcome.SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED;
+    case 3:
     case "SETTLEMENT_OUTCOME_NOT_ACCEPTED":
       return SettlementOutcome.SETTLEMENT_OUTCOME_NOT_ACCEPTED;
-    case 3:
+    case 4:
     case "SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT":
       return SettlementOutcome.SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT;
-    case 4:
+    case 5:
+    case "SETTLEMENT_OUTCOME_CANCELLED":
+      return SettlementOutcome.SETTLEMENT_OUTCOME_CANCELLED;
+    case 6:
     case "SETTLEMENT_OUTCOME_PENDING_RECONCILIATION":
       return SettlementOutcome.SETTLEMENT_OUTCOME_PENDING_RECONCILIATION;
     case -1:
@@ -115,10 +235,14 @@ export function settlementOutcomeToJSON(object: SettlementOutcome): string {
       return "SETTLEMENT_OUTCOME_UNSPECIFIED";
     case SettlementOutcome.SETTLEMENT_OUTCOME_DELIVERED:
       return "SETTLEMENT_OUTCOME_DELIVERED";
+    case SettlementOutcome.SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED:
+      return "SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED";
     case SettlementOutcome.SETTLEMENT_OUTCOME_NOT_ACCEPTED:
       return "SETTLEMENT_OUTCOME_NOT_ACCEPTED";
     case SettlementOutcome.SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT:
       return "SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT";
+    case SettlementOutcome.SETTLEMENT_OUTCOME_CANCELLED:
+      return "SETTLEMENT_OUTCOME_CANCELLED";
     case SettlementOutcome.SETTLEMENT_OUTCOME_PENDING_RECONCILIATION:
       return "SETTLEMENT_OUTCOME_PENDING_RECONCILIATION";
     case SettlementOutcome.UNRECOGNIZED:
@@ -127,37 +251,336 @@ export function settlementOutcomeToJSON(object: SettlementOutcome): string {
   }
 }
 
-export interface AuthorizeAndHoldRequest {
-  traceId: string;
-  idempotencyKey: string;
-  requestBodySha256: string;
-  /** populated when channel == EXECUTION_CHANNEL_API */
+export enum AttemptErrorClass {
+  ATTEMPT_ERROR_CLASS_UNSPECIFIED = 0,
+  ATTEMPT_ERROR_CLASS_NONE = 1,
+  ATTEMPT_ERROR_CLASS_HTTP_429 = 2,
+  ATTEMPT_ERROR_CLASS_HTTP_5XX = 3,
+  ATTEMPT_ERROR_CLASS_TIMEOUT = 4,
+  ATTEMPT_ERROR_CLASS_CONNECTION_ERROR = 5,
+  ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE = 6,
+  ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT = 7,
+  ATTEMPT_ERROR_CLASS_USER_INPUT_4XX = 8,
+  ATTEMPT_ERROR_CLASS_CONTENT_POLICY = 9,
+  ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED = 10,
+  UNRECOGNIZED = -1,
+}
+
+export function attemptErrorClassFromJSON(object: any): AttemptErrorClass {
+  switch (object) {
+    case 0:
+    case "ATTEMPT_ERROR_CLASS_UNSPECIFIED":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_UNSPECIFIED;
+    case 1:
+    case "ATTEMPT_ERROR_CLASS_NONE":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_NONE;
+    case 2:
+    case "ATTEMPT_ERROR_CLASS_HTTP_429":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_HTTP_429;
+    case 3:
+    case "ATTEMPT_ERROR_CLASS_HTTP_5XX":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_HTTP_5XX;
+    case 4:
+    case "ATTEMPT_ERROR_CLASS_TIMEOUT":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_TIMEOUT;
+    case 5:
+    case "ATTEMPT_ERROR_CLASS_CONNECTION_ERROR":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_CONNECTION_ERROR;
+    case 6:
+    case "ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE;
+    case 7:
+    case "ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT;
+    case 8:
+    case "ATTEMPT_ERROR_CLASS_USER_INPUT_4XX":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_USER_INPUT_4XX;
+    case 9:
+    case "ATTEMPT_ERROR_CLASS_CONTENT_POLICY":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_CONTENT_POLICY;
+    case 10:
+    case "ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED":
+      return AttemptErrorClass.ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AttemptErrorClass.UNRECOGNIZED;
+  }
+}
+
+export function attemptErrorClassToJSON(object: AttemptErrorClass): string {
+  switch (object) {
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_UNSPECIFIED:
+      return "ATTEMPT_ERROR_CLASS_UNSPECIFIED";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_NONE:
+      return "ATTEMPT_ERROR_CLASS_NONE";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_HTTP_429:
+      return "ATTEMPT_ERROR_CLASS_HTTP_429";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_HTTP_5XX:
+      return "ATTEMPT_ERROR_CLASS_HTTP_5XX";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_TIMEOUT:
+      return "ATTEMPT_ERROR_CLASS_TIMEOUT";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_CONNECTION_ERROR:
+      return "ATTEMPT_ERROR_CLASS_CONNECTION_ERROR";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE:
+      return "ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT:
+      return "ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_USER_INPUT_4XX:
+      return "ATTEMPT_ERROR_CLASS_USER_INPUT_4XX";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_CONTENT_POLICY:
+      return "ATTEMPT_ERROR_CLASS_CONTENT_POLICY";
+    case AttemptErrorClass.ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED:
+      return "ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED";
+    case AttemptErrorClass.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum UncertainResolutionAction {
+  UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED = 0,
+  UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED = 1,
+  UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST = 2,
+  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function uncertainResolutionActionFromJSON(object: any): UncertainResolutionAction {
+  switch (object) {
+    case 0:
+    case "UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED":
+      return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED;
+    case 1:
+    case "UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED":
+      return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED;
+    case 2:
+    case "UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST":
+      return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST;
+    case 3:
+    case "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H":
+      return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return UncertainResolutionAction.UNRECOGNIZED;
+  }
+}
+
+export function uncertainResolutionActionToJSON(object: UncertainResolutionAction): string {
+  switch (object) {
+    case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED:
+      return "UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED";
+    case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED:
+      return "UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED";
+    case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST:
+      return "UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST";
+    case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H:
+      return "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H";
+    case UncertainResolutionAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** UsageBound unifies multi-dimensional LLM token bounds/meters and Studio/API media generation units. */
+export interface UsageBound {
+  inputTokens: bigint;
+  outputTokens: bigint;
+  cacheReadTokens: bigint;
+  cacheWriteTokens: bigint;
+  reasoningTokens: bigint;
+  inputImages: bigint;
+  inputImageTokens: bigint;
+  inputAudioTokens: bigint;
+  inputAudioCacheReadTokens: bigint;
+  hasInputAudio: boolean;
+  webSearchCalls: bigint;
+  /** Media & async generation dimensions */
+  mediaOutputCount: number;
+  mediaDurationSeconds: bigint;
+  mediaWidth: number;
+  mediaHeight: number;
+  mediaMegapixelsDec: string;
+  mediaHasAudio: boolean;
+  mediaCharacterCount: bigint;
+  /** e.g. path=i2v, resolution=1080p, edit_tool=inpaint */
+  mediaAttributes: KeyValueAttribute[];
+}
+
+export interface QuoteComponentLine {
+  item: string;
+  estimatedCredits: bigint;
+  hardMaxCredits: bigint;
+}
+
+export interface BucketAllocationLine {
+  bucket: FundingBucket;
+  /** grant_id or subscription_period_id */
+  sourceId: string;
+  credits: bigint;
+  dollarMicroUsd: bigint;
+  expiresAtUnixMs: bigint;
+}
+
+/** SpendingLimitDiagnostic mirrors server-core SpendingLimitExceededDescription (never exposes supplier budgets). */
+export interface SpendingLimitDiagnostic {
+  /** "account" | "api_key" */
+  scope: string;
+  period: BudgetPeriodKind;
+  /** "credits" | "gross" */
+  unit: string;
+  limit: bigint;
+  used: bigint;
+  pendingReserved: bigint;
+  requiredReserve: bigint;
+  available: bigint;
+  resetsAtUnixMs: bigint;
+  reason: string;
+}
+
+/** CreditShortfallDiagnostic mirrors server-core CreditReservationContext. */
+export interface CreditShortfallDiagnostic {
+  requiredReservationCredits: bigint;
+  availableCredits: bigint;
+  shortCredits: bigint;
+  fundingReasons: string[];
+}
+
+export interface ThresholdWarning {
+  /** "window_5h_90pct" | "window_weekly_90pct" | "basic_monthly_90pct" | "premium_monthly_90pct" */
+  warningKind: string;
+  usedPercent: number;
+  resetsAtUnixMs: bigint;
+}
+
+export interface LockedVersionSet {
+  catalogVersion: string;
+  primaryRateCardVersion: string;
+  backupRateCardVersion: string;
+  planVersion: string;
+  fxVersion: string;
+}
+
+export interface ResolvePrincipalScopeRequest {
   apiKeySha256: string;
-  /** populated when channel == WEB_CHAT or STUDIO */
+  internalAccountId: string;
+  clientRegion: string;
+}
+
+export interface ResolvePrincipalScopeResponse {
+  authenticated: boolean;
+  rejectCode: RejectCode;
+  rejectMessage: string;
+  accountId: string;
+  apiKeyId: string;
+  keyFundingStrategy: KeyFundingStrategy;
+  /** independent key toggle (default true) */
+  allowAitEarnedCredit: boolean;
+  /** on SUBSCRIPTION_FIRST keys, false blocks Free + Referral + Dollar */
+  dollarRelayEnabled: boolean;
+  /** account setting "Continue with Premium when Basic is not enough" */
+  allowBasicToPremium: boolean;
+  allowedCatalogIds: string[];
+  modelAllowlist: string[];
+  activePlanId: string;
+  planBasicGroupIds: string[];
+  planPremiumGroupIds: string[];
+}
+
+export interface PreviewQuoteRequest {
+  apiKeySha256: string;
   internalAccountId: string;
   channel: ExecutionChannel;
   modality: Modality;
+  selectionMode: RouteSelectionMode;
   modelId: string;
   catalogVersion: string;
   primaryOfferingId: string;
   backupOfferingId: string;
-  inputTokensUpper: bigint;
-  effectiveMaxOutputTokens: bigint;
+  estimateBound?: UsageBound | undefined;
+  hardMaxBound?: UsageBound | undefined;
+  callerCeilingMicroUsd: bigint;
+  zeroRetention: boolean;
+  clientRegion: string;
+}
+
+export interface PreviewQuoteResponse {
+  eligible: boolean;
+  rejectCode: RejectCode;
+  rejectMessage: string;
+  estimatedCredits: bigint;
+  hardMaxCredits: bigint;
+  hardMaxMicroUsd: bigint;
+  usesFreeModelQuota: boolean;
+  /** F-model free quota exhausted; quote reflects regular 6-bucket fallback */
+  freeModelQuotaExhaustedFallback: boolean;
+  /** BIL-R23: Studio UI must prompt user to confirm max Dollar debit */
+  requiresDollarConfirmation: boolean;
+  maxDollarDebitMicroUsd: bigint;
+  basicToPremiumProjected: boolean;
+  breakdown: QuoteComponentLine[];
+  projectedHoldBuckets: BucketAllocationLine[];
+  budgetDiagnostic?: SpendingLimitDiagnostic | undefined;
+  creditDiagnostic?: CreditShortfallDiagnostic | undefined;
+}
+
+export interface AuthorizeAndHoldRequest {
+  traceId: string;
+  idempotencyScope: string;
+  idempotencyKey: string;
+  requestBodySha256: string;
+  /** populated when channel == EXECUTION_CHANNEL_API or API Studio */
+  apiKeySha256: string;
+  /** populated when authenticated via Web session JWT */
+  internalAccountId: string;
+  channel: ExecutionChannel;
+  modality: Modality;
+  selectionMode: RouteSelectionMode;
+  /** e.g. "maxshot/auto" or concrete model_id */
+  requestedModelId: string;
+  /** resolved concrete customer model_id */
+  modelId: string;
+  autoTaskLabel: string;
+  catalogVersion: string;
+  primaryOfferingId: string;
+  backupOfferingId: string;
+  estimateBound?: UsageBound | undefined;
+  hardMaxBound?: UsageBound | undefined;
   callerCeilingMicroUsd: bigint;
   dollarConfirmed: boolean;
+  zeroRetention: boolean;
+  clientRegion: string;
+  /** links Studio async job record (BIL-R41) */
+  studioOperationId: string;
+  initialLeaseTtlMs: bigint;
 }
 
 export interface AuthorizeAndHoldResponse {
+  status: HoldDecisionStatus;
   admitted: boolean;
   rejectCode: RejectCode;
   rejectMessage: string;
-  /** ULID, generated only when admitted == true (BIL-R24) */
+  /** ULID, generated only when admitted (BIL-R24) */
   requestId: string;
   holdId: string;
   leaseToken: string;
+  leaseExpiresAtUnixMs: bigint;
+  estimatedCredits: bigint;
+  hardMaxCredits: bigint;
   computedHardMaxMicroUsd: bigint;
-  /** reflects "Continue with Premium when Basic is not enough" */
+  providerCostCeilingMicroUsd: bigint;
+  usesFreeModelQuota: boolean;
   basicToPremiumUsed: boolean;
+  lockedVersions?: LockedVersionSet | undefined;
+  heldBuckets: BucketAllocationLine[];
+  thresholdWarnings: ThresholdWarning[];
+  budgetDiagnostic?: SpendingLimitDiagnostic | undefined;
+  creditDiagnostic?:
+    | CreditShortfallDiagnostic
+    | undefined;
+  /** populated when status == HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED */
+  cachedSettlement?: SettleResponse | undefined;
 }
 
 export interface MarkSendingRequest {
@@ -166,59 +589,2820 @@ export interface MarkSendingRequest {
   offeringId: string;
   dispatchKey: string;
   leaseToken: string;
+  leaseTtlMs: bigint;
 }
 
 export interface MarkSendingResponse {
   accepted: boolean;
+  leaseExpiresAtUnixMs: bigint;
+  rejectReason: string;
+}
+
+export interface ExtendExecutionLeaseRequest {
+  requestId: string;
+  leaseToken: string;
+  extendTtlMs: bigint;
+}
+
+export interface ExtendExecutionLeaseResponse {
+  accepted: boolean;
+  leaseExpiresAtUnixMs: bigint;
+}
+
+export interface MediaOutputSettlementItem {
+  outputId: string;
+  outputIndex: number;
+  delivered: boolean;
+  durationMs: bigint;
+  hasAudio: boolean;
+  width: number;
+  height: number;
+  failureCode: string;
 }
 
 export interface AttemptCostRecord {
   attemptId: string;
   offeringId: string;
   nativeRequestId: string;
+  /** PRV-R10 upstream router proof */
+  reportedServingEndpoint: string;
   succeeded: boolean;
-  inputTokens: bigint;
-  outputTokens: bigint;
-  cacheReadTokens: bigint;
+  errorClass: AttemptErrorClass;
+  usage?: UsageBound | undefined;
+  providerReportedCostUsdDec: string;
+  dispatchedAtUnixMs: bigint;
+  firstTokenAtUnixMs: bigint;
+  completedAtUnixMs: bigint;
 }
 
 export interface SettleRequest {
   requestId: string;
+  settlementIdempotencyKey: string;
   leaseToken: string;
   outcome: SettlementOutcome;
   servingOfferingId: string;
   nativeRequestId: string;
-  verifiedInputTokens: bigint;
-  verifiedOutputTokens: bigint;
-  verifiedCacheReadTokens: bigint;
-  /** audit evidence only when outcome == PENDING_RECONCILIATION */
+  reportedServingEndpoint: string;
+  fallbackUsed: boolean;
+  fallbackReason: string;
+  verifiedUsage?:
+    | UsageBound
+    | undefined;
+  /** audit evidence only when PENDING_RECONCILIATION (never billed as invented usage) */
   estimatedStreamedOutputTokens: bigint;
+  mediaOutputs: MediaOutputSettlementItem[];
   attempts: AttemptCostRecord[];
 }
 
 export interface SettleResponse {
   settled: boolean;
+  finalCustomerCredits: bigint;
   finalCustomerChargeMicroUsd: bigint;
+  releasedHoldCredits: bigint;
   releasedHoldMicroUsd: bigint;
+  /** extra unfrozen Dollar charged when double-authorized & not ceiling-capped */
+  shortfallTopUpMicroUsd: bigint;
+  /** overrun or uncompensated shortfall routed to discrepancy ledger */
+  platformBorneDiscrepancyMicroUsd: bigint;
+  settledProviderPayableMicroUsd: bigint;
+  /** set to dispatched_at + 24h when outcome == PENDING_RECONCILIATION */
+  autoReleaseAtUnixMs: bigint;
+  settledBuckets: BucketAllocationLine[];
+  releasedBuckets: BucketAllocationLine[];
 }
+
+export interface MarkUncertainRequest {
+  requestId: string;
+  studioOperationId: string;
+  leaseToken: string;
+  providerTaskId: string;
+  reason: string;
+}
+
+export interface MarkUncertainResponse {
+  marked: boolean;
+  /** dispatched_at + 24h (BIL-R36) */
+  autoReleaseAtUnixMs: bigint;
+}
+
+export interface ResolveUncertainRequest {
+  requestId: string;
+  resolutionIdempotencyKey: string;
+  action: UncertainResolutionAction;
+  /** operator ID or "system:finance-worker-24h" (ADM-R12) */
+  actorId: string;
+  reason: string;
+  servingOfferingId: string;
+  nativeRequestId: string;
+  /** populated when action == UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED */
+  verifiedUsage?: UsageBound | undefined;
+  mediaOutputs: MediaOutputSettlementItem[];
+  /** recorded into discrepancy ledger if already auto-released (BIL-R36) */
+  lateProviderCostUsdDec: string;
+}
+
+export interface ResolveUncertainResponse {
+  resolved: boolean;
+  settlement?: SettleResponse | undefined;
+}
+
+function createBaseUsageBound(): UsageBound {
+  return {
+    inputTokens: 0n,
+    outputTokens: 0n,
+    cacheReadTokens: 0n,
+    cacheWriteTokens: 0n,
+    reasoningTokens: 0n,
+    inputImages: 0n,
+    inputImageTokens: 0n,
+    inputAudioTokens: 0n,
+    inputAudioCacheReadTokens: 0n,
+    hasInputAudio: false,
+    webSearchCalls: 0n,
+    mediaOutputCount: 0,
+    mediaDurationSeconds: 0n,
+    mediaWidth: 0,
+    mediaHeight: 0,
+    mediaMegapixelsDec: "",
+    mediaHasAudio: false,
+    mediaCharacterCount: 0n,
+    mediaAttributes: [],
+  };
+}
+
+export const UsageBound: MessageFns<UsageBound> = {
+  encode(message: UsageBound, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.inputTokens !== 0n) {
+      if (BigInt.asIntN(64, message.inputTokens) !== message.inputTokens) {
+        throw new globalThis.Error("value provided for field message.inputTokens of type int64 too large");
+      }
+      writer.uint32(8).int64(message.inputTokens);
+    }
+    if (message.outputTokens !== 0n) {
+      if (BigInt.asIntN(64, message.outputTokens) !== message.outputTokens) {
+        throw new globalThis.Error("value provided for field message.outputTokens of type int64 too large");
+      }
+      writer.uint32(16).int64(message.outputTokens);
+    }
+    if (message.cacheReadTokens !== 0n) {
+      if (BigInt.asIntN(64, message.cacheReadTokens) !== message.cacheReadTokens) {
+        throw new globalThis.Error("value provided for field message.cacheReadTokens of type int64 too large");
+      }
+      writer.uint32(24).int64(message.cacheReadTokens);
+    }
+    if (message.cacheWriteTokens !== 0n) {
+      if (BigInt.asIntN(64, message.cacheWriteTokens) !== message.cacheWriteTokens) {
+        throw new globalThis.Error("value provided for field message.cacheWriteTokens of type int64 too large");
+      }
+      writer.uint32(32).int64(message.cacheWriteTokens);
+    }
+    if (message.reasoningTokens !== 0n) {
+      if (BigInt.asIntN(64, message.reasoningTokens) !== message.reasoningTokens) {
+        throw new globalThis.Error("value provided for field message.reasoningTokens of type int64 too large");
+      }
+      writer.uint32(40).int64(message.reasoningTokens);
+    }
+    if (message.inputImages !== 0n) {
+      if (BigInt.asIntN(64, message.inputImages) !== message.inputImages) {
+        throw new globalThis.Error("value provided for field message.inputImages of type int64 too large");
+      }
+      writer.uint32(48).int64(message.inputImages);
+    }
+    if (message.inputImageTokens !== 0n) {
+      if (BigInt.asIntN(64, message.inputImageTokens) !== message.inputImageTokens) {
+        throw new globalThis.Error("value provided for field message.inputImageTokens of type int64 too large");
+      }
+      writer.uint32(56).int64(message.inputImageTokens);
+    }
+    if (message.inputAudioTokens !== 0n) {
+      if (BigInt.asIntN(64, message.inputAudioTokens) !== message.inputAudioTokens) {
+        throw new globalThis.Error("value provided for field message.inputAudioTokens of type int64 too large");
+      }
+      writer.uint32(64).int64(message.inputAudioTokens);
+    }
+    if (message.inputAudioCacheReadTokens !== 0n) {
+      if (BigInt.asIntN(64, message.inputAudioCacheReadTokens) !== message.inputAudioCacheReadTokens) {
+        throw new globalThis.Error(
+          "value provided for field message.inputAudioCacheReadTokens of type int64 too large",
+        );
+      }
+      writer.uint32(72).int64(message.inputAudioCacheReadTokens);
+    }
+    if (message.hasInputAudio !== false) {
+      writer.uint32(80).bool(message.hasInputAudio);
+    }
+    if (message.webSearchCalls !== 0n) {
+      if (BigInt.asIntN(64, message.webSearchCalls) !== message.webSearchCalls) {
+        throw new globalThis.Error("value provided for field message.webSearchCalls of type int64 too large");
+      }
+      writer.uint32(88).int64(message.webSearchCalls);
+    }
+    if (message.mediaOutputCount !== 0) {
+      writer.uint32(96).int32(message.mediaOutputCount);
+    }
+    if (message.mediaDurationSeconds !== 0n) {
+      if (BigInt.asIntN(64, message.mediaDurationSeconds) !== message.mediaDurationSeconds) {
+        throw new globalThis.Error("value provided for field message.mediaDurationSeconds of type int64 too large");
+      }
+      writer.uint32(104).int64(message.mediaDurationSeconds);
+    }
+    if (message.mediaWidth !== 0) {
+      writer.uint32(112).int32(message.mediaWidth);
+    }
+    if (message.mediaHeight !== 0) {
+      writer.uint32(120).int32(message.mediaHeight);
+    }
+    if (message.mediaMegapixelsDec !== "") {
+      writer.uint32(130).string(message.mediaMegapixelsDec);
+    }
+    if (message.mediaHasAudio !== false) {
+      writer.uint32(136).bool(message.mediaHasAudio);
+    }
+    if (message.mediaCharacterCount !== 0n) {
+      if (BigInt.asIntN(64, message.mediaCharacterCount) !== message.mediaCharacterCount) {
+        throw new globalThis.Error("value provided for field message.mediaCharacterCount of type int64 too large");
+      }
+      writer.uint32(144).int64(message.mediaCharacterCount);
+    }
+    for (const v of message.mediaAttributes) {
+      KeyValueAttribute.encode(v!, writer.uint32(154).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UsageBound {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUsageBound();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.inputTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.outputTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.cacheReadTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.cacheWriteTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.reasoningTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.inputImages = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.inputImageTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.inputAudioTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.inputAudioCacheReadTokens = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.hasInputAudio = reader.bool();
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.webSearchCalls = reader.int64() as bigint;
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.mediaOutputCount = reader.int32();
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.mediaDurationSeconds = reader.int64() as bigint;
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.mediaWidth = reader.int32();
+            continue;
+          }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.mediaHeight = reader.int32();
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.mediaMegapixelsDec = reader.string();
+            continue;
+          }
+          case 17: {
+            if (tag !== 136) {
+              break;
+            }
+
+            message.mediaHasAudio = reader.bool();
+            continue;
+          }
+          case 18: {
+            if (tag !== 144) {
+              break;
+            }
+
+            message.mediaCharacterCount = reader.int64() as bigint;
+            continue;
+          }
+          case 19: {
+            if (tag !== 154) {
+              break;
+            }
+
+            message.mediaAttributes.push(KeyValueAttribute.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UsageBound {
+    return {
+      inputTokens: isSet(object.inputTokens)
+        ? BigInt(object.inputTokens)
+        : isSet(object.input_tokens)
+        ? BigInt(object.input_tokens)
+        : 0n,
+      outputTokens: isSet(object.outputTokens)
+        ? BigInt(object.outputTokens)
+        : isSet(object.output_tokens)
+        ? BigInt(object.output_tokens)
+        : 0n,
+      cacheReadTokens: isSet(object.cacheReadTokens)
+        ? BigInt(object.cacheReadTokens)
+        : isSet(object.cache_read_tokens)
+        ? BigInt(object.cache_read_tokens)
+        : 0n,
+      cacheWriteTokens: isSet(object.cacheWriteTokens)
+        ? BigInt(object.cacheWriteTokens)
+        : isSet(object.cache_write_tokens)
+        ? BigInt(object.cache_write_tokens)
+        : 0n,
+      reasoningTokens: isSet(object.reasoningTokens)
+        ? BigInt(object.reasoningTokens)
+        : isSet(object.reasoning_tokens)
+        ? BigInt(object.reasoning_tokens)
+        : 0n,
+      inputImages: isSet(object.inputImages)
+        ? BigInt(object.inputImages)
+        : isSet(object.input_images)
+        ? BigInt(object.input_images)
+        : 0n,
+      inputImageTokens: isSet(object.inputImageTokens)
+        ? BigInt(object.inputImageTokens)
+        : isSet(object.input_image_tokens)
+        ? BigInt(object.input_image_tokens)
+        : 0n,
+      inputAudioTokens: isSet(object.inputAudioTokens)
+        ? BigInt(object.inputAudioTokens)
+        : isSet(object.input_audio_tokens)
+        ? BigInt(object.input_audio_tokens)
+        : 0n,
+      inputAudioCacheReadTokens: isSet(object.inputAudioCacheReadTokens)
+        ? BigInt(object.inputAudioCacheReadTokens)
+        : isSet(object.input_audio_cache_read_tokens)
+        ? BigInt(object.input_audio_cache_read_tokens)
+        : 0n,
+      hasInputAudio: isSet(object.hasInputAudio)
+        ? globalThis.Boolean(object.hasInputAudio)
+        : isSet(object.has_input_audio)
+        ? globalThis.Boolean(object.has_input_audio)
+        : false,
+      webSearchCalls: isSet(object.webSearchCalls)
+        ? BigInt(object.webSearchCalls)
+        : isSet(object.web_search_calls)
+        ? BigInt(object.web_search_calls)
+        : 0n,
+      mediaOutputCount: isSet(object.mediaOutputCount)
+        ? globalThis.Number(object.mediaOutputCount)
+        : isSet(object.media_output_count)
+        ? globalThis.Number(object.media_output_count)
+        : 0,
+      mediaDurationSeconds: isSet(object.mediaDurationSeconds)
+        ? BigInt(object.mediaDurationSeconds)
+        : isSet(object.media_duration_seconds)
+        ? BigInt(object.media_duration_seconds)
+        : 0n,
+      mediaWidth: isSet(object.mediaWidth)
+        ? globalThis.Number(object.mediaWidth)
+        : isSet(object.media_width)
+        ? globalThis.Number(object.media_width)
+        : 0,
+      mediaHeight: isSet(object.mediaHeight)
+        ? globalThis.Number(object.mediaHeight)
+        : isSet(object.media_height)
+        ? globalThis.Number(object.media_height)
+        : 0,
+      mediaMegapixelsDec: isSet(object.mediaMegapixelsDec)
+        ? globalThis.String(object.mediaMegapixelsDec)
+        : isSet(object.media_megapixels_dec)
+        ? globalThis.String(object.media_megapixels_dec)
+        : "",
+      mediaHasAudio: isSet(object.mediaHasAudio)
+        ? globalThis.Boolean(object.mediaHasAudio)
+        : isSet(object.media_has_audio)
+        ? globalThis.Boolean(object.media_has_audio)
+        : false,
+      mediaCharacterCount: isSet(object.mediaCharacterCount)
+        ? BigInt(object.mediaCharacterCount)
+        : isSet(object.media_character_count)
+        ? BigInt(object.media_character_count)
+        : 0n,
+      mediaAttributes: globalThis.Array.isArray(object?.mediaAttributes)
+        ? object.mediaAttributes.map((e: any) => KeyValueAttribute.fromJSON(e))
+        : globalThis.Array.isArray(object?.media_attributes)
+        ? object.media_attributes.map((e: any) => KeyValueAttribute.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: UsageBound): unknown {
+    const obj: any = {};
+    if (message.inputTokens !== 0n) {
+      obj.inputTokens = message.inputTokens.toString();
+    }
+    if (message.outputTokens !== 0n) {
+      obj.outputTokens = message.outputTokens.toString();
+    }
+    if (message.cacheReadTokens !== 0n) {
+      obj.cacheReadTokens = message.cacheReadTokens.toString();
+    }
+    if (message.cacheWriteTokens !== 0n) {
+      obj.cacheWriteTokens = message.cacheWriteTokens.toString();
+    }
+    if (message.reasoningTokens !== 0n) {
+      obj.reasoningTokens = message.reasoningTokens.toString();
+    }
+    if (message.inputImages !== 0n) {
+      obj.inputImages = message.inputImages.toString();
+    }
+    if (message.inputImageTokens !== 0n) {
+      obj.inputImageTokens = message.inputImageTokens.toString();
+    }
+    if (message.inputAudioTokens !== 0n) {
+      obj.inputAudioTokens = message.inputAudioTokens.toString();
+    }
+    if (message.inputAudioCacheReadTokens !== 0n) {
+      obj.inputAudioCacheReadTokens = message.inputAudioCacheReadTokens.toString();
+    }
+    if (message.hasInputAudio !== false) {
+      obj.hasInputAudio = message.hasInputAudio;
+    }
+    if (message.webSearchCalls !== 0n) {
+      obj.webSearchCalls = message.webSearchCalls.toString();
+    }
+    if (message.mediaOutputCount !== 0) {
+      obj.mediaOutputCount = Math.round(message.mediaOutputCount);
+    }
+    if (message.mediaDurationSeconds !== 0n) {
+      obj.mediaDurationSeconds = message.mediaDurationSeconds.toString();
+    }
+    if (message.mediaWidth !== 0) {
+      obj.mediaWidth = Math.round(message.mediaWidth);
+    }
+    if (message.mediaHeight !== 0) {
+      obj.mediaHeight = Math.round(message.mediaHeight);
+    }
+    if (message.mediaMegapixelsDec !== "") {
+      obj.mediaMegapixelsDec = message.mediaMegapixelsDec;
+    }
+    if (message.mediaHasAudio !== false) {
+      obj.mediaHasAudio = message.mediaHasAudio;
+    }
+    if (message.mediaCharacterCount !== 0n) {
+      obj.mediaCharacterCount = message.mediaCharacterCount.toString();
+    }
+    if (message.mediaAttributes?.length) {
+      obj.mediaAttributes = message.mediaAttributes.map((e) => KeyValueAttribute.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UsageBound>, I>>(base?: I): UsageBound {
+    return UsageBound.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UsageBound>, I>>(object: I): UsageBound {
+    const message = createBaseUsageBound();
+    message.inputTokens = (object.inputTokens !== undefined && object.inputTokens !== null)
+      ? BigInt(object.inputTokens)
+      : 0n;
+    message.outputTokens = (object.outputTokens !== undefined && object.outputTokens !== null)
+      ? BigInt(object.outputTokens)
+      : 0n;
+    message.cacheReadTokens = (object.cacheReadTokens !== undefined && object.cacheReadTokens !== null)
+      ? BigInt(object.cacheReadTokens)
+      : 0n;
+    message.cacheWriteTokens = (object.cacheWriteTokens !== undefined && object.cacheWriteTokens !== null)
+      ? BigInt(object.cacheWriteTokens)
+      : 0n;
+    message.reasoningTokens = (object.reasoningTokens !== undefined && object.reasoningTokens !== null)
+      ? BigInt(object.reasoningTokens)
+      : 0n;
+    message.inputImages = (object.inputImages !== undefined && object.inputImages !== null)
+      ? BigInt(object.inputImages)
+      : 0n;
+    message.inputImageTokens = (object.inputImageTokens !== undefined && object.inputImageTokens !== null)
+      ? BigInt(object.inputImageTokens)
+      : 0n;
+    message.inputAudioTokens = (object.inputAudioTokens !== undefined && object.inputAudioTokens !== null)
+      ? BigInt(object.inputAudioTokens)
+      : 0n;
+    message.inputAudioCacheReadTokens =
+      (object.inputAudioCacheReadTokens !== undefined && object.inputAudioCacheReadTokens !== null)
+        ? BigInt(object.inputAudioCacheReadTokens)
+        : 0n;
+    message.hasInputAudio = object.hasInputAudio ?? false;
+    message.webSearchCalls = (object.webSearchCalls !== undefined && object.webSearchCalls !== null)
+      ? BigInt(object.webSearchCalls)
+      : 0n;
+    message.mediaOutputCount = object.mediaOutputCount ?? 0;
+    message.mediaDurationSeconds = (object.mediaDurationSeconds !== undefined && object.mediaDurationSeconds !== null)
+      ? BigInt(object.mediaDurationSeconds)
+      : 0n;
+    message.mediaWidth = object.mediaWidth ?? 0;
+    message.mediaHeight = object.mediaHeight ?? 0;
+    message.mediaMegapixelsDec = object.mediaMegapixelsDec ?? "";
+    message.mediaHasAudio = object.mediaHasAudio ?? false;
+    message.mediaCharacterCount = (object.mediaCharacterCount !== undefined && object.mediaCharacterCount !== null)
+      ? BigInt(object.mediaCharacterCount)
+      : 0n;
+    message.mediaAttributes = object.mediaAttributes?.map((e) => KeyValueAttribute.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseQuoteComponentLine(): QuoteComponentLine {
+  return { item: "", estimatedCredits: 0n, hardMaxCredits: 0n };
+}
+
+export const QuoteComponentLine: MessageFns<QuoteComponentLine> = {
+  encode(message: QuoteComponentLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.item !== "") {
+      writer.uint32(10).string(message.item);
+    }
+    if (message.estimatedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.estimatedCredits) !== message.estimatedCredits) {
+        throw new globalThis.Error("value provided for field message.estimatedCredits of type int64 too large");
+      }
+      writer.uint32(16).int64(message.estimatedCredits);
+    }
+    if (message.hardMaxCredits !== 0n) {
+      if (BigInt.asIntN(64, message.hardMaxCredits) !== message.hardMaxCredits) {
+        throw new globalThis.Error("value provided for field message.hardMaxCredits of type int64 too large");
+      }
+      writer.uint32(24).int64(message.hardMaxCredits);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QuoteComponentLine {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseQuoteComponentLine();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.item = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.estimatedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.hardMaxCredits = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): QuoteComponentLine {
+    return {
+      item: isSet(object.item) ? globalThis.String(object.item) : "",
+      estimatedCredits: isSet(object.estimatedCredits)
+        ? BigInt(object.estimatedCredits)
+        : isSet(object.estimated_credits)
+        ? BigInt(object.estimated_credits)
+        : 0n,
+      hardMaxCredits: isSet(object.hardMaxCredits)
+        ? BigInt(object.hardMaxCredits)
+        : isSet(object.hard_max_credits)
+        ? BigInt(object.hard_max_credits)
+        : 0n,
+    };
+  },
+
+  toJSON(message: QuoteComponentLine): unknown {
+    const obj: any = {};
+    if (message.item !== "") {
+      obj.item = message.item;
+    }
+    if (message.estimatedCredits !== 0n) {
+      obj.estimatedCredits = message.estimatedCredits.toString();
+    }
+    if (message.hardMaxCredits !== 0n) {
+      obj.hardMaxCredits = message.hardMaxCredits.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<QuoteComponentLine>, I>>(base?: I): QuoteComponentLine {
+    return QuoteComponentLine.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<QuoteComponentLine>, I>>(object: I): QuoteComponentLine {
+    const message = createBaseQuoteComponentLine();
+    message.item = object.item ?? "";
+    message.estimatedCredits = (object.estimatedCredits !== undefined && object.estimatedCredits !== null)
+      ? BigInt(object.estimatedCredits)
+      : 0n;
+    message.hardMaxCredits = (object.hardMaxCredits !== undefined && object.hardMaxCredits !== null)
+      ? BigInt(object.hardMaxCredits)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseBucketAllocationLine(): BucketAllocationLine {
+  return { bucket: 0, sourceId: "", credits: 0n, dollarMicroUsd: 0n, expiresAtUnixMs: 0n };
+}
+
+export const BucketAllocationLine: MessageFns<BucketAllocationLine> = {
+  encode(message: BucketAllocationLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.bucket !== 0) {
+      writer.uint32(8).int32(message.bucket);
+    }
+    if (message.sourceId !== "") {
+      writer.uint32(18).string(message.sourceId);
+    }
+    if (message.credits !== 0n) {
+      if (BigInt.asIntN(64, message.credits) !== message.credits) {
+        throw new globalThis.Error("value provided for field message.credits of type int64 too large");
+      }
+      writer.uint32(24).int64(message.credits);
+    }
+    if (message.dollarMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.dollarMicroUsd) !== message.dollarMicroUsd) {
+        throw new globalThis.Error("value provided for field message.dollarMicroUsd of type int64 too large");
+      }
+      writer.uint32(32).int64(message.dollarMicroUsd);
+    }
+    if (message.expiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.expiresAtUnixMs) !== message.expiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.expiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.expiresAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BucketAllocationLine {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseBucketAllocationLine();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.bucket = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.sourceId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.credits = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.dollarMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.expiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): BucketAllocationLine {
+    return {
+      bucket: isSet(object.bucket) ? fundingBucketFromJSON(object.bucket) : 0,
+      sourceId: isSet(object.sourceId)
+        ? globalThis.String(object.sourceId)
+        : isSet(object.source_id)
+        ? globalThis.String(object.source_id)
+        : "",
+      credits: isSet(object.credits) ? BigInt(object.credits) : 0n,
+      dollarMicroUsd: isSet(object.dollarMicroUsd)
+        ? BigInt(object.dollarMicroUsd)
+        : isSet(object.dollar_micro_usd)
+        ? BigInt(object.dollar_micro_usd)
+        : 0n,
+      expiresAtUnixMs: isSet(object.expiresAtUnixMs)
+        ? BigInt(object.expiresAtUnixMs)
+        : isSet(object.expires_at_unix_ms)
+        ? BigInt(object.expires_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: BucketAllocationLine): unknown {
+    const obj: any = {};
+    if (message.bucket !== 0) {
+      obj.bucket = fundingBucketToJSON(message.bucket);
+    }
+    if (message.sourceId !== "") {
+      obj.sourceId = message.sourceId;
+    }
+    if (message.credits !== 0n) {
+      obj.credits = message.credits.toString();
+    }
+    if (message.dollarMicroUsd !== 0n) {
+      obj.dollarMicroUsd = message.dollarMicroUsd.toString();
+    }
+    if (message.expiresAtUnixMs !== 0n) {
+      obj.expiresAtUnixMs = message.expiresAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BucketAllocationLine>, I>>(base?: I): BucketAllocationLine {
+    return BucketAllocationLine.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BucketAllocationLine>, I>>(object: I): BucketAllocationLine {
+    const message = createBaseBucketAllocationLine();
+    message.bucket = object.bucket ?? 0;
+    message.sourceId = object.sourceId ?? "";
+    message.credits = (object.credits !== undefined && object.credits !== null) ? BigInt(object.credits) : 0n;
+    message.dollarMicroUsd = (object.dollarMicroUsd !== undefined && object.dollarMicroUsd !== null)
+      ? BigInt(object.dollarMicroUsd)
+      : 0n;
+    message.expiresAtUnixMs = (object.expiresAtUnixMs !== undefined && object.expiresAtUnixMs !== null)
+      ? BigInt(object.expiresAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseSpendingLimitDiagnostic(): SpendingLimitDiagnostic {
+  return {
+    scope: "",
+    period: 0,
+    unit: "",
+    limit: 0n,
+    used: 0n,
+    pendingReserved: 0n,
+    requiredReserve: 0n,
+    available: 0n,
+    resetsAtUnixMs: 0n,
+    reason: "",
+  };
+}
+
+export const SpendingLimitDiagnostic: MessageFns<SpendingLimitDiagnostic> = {
+  encode(message: SpendingLimitDiagnostic, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.scope !== "") {
+      writer.uint32(10).string(message.scope);
+    }
+    if (message.period !== 0) {
+      writer.uint32(16).int32(message.period);
+    }
+    if (message.unit !== "") {
+      writer.uint32(26).string(message.unit);
+    }
+    if (message.limit !== 0n) {
+      if (BigInt.asIntN(64, message.limit) !== message.limit) {
+        throw new globalThis.Error("value provided for field message.limit of type int64 too large");
+      }
+      writer.uint32(32).int64(message.limit);
+    }
+    if (message.used !== 0n) {
+      if (BigInt.asIntN(64, message.used) !== message.used) {
+        throw new globalThis.Error("value provided for field message.used of type int64 too large");
+      }
+      writer.uint32(40).int64(message.used);
+    }
+    if (message.pendingReserved !== 0n) {
+      if (BigInt.asIntN(64, message.pendingReserved) !== message.pendingReserved) {
+        throw new globalThis.Error("value provided for field message.pendingReserved of type int64 too large");
+      }
+      writer.uint32(48).int64(message.pendingReserved);
+    }
+    if (message.requiredReserve !== 0n) {
+      if (BigInt.asIntN(64, message.requiredReserve) !== message.requiredReserve) {
+        throw new globalThis.Error("value provided for field message.requiredReserve of type int64 too large");
+      }
+      writer.uint32(56).int64(message.requiredReserve);
+    }
+    if (message.available !== 0n) {
+      if (BigInt.asIntN(64, message.available) !== message.available) {
+        throw new globalThis.Error("value provided for field message.available of type int64 too large");
+      }
+      writer.uint32(64).int64(message.available);
+    }
+    if (message.resetsAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.resetsAtUnixMs) !== message.resetsAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.resetsAtUnixMs of type int64 too large");
+      }
+      writer.uint32(72).int64(message.resetsAtUnixMs);
+    }
+    if (message.reason !== "") {
+      writer.uint32(82).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SpendingLimitDiagnostic {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSpendingLimitDiagnostic();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.scope = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.period = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.unit = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.limit = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.used = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.pendingReserved = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.requiredReserve = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.available = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.resetsAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SpendingLimitDiagnostic {
+    return {
+      scope: isSet(object.scope) ? globalThis.String(object.scope) : "",
+      period: isSet(object.period) ? budgetPeriodKindFromJSON(object.period) : 0,
+      unit: isSet(object.unit) ? globalThis.String(object.unit) : "",
+      limit: isSet(object.limit) ? BigInt(object.limit) : 0n,
+      used: isSet(object.used) ? BigInt(object.used) : 0n,
+      pendingReserved: isSet(object.pendingReserved)
+        ? BigInt(object.pendingReserved)
+        : isSet(object.pending_reserved)
+        ? BigInt(object.pending_reserved)
+        : 0n,
+      requiredReserve: isSet(object.requiredReserve)
+        ? BigInt(object.requiredReserve)
+        : isSet(object.required_reserve)
+        ? BigInt(object.required_reserve)
+        : 0n,
+      available: isSet(object.available) ? BigInt(object.available) : 0n,
+      resetsAtUnixMs: isSet(object.resetsAtUnixMs)
+        ? BigInt(object.resetsAtUnixMs)
+        : isSet(object.resets_at_unix_ms)
+        ? BigInt(object.resets_at_unix_ms)
+        : 0n,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: SpendingLimitDiagnostic): unknown {
+    const obj: any = {};
+    if (message.scope !== "") {
+      obj.scope = message.scope;
+    }
+    if (message.period !== 0) {
+      obj.period = budgetPeriodKindToJSON(message.period);
+    }
+    if (message.unit !== "") {
+      obj.unit = message.unit;
+    }
+    if (message.limit !== 0n) {
+      obj.limit = message.limit.toString();
+    }
+    if (message.used !== 0n) {
+      obj.used = message.used.toString();
+    }
+    if (message.pendingReserved !== 0n) {
+      obj.pendingReserved = message.pendingReserved.toString();
+    }
+    if (message.requiredReserve !== 0n) {
+      obj.requiredReserve = message.requiredReserve.toString();
+    }
+    if (message.available !== 0n) {
+      obj.available = message.available.toString();
+    }
+    if (message.resetsAtUnixMs !== 0n) {
+      obj.resetsAtUnixMs = message.resetsAtUnixMs.toString();
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SpendingLimitDiagnostic>, I>>(base?: I): SpendingLimitDiagnostic {
+    return SpendingLimitDiagnostic.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SpendingLimitDiagnostic>, I>>(object: I): SpendingLimitDiagnostic {
+    const message = createBaseSpendingLimitDiagnostic();
+    message.scope = object.scope ?? "";
+    message.period = object.period ?? 0;
+    message.unit = object.unit ?? "";
+    message.limit = (object.limit !== undefined && object.limit !== null) ? BigInt(object.limit) : 0n;
+    message.used = (object.used !== undefined && object.used !== null) ? BigInt(object.used) : 0n;
+    message.pendingReserved = (object.pendingReserved !== undefined && object.pendingReserved !== null)
+      ? BigInt(object.pendingReserved)
+      : 0n;
+    message.requiredReserve = (object.requiredReserve !== undefined && object.requiredReserve !== null)
+      ? BigInt(object.requiredReserve)
+      : 0n;
+    message.available = (object.available !== undefined && object.available !== null) ? BigInt(object.available) : 0n;
+    message.resetsAtUnixMs = (object.resetsAtUnixMs !== undefined && object.resetsAtUnixMs !== null)
+      ? BigInt(object.resetsAtUnixMs)
+      : 0n;
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseCreditShortfallDiagnostic(): CreditShortfallDiagnostic {
+  return { requiredReservationCredits: 0n, availableCredits: 0n, shortCredits: 0n, fundingReasons: [] };
+}
+
+export const CreditShortfallDiagnostic: MessageFns<CreditShortfallDiagnostic> = {
+  encode(message: CreditShortfallDiagnostic, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requiredReservationCredits !== 0n) {
+      if (BigInt.asIntN(64, message.requiredReservationCredits) !== message.requiredReservationCredits) {
+        throw new globalThis.Error(
+          "value provided for field message.requiredReservationCredits of type int64 too large",
+        );
+      }
+      writer.uint32(8).int64(message.requiredReservationCredits);
+    }
+    if (message.availableCredits !== 0n) {
+      if (BigInt.asIntN(64, message.availableCredits) !== message.availableCredits) {
+        throw new globalThis.Error("value provided for field message.availableCredits of type int64 too large");
+      }
+      writer.uint32(16).int64(message.availableCredits);
+    }
+    if (message.shortCredits !== 0n) {
+      if (BigInt.asIntN(64, message.shortCredits) !== message.shortCredits) {
+        throw new globalThis.Error("value provided for field message.shortCredits of type int64 too large");
+      }
+      writer.uint32(24).int64(message.shortCredits);
+    }
+    for (const v of message.fundingReasons) {
+      writer.uint32(34).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreditShortfallDiagnostic {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreditShortfallDiagnostic();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.requiredReservationCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.availableCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.shortCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.fundingReasons.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreditShortfallDiagnostic {
+    return {
+      requiredReservationCredits: isSet(object.requiredReservationCredits)
+        ? BigInt(object.requiredReservationCredits)
+        : isSet(object.required_reservation_credits)
+        ? BigInt(object.required_reservation_credits)
+        : 0n,
+      availableCredits: isSet(object.availableCredits)
+        ? BigInt(object.availableCredits)
+        : isSet(object.available_credits)
+        ? BigInt(object.available_credits)
+        : 0n,
+      shortCredits: isSet(object.shortCredits)
+        ? BigInt(object.shortCredits)
+        : isSet(object.short_credits)
+        ? BigInt(object.short_credits)
+        : 0n,
+      fundingReasons: globalThis.Array.isArray(object?.fundingReasons)
+        ? object.fundingReasons.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.funding_reasons)
+        ? object.funding_reasons.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: CreditShortfallDiagnostic): unknown {
+    const obj: any = {};
+    if (message.requiredReservationCredits !== 0n) {
+      obj.requiredReservationCredits = message.requiredReservationCredits.toString();
+    }
+    if (message.availableCredits !== 0n) {
+      obj.availableCredits = message.availableCredits.toString();
+    }
+    if (message.shortCredits !== 0n) {
+      obj.shortCredits = message.shortCredits.toString();
+    }
+    if (message.fundingReasons?.length) {
+      obj.fundingReasons = message.fundingReasons;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreditShortfallDiagnostic>, I>>(base?: I): CreditShortfallDiagnostic {
+    return CreditShortfallDiagnostic.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreditShortfallDiagnostic>, I>>(object: I): CreditShortfallDiagnostic {
+    const message = createBaseCreditShortfallDiagnostic();
+    message.requiredReservationCredits =
+      (object.requiredReservationCredits !== undefined && object.requiredReservationCredits !== null)
+        ? BigInt(object.requiredReservationCredits)
+        : 0n;
+    message.availableCredits = (object.availableCredits !== undefined && object.availableCredits !== null)
+      ? BigInt(object.availableCredits)
+      : 0n;
+    message.shortCredits = (object.shortCredits !== undefined && object.shortCredits !== null)
+      ? BigInt(object.shortCredits)
+      : 0n;
+    message.fundingReasons = object.fundingReasons?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseThresholdWarning(): ThresholdWarning {
+  return { warningKind: "", usedPercent: 0, resetsAtUnixMs: 0n };
+}
+
+export const ThresholdWarning: MessageFns<ThresholdWarning> = {
+  encode(message: ThresholdWarning, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.warningKind !== "") {
+      writer.uint32(10).string(message.warningKind);
+    }
+    if (message.usedPercent !== 0) {
+      writer.uint32(16).int32(message.usedPercent);
+    }
+    if (message.resetsAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.resetsAtUnixMs) !== message.resetsAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.resetsAtUnixMs of type int64 too large");
+      }
+      writer.uint32(24).int64(message.resetsAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ThresholdWarning {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseThresholdWarning();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.warningKind = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.usedPercent = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.resetsAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ThresholdWarning {
+    return {
+      warningKind: isSet(object.warningKind)
+        ? globalThis.String(object.warningKind)
+        : isSet(object.warning_kind)
+        ? globalThis.String(object.warning_kind)
+        : "",
+      usedPercent: isSet(object.usedPercent)
+        ? globalThis.Number(object.usedPercent)
+        : isSet(object.used_percent)
+        ? globalThis.Number(object.used_percent)
+        : 0,
+      resetsAtUnixMs: isSet(object.resetsAtUnixMs)
+        ? BigInt(object.resetsAtUnixMs)
+        : isSet(object.resets_at_unix_ms)
+        ? BigInt(object.resets_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ThresholdWarning): unknown {
+    const obj: any = {};
+    if (message.warningKind !== "") {
+      obj.warningKind = message.warningKind;
+    }
+    if (message.usedPercent !== 0) {
+      obj.usedPercent = Math.round(message.usedPercent);
+    }
+    if (message.resetsAtUnixMs !== 0n) {
+      obj.resetsAtUnixMs = message.resetsAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ThresholdWarning>, I>>(base?: I): ThresholdWarning {
+    return ThresholdWarning.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ThresholdWarning>, I>>(object: I): ThresholdWarning {
+    const message = createBaseThresholdWarning();
+    message.warningKind = object.warningKind ?? "";
+    message.usedPercent = object.usedPercent ?? 0;
+    message.resetsAtUnixMs = (object.resetsAtUnixMs !== undefined && object.resetsAtUnixMs !== null)
+      ? BigInt(object.resetsAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseLockedVersionSet(): LockedVersionSet {
+  return { catalogVersion: "", primaryRateCardVersion: "", backupRateCardVersion: "", planVersion: "", fxVersion: "" };
+}
+
+export const LockedVersionSet: MessageFns<LockedVersionSet> = {
+  encode(message: LockedVersionSet, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.catalogVersion !== "") {
+      writer.uint32(10).string(message.catalogVersion);
+    }
+    if (message.primaryRateCardVersion !== "") {
+      writer.uint32(18).string(message.primaryRateCardVersion);
+    }
+    if (message.backupRateCardVersion !== "") {
+      writer.uint32(26).string(message.backupRateCardVersion);
+    }
+    if (message.planVersion !== "") {
+      writer.uint32(34).string(message.planVersion);
+    }
+    if (message.fxVersion !== "") {
+      writer.uint32(42).string(message.fxVersion);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LockedVersionSet {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLockedVersionSet();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.catalogVersion = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.primaryRateCardVersion = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.backupRateCardVersion = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.planVersion = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.fxVersion = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LockedVersionSet {
+    return {
+      catalogVersion: isSet(object.catalogVersion)
+        ? globalThis.String(object.catalogVersion)
+        : isSet(object.catalog_version)
+        ? globalThis.String(object.catalog_version)
+        : "",
+      primaryRateCardVersion: isSet(object.primaryRateCardVersion)
+        ? globalThis.String(object.primaryRateCardVersion)
+        : isSet(object.primary_rate_card_version)
+        ? globalThis.String(object.primary_rate_card_version)
+        : "",
+      backupRateCardVersion: isSet(object.backupRateCardVersion)
+        ? globalThis.String(object.backupRateCardVersion)
+        : isSet(object.backup_rate_card_version)
+        ? globalThis.String(object.backup_rate_card_version)
+        : "",
+      planVersion: isSet(object.planVersion)
+        ? globalThis.String(object.planVersion)
+        : isSet(object.plan_version)
+        ? globalThis.String(object.plan_version)
+        : "",
+      fxVersion: isSet(object.fxVersion)
+        ? globalThis.String(object.fxVersion)
+        : isSet(object.fx_version)
+        ? globalThis.String(object.fx_version)
+        : "",
+    };
+  },
+
+  toJSON(message: LockedVersionSet): unknown {
+    const obj: any = {};
+    if (message.catalogVersion !== "") {
+      obj.catalogVersion = message.catalogVersion;
+    }
+    if (message.primaryRateCardVersion !== "") {
+      obj.primaryRateCardVersion = message.primaryRateCardVersion;
+    }
+    if (message.backupRateCardVersion !== "") {
+      obj.backupRateCardVersion = message.backupRateCardVersion;
+    }
+    if (message.planVersion !== "") {
+      obj.planVersion = message.planVersion;
+    }
+    if (message.fxVersion !== "") {
+      obj.fxVersion = message.fxVersion;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LockedVersionSet>, I>>(base?: I): LockedVersionSet {
+    return LockedVersionSet.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LockedVersionSet>, I>>(object: I): LockedVersionSet {
+    const message = createBaseLockedVersionSet();
+    message.catalogVersion = object.catalogVersion ?? "";
+    message.primaryRateCardVersion = object.primaryRateCardVersion ?? "";
+    message.backupRateCardVersion = object.backupRateCardVersion ?? "";
+    message.planVersion = object.planVersion ?? "";
+    message.fxVersion = object.fxVersion ?? "";
+    return message;
+  },
+};
+
+function createBaseResolvePrincipalScopeRequest(): ResolvePrincipalScopeRequest {
+  return { apiKeySha256: "", internalAccountId: "", clientRegion: "" };
+}
+
+export const ResolvePrincipalScopeRequest: MessageFns<ResolvePrincipalScopeRequest> = {
+  encode(message: ResolvePrincipalScopeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.apiKeySha256 !== "") {
+      writer.uint32(10).string(message.apiKeySha256);
+    }
+    if (message.internalAccountId !== "") {
+      writer.uint32(18).string(message.internalAccountId);
+    }
+    if (message.clientRegion !== "") {
+      writer.uint32(26).string(message.clientRegion);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolvePrincipalScopeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolvePrincipalScopeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.apiKeySha256 = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.internalAccountId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.clientRegion = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolvePrincipalScopeRequest {
+    return {
+      apiKeySha256: isSet(object.apiKeySha256)
+        ? globalThis.String(object.apiKeySha256)
+        : isSet(object.api_key_sha256)
+        ? globalThis.String(object.api_key_sha256)
+        : "",
+      internalAccountId: isSet(object.internalAccountId)
+        ? globalThis.String(object.internalAccountId)
+        : isSet(object.internal_account_id)
+        ? globalThis.String(object.internal_account_id)
+        : "",
+      clientRegion: isSet(object.clientRegion)
+        ? globalThis.String(object.clientRegion)
+        : isSet(object.client_region)
+        ? globalThis.String(object.client_region)
+        : "",
+    };
+  },
+
+  toJSON(message: ResolvePrincipalScopeRequest): unknown {
+    const obj: any = {};
+    if (message.apiKeySha256 !== "") {
+      obj.apiKeySha256 = message.apiKeySha256;
+    }
+    if (message.internalAccountId !== "") {
+      obj.internalAccountId = message.internalAccountId;
+    }
+    if (message.clientRegion !== "") {
+      obj.clientRegion = message.clientRegion;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolvePrincipalScopeRequest>, I>>(base?: I): ResolvePrincipalScopeRequest {
+    return ResolvePrincipalScopeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolvePrincipalScopeRequest>, I>>(object: I): ResolvePrincipalScopeRequest {
+    const message = createBaseResolvePrincipalScopeRequest();
+    message.apiKeySha256 = object.apiKeySha256 ?? "";
+    message.internalAccountId = object.internalAccountId ?? "";
+    message.clientRegion = object.clientRegion ?? "";
+    return message;
+  },
+};
+
+function createBaseResolvePrincipalScopeResponse(): ResolvePrincipalScopeResponse {
+  return {
+    authenticated: false,
+    rejectCode: 0,
+    rejectMessage: "",
+    accountId: "",
+    apiKeyId: "",
+    keyFundingStrategy: 0,
+    allowAitEarnedCredit: false,
+    dollarRelayEnabled: false,
+    allowBasicToPremium: false,
+    allowedCatalogIds: [],
+    modelAllowlist: [],
+    activePlanId: "",
+    planBasicGroupIds: [],
+    planPremiumGroupIds: [],
+  };
+}
+
+export const ResolvePrincipalScopeResponse: MessageFns<ResolvePrincipalScopeResponse> = {
+  encode(message: ResolvePrincipalScopeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.authenticated !== false) {
+      writer.uint32(8).bool(message.authenticated);
+    }
+    if (message.rejectCode !== 0) {
+      writer.uint32(16).int32(message.rejectCode);
+    }
+    if (message.rejectMessage !== "") {
+      writer.uint32(26).string(message.rejectMessage);
+    }
+    if (message.accountId !== "") {
+      writer.uint32(34).string(message.accountId);
+    }
+    if (message.apiKeyId !== "") {
+      writer.uint32(42).string(message.apiKeyId);
+    }
+    if (message.keyFundingStrategy !== 0) {
+      writer.uint32(48).int32(message.keyFundingStrategy);
+    }
+    if (message.allowAitEarnedCredit !== false) {
+      writer.uint32(56).bool(message.allowAitEarnedCredit);
+    }
+    if (message.dollarRelayEnabled !== false) {
+      writer.uint32(64).bool(message.dollarRelayEnabled);
+    }
+    if (message.allowBasicToPremium !== false) {
+      writer.uint32(72).bool(message.allowBasicToPremium);
+    }
+    for (const v of message.allowedCatalogIds) {
+      writer.uint32(82).string(v!);
+    }
+    for (const v of message.modelAllowlist) {
+      writer.uint32(90).string(v!);
+    }
+    if (message.activePlanId !== "") {
+      writer.uint32(98).string(message.activePlanId);
+    }
+    for (const v of message.planBasicGroupIds) {
+      writer.uint32(106).string(v!);
+    }
+    for (const v of message.planPremiumGroupIds) {
+      writer.uint32(114).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolvePrincipalScopeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolvePrincipalScopeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.authenticated = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.rejectCode = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.rejectMessage = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.keyFundingStrategy = reader.int32() as any;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.allowAitEarnedCredit = reader.bool();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.dollarRelayEnabled = reader.bool();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.allowBasicToPremium = reader.bool();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.allowedCatalogIds.push(reader.string());
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.modelAllowlist.push(reader.string());
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.activePlanId = reader.string();
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.planBasicGroupIds.push(reader.string());
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.planPremiumGroupIds.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolvePrincipalScopeResponse {
+    return {
+      authenticated: isSet(object.authenticated) ? globalThis.Boolean(object.authenticated) : false,
+      rejectCode: isSet(object.rejectCode)
+        ? rejectCodeFromJSON(object.rejectCode)
+        : isSet(object.reject_code)
+        ? rejectCodeFromJSON(object.reject_code)
+        : 0,
+      rejectMessage: isSet(object.rejectMessage)
+        ? globalThis.String(object.rejectMessage)
+        : isSet(object.reject_message)
+        ? globalThis.String(object.reject_message)
+        : "",
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      keyFundingStrategy: isSet(object.keyFundingStrategy)
+        ? keyFundingStrategyFromJSON(object.keyFundingStrategy)
+        : isSet(object.key_funding_strategy)
+        ? keyFundingStrategyFromJSON(object.key_funding_strategy)
+        : 0,
+      allowAitEarnedCredit: isSet(object.allowAitEarnedCredit)
+        ? globalThis.Boolean(object.allowAitEarnedCredit)
+        : isSet(object.allow_ait_earned_credit)
+        ? globalThis.Boolean(object.allow_ait_earned_credit)
+        : false,
+      dollarRelayEnabled: isSet(object.dollarRelayEnabled)
+        ? globalThis.Boolean(object.dollarRelayEnabled)
+        : isSet(object.dollar_relay_enabled)
+        ? globalThis.Boolean(object.dollar_relay_enabled)
+        : false,
+      allowBasicToPremium: isSet(object.allowBasicToPremium)
+        ? globalThis.Boolean(object.allowBasicToPremium)
+        : isSet(object.allow_basic_to_premium)
+        ? globalThis.Boolean(object.allow_basic_to_premium)
+        : false,
+      allowedCatalogIds: globalThis.Array.isArray(object?.allowedCatalogIds)
+        ? object.allowedCatalogIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.allowed_catalog_ids)
+        ? object.allowed_catalog_ids.map((e: any) => globalThis.String(e))
+        : [],
+      modelAllowlist: globalThis.Array.isArray(object?.modelAllowlist)
+        ? object.modelAllowlist.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.model_allowlist)
+        ? object.model_allowlist.map((e: any) => globalThis.String(e))
+        : [],
+      activePlanId: isSet(object.activePlanId)
+        ? globalThis.String(object.activePlanId)
+        : isSet(object.active_plan_id)
+        ? globalThis.String(object.active_plan_id)
+        : "",
+      planBasicGroupIds: globalThis.Array.isArray(object?.planBasicGroupIds)
+        ? object.planBasicGroupIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.plan_basic_group_ids)
+        ? object.plan_basic_group_ids.map((e: any) => globalThis.String(e))
+        : [],
+      planPremiumGroupIds: globalThis.Array.isArray(object?.planPremiumGroupIds)
+        ? object.planPremiumGroupIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.plan_premium_group_ids)
+        ? object.plan_premium_group_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ResolvePrincipalScopeResponse): unknown {
+    const obj: any = {};
+    if (message.authenticated !== false) {
+      obj.authenticated = message.authenticated;
+    }
+    if (message.rejectCode !== 0) {
+      obj.rejectCode = rejectCodeToJSON(message.rejectCode);
+    }
+    if (message.rejectMessage !== "") {
+      obj.rejectMessage = message.rejectMessage;
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.keyFundingStrategy !== 0) {
+      obj.keyFundingStrategy = keyFundingStrategyToJSON(message.keyFundingStrategy);
+    }
+    if (message.allowAitEarnedCredit !== false) {
+      obj.allowAitEarnedCredit = message.allowAitEarnedCredit;
+    }
+    if (message.dollarRelayEnabled !== false) {
+      obj.dollarRelayEnabled = message.dollarRelayEnabled;
+    }
+    if (message.allowBasicToPremium !== false) {
+      obj.allowBasicToPremium = message.allowBasicToPremium;
+    }
+    if (message.allowedCatalogIds?.length) {
+      obj.allowedCatalogIds = message.allowedCatalogIds;
+    }
+    if (message.modelAllowlist?.length) {
+      obj.modelAllowlist = message.modelAllowlist;
+    }
+    if (message.activePlanId !== "") {
+      obj.activePlanId = message.activePlanId;
+    }
+    if (message.planBasicGroupIds?.length) {
+      obj.planBasicGroupIds = message.planBasicGroupIds;
+    }
+    if (message.planPremiumGroupIds?.length) {
+      obj.planPremiumGroupIds = message.planPremiumGroupIds;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolvePrincipalScopeResponse>, I>>(base?: I): ResolvePrincipalScopeResponse {
+    return ResolvePrincipalScopeResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolvePrincipalScopeResponse>, I>>(
+    object: I,
+  ): ResolvePrincipalScopeResponse {
+    const message = createBaseResolvePrincipalScopeResponse();
+    message.authenticated = object.authenticated ?? false;
+    message.rejectCode = object.rejectCode ?? 0;
+    message.rejectMessage = object.rejectMessage ?? "";
+    message.accountId = object.accountId ?? "";
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.keyFundingStrategy = object.keyFundingStrategy ?? 0;
+    message.allowAitEarnedCredit = object.allowAitEarnedCredit ?? false;
+    message.dollarRelayEnabled = object.dollarRelayEnabled ?? false;
+    message.allowBasicToPremium = object.allowBasicToPremium ?? false;
+    message.allowedCatalogIds = object.allowedCatalogIds?.map((e) => e) || [];
+    message.modelAllowlist = object.modelAllowlist?.map((e) => e) || [];
+    message.activePlanId = object.activePlanId ?? "";
+    message.planBasicGroupIds = object.planBasicGroupIds?.map((e) => e) || [];
+    message.planPremiumGroupIds = object.planPremiumGroupIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBasePreviewQuoteRequest(): PreviewQuoteRequest {
+  return {
+    apiKeySha256: "",
+    internalAccountId: "",
+    channel: 0,
+    modality: 0,
+    selectionMode: 0,
+    modelId: "",
+    catalogVersion: "",
+    primaryOfferingId: "",
+    backupOfferingId: "",
+    estimateBound: undefined,
+    hardMaxBound: undefined,
+    callerCeilingMicroUsd: 0n,
+    zeroRetention: false,
+    clientRegion: "",
+  };
+}
+
+export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
+  encode(message: PreviewQuoteRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.apiKeySha256 !== "") {
+      writer.uint32(10).string(message.apiKeySha256);
+    }
+    if (message.internalAccountId !== "") {
+      writer.uint32(18).string(message.internalAccountId);
+    }
+    if (message.channel !== 0) {
+      writer.uint32(24).int32(message.channel);
+    }
+    if (message.modality !== 0) {
+      writer.uint32(32).int32(message.modality);
+    }
+    if (message.selectionMode !== 0) {
+      writer.uint32(40).int32(message.selectionMode);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(50).string(message.modelId);
+    }
+    if (message.catalogVersion !== "") {
+      writer.uint32(58).string(message.catalogVersion);
+    }
+    if (message.primaryOfferingId !== "") {
+      writer.uint32(66).string(message.primaryOfferingId);
+    }
+    if (message.backupOfferingId !== "") {
+      writer.uint32(74).string(message.backupOfferingId);
+    }
+    if (message.estimateBound !== undefined) {
+      UsageBound.encode(message.estimateBound, writer.uint32(82).fork()).join();
+    }
+    if (message.hardMaxBound !== undefined) {
+      UsageBound.encode(message.hardMaxBound, writer.uint32(90).fork()).join();
+    }
+    if (message.callerCeilingMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.callerCeilingMicroUsd) !== message.callerCeilingMicroUsd) {
+        throw new globalThis.Error("value provided for field message.callerCeilingMicroUsd of type int64 too large");
+      }
+      writer.uint32(96).int64(message.callerCeilingMicroUsd);
+    }
+    if (message.zeroRetention !== false) {
+      writer.uint32(104).bool(message.zeroRetention);
+    }
+    if (message.clientRegion !== "") {
+      writer.uint32(114).string(message.clientRegion);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewQuoteRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePreviewQuoteRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.apiKeySha256 = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.internalAccountId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.channel = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.modality = reader.int32() as any;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.selectionMode = reader.int32() as any;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.modelId = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.catalogVersion = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.primaryOfferingId = reader.string();
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.backupOfferingId = reader.string();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.estimateBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.hardMaxBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.callerCeilingMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.zeroRetention = reader.bool();
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.clientRegion = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PreviewQuoteRequest {
+    return {
+      apiKeySha256: isSet(object.apiKeySha256)
+        ? globalThis.String(object.apiKeySha256)
+        : isSet(object.api_key_sha256)
+        ? globalThis.String(object.api_key_sha256)
+        : "",
+      internalAccountId: isSet(object.internalAccountId)
+        ? globalThis.String(object.internalAccountId)
+        : isSet(object.internal_account_id)
+        ? globalThis.String(object.internal_account_id)
+        : "",
+      channel: isSet(object.channel) ? executionChannelFromJSON(object.channel) : 0,
+      modality: isSet(object.modality) ? modalityFromJSON(object.modality) : 0,
+      selectionMode: isSet(object.selectionMode)
+        ? routeSelectionModeFromJSON(object.selectionMode)
+        : isSet(object.selection_mode)
+        ? routeSelectionModeFromJSON(object.selection_mode)
+        : 0,
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : "",
+      catalogVersion: isSet(object.catalogVersion)
+        ? globalThis.String(object.catalogVersion)
+        : isSet(object.catalog_version)
+        ? globalThis.String(object.catalog_version)
+        : "",
+      primaryOfferingId: isSet(object.primaryOfferingId)
+        ? globalThis.String(object.primaryOfferingId)
+        : isSet(object.primary_offering_id)
+        ? globalThis.String(object.primary_offering_id)
+        : "",
+      backupOfferingId: isSet(object.backupOfferingId)
+        ? globalThis.String(object.backupOfferingId)
+        : isSet(object.backup_offering_id)
+        ? globalThis.String(object.backup_offering_id)
+        : "",
+      estimateBound: isSet(object.estimateBound)
+        ? UsageBound.fromJSON(object.estimateBound)
+        : isSet(object.estimate_bound)
+        ? UsageBound.fromJSON(object.estimate_bound)
+        : undefined,
+      hardMaxBound: isSet(object.hardMaxBound)
+        ? UsageBound.fromJSON(object.hardMaxBound)
+        : isSet(object.hard_max_bound)
+        ? UsageBound.fromJSON(object.hard_max_bound)
+        : undefined,
+      callerCeilingMicroUsd: isSet(object.callerCeilingMicroUsd)
+        ? BigInt(object.callerCeilingMicroUsd)
+        : isSet(object.caller_ceiling_micro_usd)
+        ? BigInt(object.caller_ceiling_micro_usd)
+        : 0n,
+      zeroRetention: isSet(object.zeroRetention)
+        ? globalThis.Boolean(object.zeroRetention)
+        : isSet(object.zero_retention)
+        ? globalThis.Boolean(object.zero_retention)
+        : false,
+      clientRegion: isSet(object.clientRegion)
+        ? globalThis.String(object.clientRegion)
+        : isSet(object.client_region)
+        ? globalThis.String(object.client_region)
+        : "",
+    };
+  },
+
+  toJSON(message: PreviewQuoteRequest): unknown {
+    const obj: any = {};
+    if (message.apiKeySha256 !== "") {
+      obj.apiKeySha256 = message.apiKeySha256;
+    }
+    if (message.internalAccountId !== "") {
+      obj.internalAccountId = message.internalAccountId;
+    }
+    if (message.channel !== 0) {
+      obj.channel = executionChannelToJSON(message.channel);
+    }
+    if (message.modality !== 0) {
+      obj.modality = modalityToJSON(message.modality);
+    }
+    if (message.selectionMode !== 0) {
+      obj.selectionMode = routeSelectionModeToJSON(message.selectionMode);
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.catalogVersion !== "") {
+      obj.catalogVersion = message.catalogVersion;
+    }
+    if (message.primaryOfferingId !== "") {
+      obj.primaryOfferingId = message.primaryOfferingId;
+    }
+    if (message.backupOfferingId !== "") {
+      obj.backupOfferingId = message.backupOfferingId;
+    }
+    if (message.estimateBound !== undefined) {
+      obj.estimateBound = UsageBound.toJSON(message.estimateBound);
+    }
+    if (message.hardMaxBound !== undefined) {
+      obj.hardMaxBound = UsageBound.toJSON(message.hardMaxBound);
+    }
+    if (message.callerCeilingMicroUsd !== 0n) {
+      obj.callerCeilingMicroUsd = message.callerCeilingMicroUsd.toString();
+    }
+    if (message.zeroRetention !== false) {
+      obj.zeroRetention = message.zeroRetention;
+    }
+    if (message.clientRegion !== "") {
+      obj.clientRegion = message.clientRegion;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PreviewQuoteRequest>, I>>(base?: I): PreviewQuoteRequest {
+    return PreviewQuoteRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PreviewQuoteRequest>, I>>(object: I): PreviewQuoteRequest {
+    const message = createBasePreviewQuoteRequest();
+    message.apiKeySha256 = object.apiKeySha256 ?? "";
+    message.internalAccountId = object.internalAccountId ?? "";
+    message.channel = object.channel ?? 0;
+    message.modality = object.modality ?? 0;
+    message.selectionMode = object.selectionMode ?? 0;
+    message.modelId = object.modelId ?? "";
+    message.catalogVersion = object.catalogVersion ?? "";
+    message.primaryOfferingId = object.primaryOfferingId ?? "";
+    message.backupOfferingId = object.backupOfferingId ?? "";
+    message.estimateBound = (object.estimateBound !== undefined && object.estimateBound !== null)
+      ? UsageBound.fromPartial(object.estimateBound)
+      : undefined;
+    message.hardMaxBound = (object.hardMaxBound !== undefined && object.hardMaxBound !== null)
+      ? UsageBound.fromPartial(object.hardMaxBound)
+      : undefined;
+    message.callerCeilingMicroUsd =
+      (object.callerCeilingMicroUsd !== undefined && object.callerCeilingMicroUsd !== null)
+        ? BigInt(object.callerCeilingMicroUsd)
+        : 0n;
+    message.zeroRetention = object.zeroRetention ?? false;
+    message.clientRegion = object.clientRegion ?? "";
+    return message;
+  },
+};
+
+function createBasePreviewQuoteResponse(): PreviewQuoteResponse {
+  return {
+    eligible: false,
+    rejectCode: 0,
+    rejectMessage: "",
+    estimatedCredits: 0n,
+    hardMaxCredits: 0n,
+    hardMaxMicroUsd: 0n,
+    usesFreeModelQuota: false,
+    freeModelQuotaExhaustedFallback: false,
+    requiresDollarConfirmation: false,
+    maxDollarDebitMicroUsd: 0n,
+    basicToPremiumProjected: false,
+    breakdown: [],
+    projectedHoldBuckets: [],
+    budgetDiagnostic: undefined,
+    creditDiagnostic: undefined,
+  };
+}
+
+export const PreviewQuoteResponse: MessageFns<PreviewQuoteResponse> = {
+  encode(message: PreviewQuoteResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.eligible !== false) {
+      writer.uint32(8).bool(message.eligible);
+    }
+    if (message.rejectCode !== 0) {
+      writer.uint32(16).int32(message.rejectCode);
+    }
+    if (message.rejectMessage !== "") {
+      writer.uint32(26).string(message.rejectMessage);
+    }
+    if (message.estimatedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.estimatedCredits) !== message.estimatedCredits) {
+        throw new globalThis.Error("value provided for field message.estimatedCredits of type int64 too large");
+      }
+      writer.uint32(32).int64(message.estimatedCredits);
+    }
+    if (message.hardMaxCredits !== 0n) {
+      if (BigInt.asIntN(64, message.hardMaxCredits) !== message.hardMaxCredits) {
+        throw new globalThis.Error("value provided for field message.hardMaxCredits of type int64 too large");
+      }
+      writer.uint32(40).int64(message.hardMaxCredits);
+    }
+    if (message.hardMaxMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.hardMaxMicroUsd) !== message.hardMaxMicroUsd) {
+        throw new globalThis.Error("value provided for field message.hardMaxMicroUsd of type int64 too large");
+      }
+      writer.uint32(48).int64(message.hardMaxMicroUsd);
+    }
+    if (message.usesFreeModelQuota !== false) {
+      writer.uint32(56).bool(message.usesFreeModelQuota);
+    }
+    if (message.freeModelQuotaExhaustedFallback !== false) {
+      writer.uint32(64).bool(message.freeModelQuotaExhaustedFallback);
+    }
+    if (message.requiresDollarConfirmation !== false) {
+      writer.uint32(72).bool(message.requiresDollarConfirmation);
+    }
+    if (message.maxDollarDebitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.maxDollarDebitMicroUsd) !== message.maxDollarDebitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.maxDollarDebitMicroUsd of type int64 too large");
+      }
+      writer.uint32(80).int64(message.maxDollarDebitMicroUsd);
+    }
+    if (message.basicToPremiumProjected !== false) {
+      writer.uint32(88).bool(message.basicToPremiumProjected);
+    }
+    for (const v of message.breakdown) {
+      QuoteComponentLine.encode(v!, writer.uint32(98).fork()).join();
+    }
+    for (const v of message.projectedHoldBuckets) {
+      BucketAllocationLine.encode(v!, writer.uint32(106).fork()).join();
+    }
+    if (message.budgetDiagnostic !== undefined) {
+      SpendingLimitDiagnostic.encode(message.budgetDiagnostic, writer.uint32(114).fork()).join();
+    }
+    if (message.creditDiagnostic !== undefined) {
+      CreditShortfallDiagnostic.encode(message.creditDiagnostic, writer.uint32(122).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewQuoteResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePreviewQuoteResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.eligible = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.rejectCode = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.rejectMessage = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.estimatedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.hardMaxCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.hardMaxMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.usesFreeModelQuota = reader.bool();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.freeModelQuotaExhaustedFallback = reader.bool();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.requiresDollarConfirmation = reader.bool();
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.maxDollarDebitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.basicToPremiumProjected = reader.bool();
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.breakdown.push(QuoteComponentLine.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
+              break;
+            }
+
+            message.projectedHoldBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.budgetDiagnostic = SpendingLimitDiagnostic.decode(reader, reader.uint32());
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.creditDiagnostic = CreditShortfallDiagnostic.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PreviewQuoteResponse {
+    return {
+      eligible: isSet(object.eligible) ? globalThis.Boolean(object.eligible) : false,
+      rejectCode: isSet(object.rejectCode)
+        ? rejectCodeFromJSON(object.rejectCode)
+        : isSet(object.reject_code)
+        ? rejectCodeFromJSON(object.reject_code)
+        : 0,
+      rejectMessage: isSet(object.rejectMessage)
+        ? globalThis.String(object.rejectMessage)
+        : isSet(object.reject_message)
+        ? globalThis.String(object.reject_message)
+        : "",
+      estimatedCredits: isSet(object.estimatedCredits)
+        ? BigInt(object.estimatedCredits)
+        : isSet(object.estimated_credits)
+        ? BigInt(object.estimated_credits)
+        : 0n,
+      hardMaxCredits: isSet(object.hardMaxCredits)
+        ? BigInt(object.hardMaxCredits)
+        : isSet(object.hard_max_credits)
+        ? BigInt(object.hard_max_credits)
+        : 0n,
+      hardMaxMicroUsd: isSet(object.hardMaxMicroUsd)
+        ? BigInt(object.hardMaxMicroUsd)
+        : isSet(object.hard_max_micro_usd)
+        ? BigInt(object.hard_max_micro_usd)
+        : 0n,
+      usesFreeModelQuota: isSet(object.usesFreeModelQuota)
+        ? globalThis.Boolean(object.usesFreeModelQuota)
+        : isSet(object.uses_free_model_quota)
+        ? globalThis.Boolean(object.uses_free_model_quota)
+        : false,
+      freeModelQuotaExhaustedFallback: isSet(object.freeModelQuotaExhaustedFallback)
+        ? globalThis.Boolean(object.freeModelQuotaExhaustedFallback)
+        : isSet(object.free_model_quota_exhausted_fallback)
+        ? globalThis.Boolean(object.free_model_quota_exhausted_fallback)
+        : false,
+      requiresDollarConfirmation: isSet(object.requiresDollarConfirmation)
+        ? globalThis.Boolean(object.requiresDollarConfirmation)
+        : isSet(object.requires_dollar_confirmation)
+        ? globalThis.Boolean(object.requires_dollar_confirmation)
+        : false,
+      maxDollarDebitMicroUsd: isSet(object.maxDollarDebitMicroUsd)
+        ? BigInt(object.maxDollarDebitMicroUsd)
+        : isSet(object.max_dollar_debit_micro_usd)
+        ? BigInt(object.max_dollar_debit_micro_usd)
+        : 0n,
+      basicToPremiumProjected: isSet(object.basicToPremiumProjected)
+        ? globalThis.Boolean(object.basicToPremiumProjected)
+        : isSet(object.basic_to_premium_projected)
+        ? globalThis.Boolean(object.basic_to_premium_projected)
+        : false,
+      breakdown: globalThis.Array.isArray(object?.breakdown)
+        ? object.breakdown.map((e: any) => QuoteComponentLine.fromJSON(e))
+        : [],
+      projectedHoldBuckets: globalThis.Array.isArray(object?.projectedHoldBuckets)
+        ? object.projectedHoldBuckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : globalThis.Array.isArray(object?.projected_hold_buckets)
+        ? object.projected_hold_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : [],
+      budgetDiagnostic: isSet(object.budgetDiagnostic)
+        ? SpendingLimitDiagnostic.fromJSON(object.budgetDiagnostic)
+        : isSet(object.budget_diagnostic)
+        ? SpendingLimitDiagnostic.fromJSON(object.budget_diagnostic)
+        : undefined,
+      creditDiagnostic: isSet(object.creditDiagnostic)
+        ? CreditShortfallDiagnostic.fromJSON(object.creditDiagnostic)
+        : isSet(object.credit_diagnostic)
+        ? CreditShortfallDiagnostic.fromJSON(object.credit_diagnostic)
+        : undefined,
+    };
+  },
+
+  toJSON(message: PreviewQuoteResponse): unknown {
+    const obj: any = {};
+    if (message.eligible !== false) {
+      obj.eligible = message.eligible;
+    }
+    if (message.rejectCode !== 0) {
+      obj.rejectCode = rejectCodeToJSON(message.rejectCode);
+    }
+    if (message.rejectMessage !== "") {
+      obj.rejectMessage = message.rejectMessage;
+    }
+    if (message.estimatedCredits !== 0n) {
+      obj.estimatedCredits = message.estimatedCredits.toString();
+    }
+    if (message.hardMaxCredits !== 0n) {
+      obj.hardMaxCredits = message.hardMaxCredits.toString();
+    }
+    if (message.hardMaxMicroUsd !== 0n) {
+      obj.hardMaxMicroUsd = message.hardMaxMicroUsd.toString();
+    }
+    if (message.usesFreeModelQuota !== false) {
+      obj.usesFreeModelQuota = message.usesFreeModelQuota;
+    }
+    if (message.freeModelQuotaExhaustedFallback !== false) {
+      obj.freeModelQuotaExhaustedFallback = message.freeModelQuotaExhaustedFallback;
+    }
+    if (message.requiresDollarConfirmation !== false) {
+      obj.requiresDollarConfirmation = message.requiresDollarConfirmation;
+    }
+    if (message.maxDollarDebitMicroUsd !== 0n) {
+      obj.maxDollarDebitMicroUsd = message.maxDollarDebitMicroUsd.toString();
+    }
+    if (message.basicToPremiumProjected !== false) {
+      obj.basicToPremiumProjected = message.basicToPremiumProjected;
+    }
+    if (message.breakdown?.length) {
+      obj.breakdown = message.breakdown.map((e) => QuoteComponentLine.toJSON(e));
+    }
+    if (message.projectedHoldBuckets?.length) {
+      obj.projectedHoldBuckets = message.projectedHoldBuckets.map((e) => BucketAllocationLine.toJSON(e));
+    }
+    if (message.budgetDiagnostic !== undefined) {
+      obj.budgetDiagnostic = SpendingLimitDiagnostic.toJSON(message.budgetDiagnostic);
+    }
+    if (message.creditDiagnostic !== undefined) {
+      obj.creditDiagnostic = CreditShortfallDiagnostic.toJSON(message.creditDiagnostic);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PreviewQuoteResponse>, I>>(base?: I): PreviewQuoteResponse {
+    return PreviewQuoteResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PreviewQuoteResponse>, I>>(object: I): PreviewQuoteResponse {
+    const message = createBasePreviewQuoteResponse();
+    message.eligible = object.eligible ?? false;
+    message.rejectCode = object.rejectCode ?? 0;
+    message.rejectMessage = object.rejectMessage ?? "";
+    message.estimatedCredits = (object.estimatedCredits !== undefined && object.estimatedCredits !== null)
+      ? BigInt(object.estimatedCredits)
+      : 0n;
+    message.hardMaxCredits = (object.hardMaxCredits !== undefined && object.hardMaxCredits !== null)
+      ? BigInt(object.hardMaxCredits)
+      : 0n;
+    message.hardMaxMicroUsd = (object.hardMaxMicroUsd !== undefined && object.hardMaxMicroUsd !== null)
+      ? BigInt(object.hardMaxMicroUsd)
+      : 0n;
+    message.usesFreeModelQuota = object.usesFreeModelQuota ?? false;
+    message.freeModelQuotaExhaustedFallback = object.freeModelQuotaExhaustedFallback ?? false;
+    message.requiresDollarConfirmation = object.requiresDollarConfirmation ?? false;
+    message.maxDollarDebitMicroUsd =
+      (object.maxDollarDebitMicroUsd !== undefined && object.maxDollarDebitMicroUsd !== null)
+        ? BigInt(object.maxDollarDebitMicroUsd)
+        : 0n;
+    message.basicToPremiumProjected = object.basicToPremiumProjected ?? false;
+    message.breakdown = object.breakdown?.map((e) => QuoteComponentLine.fromPartial(e)) || [];
+    message.projectedHoldBuckets = object.projectedHoldBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    message.budgetDiagnostic = (object.budgetDiagnostic !== undefined && object.budgetDiagnostic !== null)
+      ? SpendingLimitDiagnostic.fromPartial(object.budgetDiagnostic)
+      : undefined;
+    message.creditDiagnostic = (object.creditDiagnostic !== undefined && object.creditDiagnostic !== null)
+      ? CreditShortfallDiagnostic.fromPartial(object.creditDiagnostic)
+      : undefined;
+    return message;
+  },
+};
 
 function createBaseAuthorizeAndHoldRequest(): AuthorizeAndHoldRequest {
   return {
     traceId: "",
+    idempotencyScope: "",
     idempotencyKey: "",
     requestBodySha256: "",
     apiKeySha256: "",
     internalAccountId: "",
     channel: 0,
     modality: 0,
+    selectionMode: 0,
+    requestedModelId: "",
     modelId: "",
+    autoTaskLabel: "",
     catalogVersion: "",
     primaryOfferingId: "",
     backupOfferingId: "",
-    inputTokensUpper: 0n,
-    effectiveMaxOutputTokens: 0n,
+    estimateBound: undefined,
+    hardMaxBound: undefined,
     callerCeilingMicroUsd: 0n,
     dollarConfirmed: false,
+    zeroRetention: false,
+    clientRegion: "",
+    studioOperationId: "",
+    initialLeaseTtlMs: 0n,
   };
 }
 
@@ -227,56 +3411,77 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     if (message.traceId !== "") {
       writer.uint32(10).string(message.traceId);
     }
+    if (message.idempotencyScope !== "") {
+      writer.uint32(18).string(message.idempotencyScope);
+    }
     if (message.idempotencyKey !== "") {
-      writer.uint32(18).string(message.idempotencyKey);
+      writer.uint32(26).string(message.idempotencyKey);
     }
     if (message.requestBodySha256 !== "") {
-      writer.uint32(26).string(message.requestBodySha256);
+      writer.uint32(34).string(message.requestBodySha256);
     }
     if (message.apiKeySha256 !== "") {
-      writer.uint32(34).string(message.apiKeySha256);
+      writer.uint32(42).string(message.apiKeySha256);
     }
     if (message.internalAccountId !== "") {
-      writer.uint32(42).string(message.internalAccountId);
+      writer.uint32(50).string(message.internalAccountId);
     }
     if (message.channel !== 0) {
-      writer.uint32(48).int32(message.channel);
+      writer.uint32(56).int32(message.channel);
     }
     if (message.modality !== 0) {
-      writer.uint32(56).int32(message.modality);
+      writer.uint32(64).int32(message.modality);
+    }
+    if (message.selectionMode !== 0) {
+      writer.uint32(72).int32(message.selectionMode);
+    }
+    if (message.requestedModelId !== "") {
+      writer.uint32(82).string(message.requestedModelId);
     }
     if (message.modelId !== "") {
-      writer.uint32(66).string(message.modelId);
+      writer.uint32(90).string(message.modelId);
+    }
+    if (message.autoTaskLabel !== "") {
+      writer.uint32(98).string(message.autoTaskLabel);
     }
     if (message.catalogVersion !== "") {
-      writer.uint32(74).string(message.catalogVersion);
+      writer.uint32(106).string(message.catalogVersion);
     }
     if (message.primaryOfferingId !== "") {
-      writer.uint32(82).string(message.primaryOfferingId);
+      writer.uint32(114).string(message.primaryOfferingId);
     }
     if (message.backupOfferingId !== "") {
-      writer.uint32(90).string(message.backupOfferingId);
+      writer.uint32(122).string(message.backupOfferingId);
     }
-    if (message.inputTokensUpper !== 0n) {
-      if (BigInt.asIntN(64, message.inputTokensUpper) !== message.inputTokensUpper) {
-        throw new globalThis.Error("value provided for field message.inputTokensUpper of type int64 too large");
-      }
-      writer.uint32(96).int64(message.inputTokensUpper);
+    if (message.estimateBound !== undefined) {
+      UsageBound.encode(message.estimateBound, writer.uint32(130).fork()).join();
     }
-    if (message.effectiveMaxOutputTokens !== 0n) {
-      if (BigInt.asIntN(64, message.effectiveMaxOutputTokens) !== message.effectiveMaxOutputTokens) {
-        throw new globalThis.Error("value provided for field message.effectiveMaxOutputTokens of type int64 too large");
-      }
-      writer.uint32(104).int64(message.effectiveMaxOutputTokens);
+    if (message.hardMaxBound !== undefined) {
+      UsageBound.encode(message.hardMaxBound, writer.uint32(138).fork()).join();
     }
     if (message.callerCeilingMicroUsd !== 0n) {
       if (BigInt.asIntN(64, message.callerCeilingMicroUsd) !== message.callerCeilingMicroUsd) {
         throw new globalThis.Error("value provided for field message.callerCeilingMicroUsd of type int64 too large");
       }
-      writer.uint32(112).int64(message.callerCeilingMicroUsd);
+      writer.uint32(144).int64(message.callerCeilingMicroUsd);
     }
     if (message.dollarConfirmed !== false) {
-      writer.uint32(120).bool(message.dollarConfirmed);
+      writer.uint32(152).bool(message.dollarConfirmed);
+    }
+    if (message.zeroRetention !== false) {
+      writer.uint32(160).bool(message.zeroRetention);
+    }
+    if (message.clientRegion !== "") {
+      writer.uint32(170).string(message.clientRegion);
+    }
+    if (message.studioOperationId !== "") {
+      writer.uint32(178).string(message.studioOperationId);
+    }
+    if (message.initialLeaseTtlMs !== 0n) {
+      if (BigInt.asIntN(64, message.initialLeaseTtlMs) !== message.initialLeaseTtlMs) {
+        throw new globalThis.Error("value provided for field message.initialLeaseTtlMs of type int64 too large");
+      }
+      writer.uint32(184).int64(message.initialLeaseTtlMs);
     }
     return writer;
   },
@@ -307,7 +3512,7 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.idempotencyKey = reader.string();
+            message.idempotencyScope = reader.string();
             continue;
           }
           case 3: {
@@ -315,7 +3520,7 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.requestBodySha256 = reader.string();
+            message.idempotencyKey = reader.string();
             continue;
           }
           case 4: {
@@ -323,7 +3528,7 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.apiKeySha256 = reader.string();
+            message.requestBodySha256 = reader.string();
             continue;
           }
           case 5: {
@@ -331,15 +3536,15 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.internalAccountId = reader.string();
+            message.apiKeySha256 = reader.string();
             continue;
           }
           case 6: {
-            if (tag !== 48) {
+            if (tag !== 50) {
               break;
             }
 
-            message.channel = reader.int32() as any;
+            message.internalAccountId = reader.string();
             continue;
           }
           case 7: {
@@ -347,23 +3552,23 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.modality = reader.int32() as any;
+            message.channel = reader.int32() as any;
             continue;
           }
           case 8: {
-            if (tag !== 66) {
+            if (tag !== 64) {
               break;
             }
 
-            message.modelId = reader.string();
+            message.modality = reader.int32() as any;
             continue;
           }
           case 9: {
-            if (tag !== 74) {
+            if (tag !== 72) {
               break;
             }
 
-            message.catalogVersion = reader.string();
+            message.selectionMode = reader.int32() as any;
             continue;
           }
           case 10: {
@@ -371,7 +3576,7 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.primaryOfferingId = reader.string();
+            message.requestedModelId = reader.string();
             continue;
           }
           case 11: {
@@ -379,39 +3584,103 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
               break;
             }
 
-            message.backupOfferingId = reader.string();
+            message.modelId = reader.string();
             continue;
           }
           case 12: {
-            if (tag !== 96) {
+            if (tag !== 98) {
               break;
             }
 
-            message.inputTokensUpper = reader.int64() as bigint;
+            message.autoTaskLabel = reader.string();
             continue;
           }
           case 13: {
-            if (tag !== 104) {
+            if (tag !== 106) {
               break;
             }
 
-            message.effectiveMaxOutputTokens = reader.int64() as bigint;
+            message.catalogVersion = reader.string();
             continue;
           }
           case 14: {
-            if (tag !== 112) {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.primaryOfferingId = reader.string();
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.backupOfferingId = reader.string();
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.estimateBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 17: {
+            if (tag !== 138) {
+              break;
+            }
+
+            message.hardMaxBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 18: {
+            if (tag !== 144) {
               break;
             }
 
             message.callerCeilingMicroUsd = reader.int64() as bigint;
             continue;
           }
-          case 15: {
-            if (tag !== 120) {
+          case 19: {
+            if (tag !== 152) {
               break;
             }
 
             message.dollarConfirmed = reader.bool();
+            continue;
+          }
+          case 20: {
+            if (tag !== 160) {
+              break;
+            }
+
+            message.zeroRetention = reader.bool();
+            continue;
+          }
+          case 21: {
+            if (tag !== 170) {
+              break;
+            }
+
+            message.clientRegion = reader.string();
+            continue;
+          }
+          case 22: {
+            if (tag !== 178) {
+              break;
+            }
+
+            message.studioOperationId = reader.string();
+            continue;
+          }
+          case 23: {
+            if (tag !== 184) {
+              break;
+            }
+
+            message.initialLeaseTtlMs = reader.int64() as bigint;
             continue;
           }
         }
@@ -432,6 +3701,11 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         ? globalThis.String(object.traceId)
         : isSet(object.trace_id)
         ? globalThis.String(object.trace_id)
+        : "",
+      idempotencyScope: isSet(object.idempotencyScope)
+        ? globalThis.String(object.idempotencyScope)
+        : isSet(object.idempotency_scope)
+        ? globalThis.String(object.idempotency_scope)
         : "",
       idempotencyKey: isSet(object.idempotencyKey)
         ? globalThis.String(object.idempotencyKey)
@@ -455,10 +3729,25 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         : "",
       channel: isSet(object.channel) ? executionChannelFromJSON(object.channel) : 0,
       modality: isSet(object.modality) ? modalityFromJSON(object.modality) : 0,
+      selectionMode: isSet(object.selectionMode)
+        ? routeSelectionModeFromJSON(object.selectionMode)
+        : isSet(object.selection_mode)
+        ? routeSelectionModeFromJSON(object.selection_mode)
+        : 0,
+      requestedModelId: isSet(object.requestedModelId)
+        ? globalThis.String(object.requestedModelId)
+        : isSet(object.requested_model_id)
+        ? globalThis.String(object.requested_model_id)
+        : "",
       modelId: isSet(object.modelId)
         ? globalThis.String(object.modelId)
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
+        : "",
+      autoTaskLabel: isSet(object.autoTaskLabel)
+        ? globalThis.String(object.autoTaskLabel)
+        : isSet(object.auto_task_label)
+        ? globalThis.String(object.auto_task_label)
         : "",
       catalogVersion: isSet(object.catalogVersion)
         ? globalThis.String(object.catalogVersion)
@@ -475,16 +3764,16 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         : isSet(object.backup_offering_id)
         ? globalThis.String(object.backup_offering_id)
         : "",
-      inputTokensUpper: isSet(object.inputTokensUpper)
-        ? BigInt(object.inputTokensUpper)
-        : isSet(object.input_tokens_upper)
-        ? BigInt(object.input_tokens_upper)
-        : 0n,
-      effectiveMaxOutputTokens: isSet(object.effectiveMaxOutputTokens)
-        ? BigInt(object.effectiveMaxOutputTokens)
-        : isSet(object.effective_max_output_tokens)
-        ? BigInt(object.effective_max_output_tokens)
-        : 0n,
+      estimateBound: isSet(object.estimateBound)
+        ? UsageBound.fromJSON(object.estimateBound)
+        : isSet(object.estimate_bound)
+        ? UsageBound.fromJSON(object.estimate_bound)
+        : undefined,
+      hardMaxBound: isSet(object.hardMaxBound)
+        ? UsageBound.fromJSON(object.hardMaxBound)
+        : isSet(object.hard_max_bound)
+        ? UsageBound.fromJSON(object.hard_max_bound)
+        : undefined,
       callerCeilingMicroUsd: isSet(object.callerCeilingMicroUsd)
         ? BigInt(object.callerCeilingMicroUsd)
         : isSet(object.caller_ceiling_micro_usd)
@@ -495,6 +3784,26 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
         : isSet(object.dollar_confirmed)
         ? globalThis.Boolean(object.dollar_confirmed)
         : false,
+      zeroRetention: isSet(object.zeroRetention)
+        ? globalThis.Boolean(object.zeroRetention)
+        : isSet(object.zero_retention)
+        ? globalThis.Boolean(object.zero_retention)
+        : false,
+      clientRegion: isSet(object.clientRegion)
+        ? globalThis.String(object.clientRegion)
+        : isSet(object.client_region)
+        ? globalThis.String(object.client_region)
+        : "",
+      studioOperationId: isSet(object.studioOperationId)
+        ? globalThis.String(object.studioOperationId)
+        : isSet(object.studio_operation_id)
+        ? globalThis.String(object.studio_operation_id)
+        : "",
+      initialLeaseTtlMs: isSet(object.initialLeaseTtlMs)
+        ? BigInt(object.initialLeaseTtlMs)
+        : isSet(object.initial_lease_ttl_ms)
+        ? BigInt(object.initial_lease_ttl_ms)
+        : 0n,
     };
   },
 
@@ -502,6 +3811,9 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     const obj: any = {};
     if (message.traceId !== "") {
       obj.traceId = message.traceId;
+    }
+    if (message.idempotencyScope !== "") {
+      obj.idempotencyScope = message.idempotencyScope;
     }
     if (message.idempotencyKey !== "") {
       obj.idempotencyKey = message.idempotencyKey;
@@ -521,8 +3833,17 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     if (message.modality !== 0) {
       obj.modality = modalityToJSON(message.modality);
     }
+    if (message.selectionMode !== 0) {
+      obj.selectionMode = routeSelectionModeToJSON(message.selectionMode);
+    }
+    if (message.requestedModelId !== "") {
+      obj.requestedModelId = message.requestedModelId;
+    }
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
+    }
+    if (message.autoTaskLabel !== "") {
+      obj.autoTaskLabel = message.autoTaskLabel;
     }
     if (message.catalogVersion !== "") {
       obj.catalogVersion = message.catalogVersion;
@@ -533,17 +3854,29 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
     if (message.backupOfferingId !== "") {
       obj.backupOfferingId = message.backupOfferingId;
     }
-    if (message.inputTokensUpper !== 0n) {
-      obj.inputTokensUpper = message.inputTokensUpper.toString();
+    if (message.estimateBound !== undefined) {
+      obj.estimateBound = UsageBound.toJSON(message.estimateBound);
     }
-    if (message.effectiveMaxOutputTokens !== 0n) {
-      obj.effectiveMaxOutputTokens = message.effectiveMaxOutputTokens.toString();
+    if (message.hardMaxBound !== undefined) {
+      obj.hardMaxBound = UsageBound.toJSON(message.hardMaxBound);
     }
     if (message.callerCeilingMicroUsd !== 0n) {
       obj.callerCeilingMicroUsd = message.callerCeilingMicroUsd.toString();
     }
     if (message.dollarConfirmed !== false) {
       obj.dollarConfirmed = message.dollarConfirmed;
+    }
+    if (message.zeroRetention !== false) {
+      obj.zeroRetention = message.zeroRetention;
+    }
+    if (message.clientRegion !== "") {
+      obj.clientRegion = message.clientRegion;
+    }
+    if (message.studioOperationId !== "") {
+      obj.studioOperationId = message.studioOperationId;
+    }
+    if (message.initialLeaseTtlMs !== 0n) {
+      obj.initialLeaseTtlMs = message.initialLeaseTtlMs.toString();
     }
     return obj;
   },
@@ -554,73 +3887,144 @@ export const AuthorizeAndHoldRequest: MessageFns<AuthorizeAndHoldRequest> = {
   fromPartial<I extends Exact<DeepPartial<AuthorizeAndHoldRequest>, I>>(object: I): AuthorizeAndHoldRequest {
     const message = createBaseAuthorizeAndHoldRequest();
     message.traceId = object.traceId ?? "";
+    message.idempotencyScope = object.idempotencyScope ?? "";
     message.idempotencyKey = object.idempotencyKey ?? "";
     message.requestBodySha256 = object.requestBodySha256 ?? "";
     message.apiKeySha256 = object.apiKeySha256 ?? "";
     message.internalAccountId = object.internalAccountId ?? "";
     message.channel = object.channel ?? 0;
     message.modality = object.modality ?? 0;
+    message.selectionMode = object.selectionMode ?? 0;
+    message.requestedModelId = object.requestedModelId ?? "";
     message.modelId = object.modelId ?? "";
+    message.autoTaskLabel = object.autoTaskLabel ?? "";
     message.catalogVersion = object.catalogVersion ?? "";
     message.primaryOfferingId = object.primaryOfferingId ?? "";
     message.backupOfferingId = object.backupOfferingId ?? "";
-    message.inputTokensUpper = (object.inputTokensUpper !== undefined && object.inputTokensUpper !== null)
-      ? BigInt(object.inputTokensUpper)
-      : 0n;
-    message.effectiveMaxOutputTokens =
-      (object.effectiveMaxOutputTokens !== undefined && object.effectiveMaxOutputTokens !== null)
-        ? BigInt(object.effectiveMaxOutputTokens)
-        : 0n;
+    message.estimateBound = (object.estimateBound !== undefined && object.estimateBound !== null)
+      ? UsageBound.fromPartial(object.estimateBound)
+      : undefined;
+    message.hardMaxBound = (object.hardMaxBound !== undefined && object.hardMaxBound !== null)
+      ? UsageBound.fromPartial(object.hardMaxBound)
+      : undefined;
     message.callerCeilingMicroUsd =
       (object.callerCeilingMicroUsd !== undefined && object.callerCeilingMicroUsd !== null)
         ? BigInt(object.callerCeilingMicroUsd)
         : 0n;
     message.dollarConfirmed = object.dollarConfirmed ?? false;
+    message.zeroRetention = object.zeroRetention ?? false;
+    message.clientRegion = object.clientRegion ?? "";
+    message.studioOperationId = object.studioOperationId ?? "";
+    message.initialLeaseTtlMs = (object.initialLeaseTtlMs !== undefined && object.initialLeaseTtlMs !== null)
+      ? BigInt(object.initialLeaseTtlMs)
+      : 0n;
     return message;
   },
 };
 
 function createBaseAuthorizeAndHoldResponse(): AuthorizeAndHoldResponse {
   return {
+    status: 0,
     admitted: false,
     rejectCode: 0,
     rejectMessage: "",
     requestId: "",
     holdId: "",
     leaseToken: "",
+    leaseExpiresAtUnixMs: 0n,
+    estimatedCredits: 0n,
+    hardMaxCredits: 0n,
     computedHardMaxMicroUsd: 0n,
+    providerCostCeilingMicroUsd: 0n,
+    usesFreeModelQuota: false,
     basicToPremiumUsed: false,
+    lockedVersions: undefined,
+    heldBuckets: [],
+    thresholdWarnings: [],
+    budgetDiagnostic: undefined,
+    creditDiagnostic: undefined,
+    cachedSettlement: undefined,
   };
 }
 
 export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
   encode(message: AuthorizeAndHoldResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== 0) {
+      writer.uint32(8).int32(message.status);
+    }
     if (message.admitted !== false) {
-      writer.uint32(8).bool(message.admitted);
+      writer.uint32(16).bool(message.admitted);
     }
     if (message.rejectCode !== 0) {
-      writer.uint32(16).int32(message.rejectCode);
+      writer.uint32(24).int32(message.rejectCode);
     }
     if (message.rejectMessage !== "") {
-      writer.uint32(26).string(message.rejectMessage);
+      writer.uint32(34).string(message.rejectMessage);
     }
     if (message.requestId !== "") {
-      writer.uint32(34).string(message.requestId);
+      writer.uint32(42).string(message.requestId);
     }
     if (message.holdId !== "") {
-      writer.uint32(42).string(message.holdId);
+      writer.uint32(50).string(message.holdId);
     }
     if (message.leaseToken !== "") {
-      writer.uint32(50).string(message.leaseToken);
+      writer.uint32(58).string(message.leaseToken);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.leaseExpiresAtUnixMs) !== message.leaseExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.leaseExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(64).int64(message.leaseExpiresAtUnixMs);
+    }
+    if (message.estimatedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.estimatedCredits) !== message.estimatedCredits) {
+        throw new globalThis.Error("value provided for field message.estimatedCredits of type int64 too large");
+      }
+      writer.uint32(72).int64(message.estimatedCredits);
+    }
+    if (message.hardMaxCredits !== 0n) {
+      if (BigInt.asIntN(64, message.hardMaxCredits) !== message.hardMaxCredits) {
+        throw new globalThis.Error("value provided for field message.hardMaxCredits of type int64 too large");
+      }
+      writer.uint32(80).int64(message.hardMaxCredits);
     }
     if (message.computedHardMaxMicroUsd !== 0n) {
       if (BigInt.asIntN(64, message.computedHardMaxMicroUsd) !== message.computedHardMaxMicroUsd) {
         throw new globalThis.Error("value provided for field message.computedHardMaxMicroUsd of type int64 too large");
       }
-      writer.uint32(56).int64(message.computedHardMaxMicroUsd);
+      writer.uint32(88).int64(message.computedHardMaxMicroUsd);
+    }
+    if (message.providerCostCeilingMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.providerCostCeilingMicroUsd) !== message.providerCostCeilingMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.providerCostCeilingMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(96).int64(message.providerCostCeilingMicroUsd);
+    }
+    if (message.usesFreeModelQuota !== false) {
+      writer.uint32(104).bool(message.usesFreeModelQuota);
     }
     if (message.basicToPremiumUsed !== false) {
-      writer.uint32(64).bool(message.basicToPremiumUsed);
+      writer.uint32(112).bool(message.basicToPremiumUsed);
+    }
+    if (message.lockedVersions !== undefined) {
+      LockedVersionSet.encode(message.lockedVersions, writer.uint32(122).fork()).join();
+    }
+    for (const v of message.heldBuckets) {
+      BucketAllocationLine.encode(v!, writer.uint32(130).fork()).join();
+    }
+    for (const v of message.thresholdWarnings) {
+      ThresholdWarning.encode(v!, writer.uint32(138).fork()).join();
+    }
+    if (message.budgetDiagnostic !== undefined) {
+      SpendingLimitDiagnostic.encode(message.budgetDiagnostic, writer.uint32(146).fork()).join();
+    }
+    if (message.creditDiagnostic !== undefined) {
+      CreditShortfallDiagnostic.encode(message.creditDiagnostic, writer.uint32(154).fork()).join();
+    }
+    if (message.cachedSettlement !== undefined) {
+      SettleResponse.encode(message.cachedSettlement, writer.uint32(162).fork()).join();
     }
     return writer;
   },
@@ -643,7 +4047,7 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
-            message.admitted = reader.bool();
+            message.status = reader.int32() as any;
             continue;
           }
           case 2: {
@@ -651,15 +4055,15 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
-            message.rejectCode = reader.int32() as any;
+            message.admitted = reader.bool();
             continue;
           }
           case 3: {
-            if (tag !== 26) {
+            if (tag !== 24) {
               break;
             }
 
-            message.rejectMessage = reader.string();
+            message.rejectCode = reader.int32() as any;
             continue;
           }
           case 4: {
@@ -667,7 +4071,7 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
-            message.requestId = reader.string();
+            message.rejectMessage = reader.string();
             continue;
           }
           case 5: {
@@ -675,7 +4079,7 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
-            message.holdId = reader.string();
+            message.requestId = reader.string();
             continue;
           }
           case 6: {
@@ -683,15 +4087,15 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
-            message.leaseToken = reader.string();
+            message.holdId = reader.string();
             continue;
           }
           case 7: {
-            if (tag !== 56) {
+            if (tag !== 58) {
               break;
             }
 
-            message.computedHardMaxMicroUsd = reader.int64() as bigint;
+            message.leaseToken = reader.string();
             continue;
           }
           case 8: {
@@ -699,7 +4103,103 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
               break;
             }
 
+            message.leaseExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.estimatedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.hardMaxCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.computedHardMaxMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.providerCostCeilingMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.usesFreeModelQuota = reader.bool();
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
             message.basicToPremiumUsed = reader.bool();
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.lockedVersions = LockedVersionSet.decode(reader, reader.uint32());
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.heldBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 17: {
+            if (tag !== 138) {
+              break;
+            }
+
+            message.thresholdWarnings.push(ThresholdWarning.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 18: {
+            if (tag !== 146) {
+              break;
+            }
+
+            message.budgetDiagnostic = SpendingLimitDiagnostic.decode(reader, reader.uint32());
+            continue;
+          }
+          case 19: {
+            if (tag !== 154) {
+              break;
+            }
+
+            message.creditDiagnostic = CreditShortfallDiagnostic.decode(reader, reader.uint32());
+            continue;
+          }
+          case 20: {
+            if (tag !== 162) {
+              break;
+            }
+
+            message.cachedSettlement = SettleResponse.decode(reader, reader.uint32());
             continue;
           }
         }
@@ -716,6 +4216,7 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
 
   fromJSON(object: any): AuthorizeAndHoldResponse {
     return {
+      status: isSet(object.status) ? holdDecisionStatusFromJSON(object.status) : 0,
       admitted: isSet(object.admitted) ? globalThis.Boolean(object.admitted) : false,
       rejectCode: isSet(object.rejectCode)
         ? rejectCodeFromJSON(object.rejectCode)
@@ -742,21 +4243,79 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
         : isSet(object.lease_token)
         ? globalThis.String(object.lease_token)
         : "",
+      leaseExpiresAtUnixMs: isSet(object.leaseExpiresAtUnixMs)
+        ? BigInt(object.leaseExpiresAtUnixMs)
+        : isSet(object.lease_expires_at_unix_ms)
+        ? BigInt(object.lease_expires_at_unix_ms)
+        : 0n,
+      estimatedCredits: isSet(object.estimatedCredits)
+        ? BigInt(object.estimatedCredits)
+        : isSet(object.estimated_credits)
+        ? BigInt(object.estimated_credits)
+        : 0n,
+      hardMaxCredits: isSet(object.hardMaxCredits)
+        ? BigInt(object.hardMaxCredits)
+        : isSet(object.hard_max_credits)
+        ? BigInt(object.hard_max_credits)
+        : 0n,
       computedHardMaxMicroUsd: isSet(object.computedHardMaxMicroUsd)
         ? BigInt(object.computedHardMaxMicroUsd)
         : isSet(object.computed_hard_max_micro_usd)
         ? BigInt(object.computed_hard_max_micro_usd)
         : 0n,
+      providerCostCeilingMicroUsd: isSet(object.providerCostCeilingMicroUsd)
+        ? BigInt(object.providerCostCeilingMicroUsd)
+        : isSet(object.provider_cost_ceiling_micro_usd)
+        ? BigInt(object.provider_cost_ceiling_micro_usd)
+        : 0n,
+      usesFreeModelQuota: isSet(object.usesFreeModelQuota)
+        ? globalThis.Boolean(object.usesFreeModelQuota)
+        : isSet(object.uses_free_model_quota)
+        ? globalThis.Boolean(object.uses_free_model_quota)
+        : false,
       basicToPremiumUsed: isSet(object.basicToPremiumUsed)
         ? globalThis.Boolean(object.basicToPremiumUsed)
         : isSet(object.basic_to_premium_used)
         ? globalThis.Boolean(object.basic_to_premium_used)
         : false,
+      lockedVersions: isSet(object.lockedVersions)
+        ? LockedVersionSet.fromJSON(object.lockedVersions)
+        : isSet(object.locked_versions)
+        ? LockedVersionSet.fromJSON(object.locked_versions)
+        : undefined,
+      heldBuckets: globalThis.Array.isArray(object?.heldBuckets)
+        ? object.heldBuckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : globalThis.Array.isArray(object?.held_buckets)
+        ? object.held_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : [],
+      thresholdWarnings: globalThis.Array.isArray(object?.thresholdWarnings)
+        ? object.thresholdWarnings.map((e: any) => ThresholdWarning.fromJSON(e))
+        : globalThis.Array.isArray(object?.threshold_warnings)
+        ? object.threshold_warnings.map((e: any) => ThresholdWarning.fromJSON(e))
+        : [],
+      budgetDiagnostic: isSet(object.budgetDiagnostic)
+        ? SpendingLimitDiagnostic.fromJSON(object.budgetDiagnostic)
+        : isSet(object.budget_diagnostic)
+        ? SpendingLimitDiagnostic.fromJSON(object.budget_diagnostic)
+        : undefined,
+      creditDiagnostic: isSet(object.creditDiagnostic)
+        ? CreditShortfallDiagnostic.fromJSON(object.creditDiagnostic)
+        : isSet(object.credit_diagnostic)
+        ? CreditShortfallDiagnostic.fromJSON(object.credit_diagnostic)
+        : undefined,
+      cachedSettlement: isSet(object.cachedSettlement)
+        ? SettleResponse.fromJSON(object.cachedSettlement)
+        : isSet(object.cached_settlement)
+        ? SettleResponse.fromJSON(object.cached_settlement)
+        : undefined,
     };
   },
 
   toJSON(message: AuthorizeAndHoldResponse): unknown {
     const obj: any = {};
+    if (message.status !== 0) {
+      obj.status = holdDecisionStatusToJSON(message.status);
+    }
     if (message.admitted !== false) {
       obj.admitted = message.admitted;
     }
@@ -775,11 +4334,44 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
     if (message.leaseToken !== "") {
       obj.leaseToken = message.leaseToken;
     }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      obj.leaseExpiresAtUnixMs = message.leaseExpiresAtUnixMs.toString();
+    }
+    if (message.estimatedCredits !== 0n) {
+      obj.estimatedCredits = message.estimatedCredits.toString();
+    }
+    if (message.hardMaxCredits !== 0n) {
+      obj.hardMaxCredits = message.hardMaxCredits.toString();
+    }
     if (message.computedHardMaxMicroUsd !== 0n) {
       obj.computedHardMaxMicroUsd = message.computedHardMaxMicroUsd.toString();
     }
+    if (message.providerCostCeilingMicroUsd !== 0n) {
+      obj.providerCostCeilingMicroUsd = message.providerCostCeilingMicroUsd.toString();
+    }
+    if (message.usesFreeModelQuota !== false) {
+      obj.usesFreeModelQuota = message.usesFreeModelQuota;
+    }
     if (message.basicToPremiumUsed !== false) {
       obj.basicToPremiumUsed = message.basicToPremiumUsed;
+    }
+    if (message.lockedVersions !== undefined) {
+      obj.lockedVersions = LockedVersionSet.toJSON(message.lockedVersions);
+    }
+    if (message.heldBuckets?.length) {
+      obj.heldBuckets = message.heldBuckets.map((e) => BucketAllocationLine.toJSON(e));
+    }
+    if (message.thresholdWarnings?.length) {
+      obj.thresholdWarnings = message.thresholdWarnings.map((e) => ThresholdWarning.toJSON(e));
+    }
+    if (message.budgetDiagnostic !== undefined) {
+      obj.budgetDiagnostic = SpendingLimitDiagnostic.toJSON(message.budgetDiagnostic);
+    }
+    if (message.creditDiagnostic !== undefined) {
+      obj.creditDiagnostic = CreditShortfallDiagnostic.toJSON(message.creditDiagnostic);
+    }
+    if (message.cachedSettlement !== undefined) {
+      obj.cachedSettlement = SettleResponse.toJSON(message.cachedSettlement);
     }
     return obj;
   },
@@ -789,23 +4381,52 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
   },
   fromPartial<I extends Exact<DeepPartial<AuthorizeAndHoldResponse>, I>>(object: I): AuthorizeAndHoldResponse {
     const message = createBaseAuthorizeAndHoldResponse();
+    message.status = object.status ?? 0;
     message.admitted = object.admitted ?? false;
     message.rejectCode = object.rejectCode ?? 0;
     message.rejectMessage = object.rejectMessage ?? "";
     message.requestId = object.requestId ?? "";
     message.holdId = object.holdId ?? "";
     message.leaseToken = object.leaseToken ?? "";
+    message.leaseExpiresAtUnixMs = (object.leaseExpiresAtUnixMs !== undefined && object.leaseExpiresAtUnixMs !== null)
+      ? BigInt(object.leaseExpiresAtUnixMs)
+      : 0n;
+    message.estimatedCredits = (object.estimatedCredits !== undefined && object.estimatedCredits !== null)
+      ? BigInt(object.estimatedCredits)
+      : 0n;
+    message.hardMaxCredits = (object.hardMaxCredits !== undefined && object.hardMaxCredits !== null)
+      ? BigInt(object.hardMaxCredits)
+      : 0n;
     message.computedHardMaxMicroUsd =
       (object.computedHardMaxMicroUsd !== undefined && object.computedHardMaxMicroUsd !== null)
         ? BigInt(object.computedHardMaxMicroUsd)
         : 0n;
+    message.providerCostCeilingMicroUsd =
+      (object.providerCostCeilingMicroUsd !== undefined && object.providerCostCeilingMicroUsd !== null)
+        ? BigInt(object.providerCostCeilingMicroUsd)
+        : 0n;
+    message.usesFreeModelQuota = object.usesFreeModelQuota ?? false;
     message.basicToPremiumUsed = object.basicToPremiumUsed ?? false;
+    message.lockedVersions = (object.lockedVersions !== undefined && object.lockedVersions !== null)
+      ? LockedVersionSet.fromPartial(object.lockedVersions)
+      : undefined;
+    message.heldBuckets = object.heldBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    message.thresholdWarnings = object.thresholdWarnings?.map((e) => ThresholdWarning.fromPartial(e)) || [];
+    message.budgetDiagnostic = (object.budgetDiagnostic !== undefined && object.budgetDiagnostic !== null)
+      ? SpendingLimitDiagnostic.fromPartial(object.budgetDiagnostic)
+      : undefined;
+    message.creditDiagnostic = (object.creditDiagnostic !== undefined && object.creditDiagnostic !== null)
+      ? CreditShortfallDiagnostic.fromPartial(object.creditDiagnostic)
+      : undefined;
+    message.cachedSettlement = (object.cachedSettlement !== undefined && object.cachedSettlement !== null)
+      ? SettleResponse.fromPartial(object.cachedSettlement)
+      : undefined;
     return message;
   },
 };
 
 function createBaseMarkSendingRequest(): MarkSendingRequest {
-  return { requestId: "", attemptId: "", offeringId: "", dispatchKey: "", leaseToken: "" };
+  return { requestId: "", attemptId: "", offeringId: "", dispatchKey: "", leaseToken: "", leaseTtlMs: 0n };
 }
 
 export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
@@ -824,6 +4445,12 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
     }
     if (message.leaseToken !== "") {
       writer.uint32(42).string(message.leaseToken);
+    }
+    if (message.leaseTtlMs !== 0n) {
+      if (BigInt.asIntN(64, message.leaseTtlMs) !== message.leaseTtlMs) {
+        throw new globalThis.Error("value provided for field message.leaseTtlMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.leaseTtlMs);
     }
     return writer;
   },
@@ -881,6 +4508,14 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
             message.leaseToken = reader.string();
             continue;
           }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.leaseTtlMs = reader.int64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -920,6 +4555,11 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
         : isSet(object.lease_token)
         ? globalThis.String(object.lease_token)
         : "",
+      leaseTtlMs: isSet(object.leaseTtlMs)
+        ? BigInt(object.leaseTtlMs)
+        : isSet(object.lease_ttl_ms)
+        ? BigInt(object.lease_ttl_ms)
+        : 0n,
     };
   },
 
@@ -940,6 +4580,9 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
     if (message.leaseToken !== "") {
       obj.leaseToken = message.leaseToken;
     }
+    if (message.leaseTtlMs !== 0n) {
+      obj.leaseTtlMs = message.leaseTtlMs.toString();
+    }
     return obj;
   },
 
@@ -953,18 +4596,30 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
     message.offeringId = object.offeringId ?? "";
     message.dispatchKey = object.dispatchKey ?? "";
     message.leaseToken = object.leaseToken ?? "";
+    message.leaseTtlMs = (object.leaseTtlMs !== undefined && object.leaseTtlMs !== null)
+      ? BigInt(object.leaseTtlMs)
+      : 0n;
     return message;
   },
 };
 
 function createBaseMarkSendingResponse(): MarkSendingResponse {
-  return { accepted: false };
+  return { accepted: false, leaseExpiresAtUnixMs: 0n, rejectReason: "" };
 }
 
 export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
   encode(message: MarkSendingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.accepted !== false) {
       writer.uint32(8).bool(message.accepted);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.leaseExpiresAtUnixMs) !== message.leaseExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.leaseExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(16).int64(message.leaseExpiresAtUnixMs);
+    }
+    if (message.rejectReason !== "") {
+      writer.uint32(26).string(message.rejectReason);
     }
     return writer;
   },
@@ -990,6 +4645,22 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
             message.accepted = reader.bool();
             continue;
           }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.leaseExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.rejectReason = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1003,13 +4674,31 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
   },
 
   fromJSON(object: any): MarkSendingResponse {
-    return { accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false };
+    return {
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      leaseExpiresAtUnixMs: isSet(object.leaseExpiresAtUnixMs)
+        ? BigInt(object.leaseExpiresAtUnixMs)
+        : isSet(object.lease_expires_at_unix_ms)
+        ? BigInt(object.lease_expires_at_unix_ms)
+        : 0n,
+      rejectReason: isSet(object.rejectReason)
+        ? globalThis.String(object.rejectReason)
+        : isSet(object.reject_reason)
+        ? globalThis.String(object.reject_reason)
+        : "",
+    };
   },
 
   toJSON(message: MarkSendingResponse): unknown {
     const obj: any = {};
     if (message.accepted !== false) {
       obj.accepted = message.accepted;
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      obj.leaseExpiresAtUnixMs = message.leaseExpiresAtUnixMs.toString();
+    }
+    if (message.rejectReason !== "") {
+      obj.rejectReason = message.rejectReason;
     }
     return obj;
   },
@@ -1020,6 +4709,437 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
   fromPartial<I extends Exact<DeepPartial<MarkSendingResponse>, I>>(object: I): MarkSendingResponse {
     const message = createBaseMarkSendingResponse();
     message.accepted = object.accepted ?? false;
+    message.leaseExpiresAtUnixMs = (object.leaseExpiresAtUnixMs !== undefined && object.leaseExpiresAtUnixMs !== null)
+      ? BigInt(object.leaseExpiresAtUnixMs)
+      : 0n;
+    message.rejectReason = object.rejectReason ?? "";
+    return message;
+  },
+};
+
+function createBaseExtendExecutionLeaseRequest(): ExtendExecutionLeaseRequest {
+  return { requestId: "", leaseToken: "", extendTtlMs: 0n };
+}
+
+export const ExtendExecutionLeaseRequest: MessageFns<ExtendExecutionLeaseRequest> = {
+  encode(message: ExtendExecutionLeaseRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.leaseToken !== "") {
+      writer.uint32(18).string(message.leaseToken);
+    }
+    if (message.extendTtlMs !== 0n) {
+      if (BigInt.asIntN(64, message.extendTtlMs) !== message.extendTtlMs) {
+        throw new globalThis.Error("value provided for field message.extendTtlMs of type int64 too large");
+      }
+      writer.uint32(24).int64(message.extendTtlMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExtendExecutionLeaseRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseExtendExecutionLeaseRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.leaseToken = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.extendTtlMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ExtendExecutionLeaseRequest {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      leaseToken: isSet(object.leaseToken)
+        ? globalThis.String(object.leaseToken)
+        : isSet(object.lease_token)
+        ? globalThis.String(object.lease_token)
+        : "",
+      extendTtlMs: isSet(object.extendTtlMs)
+        ? BigInt(object.extendTtlMs)
+        : isSet(object.extend_ttl_ms)
+        ? BigInt(object.extend_ttl_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ExtendExecutionLeaseRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.leaseToken !== "") {
+      obj.leaseToken = message.leaseToken;
+    }
+    if (message.extendTtlMs !== 0n) {
+      obj.extendTtlMs = message.extendTtlMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ExtendExecutionLeaseRequest>, I>>(base?: I): ExtendExecutionLeaseRequest {
+    return ExtendExecutionLeaseRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ExtendExecutionLeaseRequest>, I>>(object: I): ExtendExecutionLeaseRequest {
+    const message = createBaseExtendExecutionLeaseRequest();
+    message.requestId = object.requestId ?? "";
+    message.leaseToken = object.leaseToken ?? "";
+    message.extendTtlMs = (object.extendTtlMs !== undefined && object.extendTtlMs !== null)
+      ? BigInt(object.extendTtlMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseExtendExecutionLeaseResponse(): ExtendExecutionLeaseResponse {
+  return { accepted: false, leaseExpiresAtUnixMs: 0n };
+}
+
+export const ExtendExecutionLeaseResponse: MessageFns<ExtendExecutionLeaseResponse> = {
+  encode(message: ExtendExecutionLeaseResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accepted !== false) {
+      writer.uint32(8).bool(message.accepted);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.leaseExpiresAtUnixMs) !== message.leaseExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.leaseExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(16).int64(message.leaseExpiresAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExtendExecutionLeaseResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseExtendExecutionLeaseResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.accepted = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.leaseExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ExtendExecutionLeaseResponse {
+    return {
+      accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+      leaseExpiresAtUnixMs: isSet(object.leaseExpiresAtUnixMs)
+        ? BigInt(object.leaseExpiresAtUnixMs)
+        : isSet(object.lease_expires_at_unix_ms)
+        ? BigInt(object.lease_expires_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ExtendExecutionLeaseResponse): unknown {
+    const obj: any = {};
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      obj.leaseExpiresAtUnixMs = message.leaseExpiresAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ExtendExecutionLeaseResponse>, I>>(base?: I): ExtendExecutionLeaseResponse {
+    return ExtendExecutionLeaseResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ExtendExecutionLeaseResponse>, I>>(object: I): ExtendExecutionLeaseResponse {
+    const message = createBaseExtendExecutionLeaseResponse();
+    message.accepted = object.accepted ?? false;
+    message.leaseExpiresAtUnixMs = (object.leaseExpiresAtUnixMs !== undefined && object.leaseExpiresAtUnixMs !== null)
+      ? BigInt(object.leaseExpiresAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseMediaOutputSettlementItem(): MediaOutputSettlementItem {
+  return {
+    outputId: "",
+    outputIndex: 0,
+    delivered: false,
+    durationMs: 0n,
+    hasAudio: false,
+    width: 0,
+    height: 0,
+    failureCode: "",
+  };
+}
+
+export const MediaOutputSettlementItem: MessageFns<MediaOutputSettlementItem> = {
+  encode(message: MediaOutputSettlementItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.outputId !== "") {
+      writer.uint32(10).string(message.outputId);
+    }
+    if (message.outputIndex !== 0) {
+      writer.uint32(16).int32(message.outputIndex);
+    }
+    if (message.delivered !== false) {
+      writer.uint32(24).bool(message.delivered);
+    }
+    if (message.durationMs !== 0n) {
+      if (BigInt.asIntN(64, message.durationMs) !== message.durationMs) {
+        throw new globalThis.Error("value provided for field message.durationMs of type int64 too large");
+      }
+      writer.uint32(32).int64(message.durationMs);
+    }
+    if (message.hasAudio !== false) {
+      writer.uint32(40).bool(message.hasAudio);
+    }
+    if (message.width !== 0) {
+      writer.uint32(48).int32(message.width);
+    }
+    if (message.height !== 0) {
+      writer.uint32(56).int32(message.height);
+    }
+    if (message.failureCode !== "") {
+      writer.uint32(66).string(message.failureCode);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MediaOutputSettlementItem {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMediaOutputSettlementItem();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.outputId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.outputIndex = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.delivered = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.durationMs = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.hasAudio = reader.bool();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.width = reader.int32();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.height = reader.int32();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.failureCode = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MediaOutputSettlementItem {
+    return {
+      outputId: isSet(object.outputId)
+        ? globalThis.String(object.outputId)
+        : isSet(object.output_id)
+        ? globalThis.String(object.output_id)
+        : "",
+      outputIndex: isSet(object.outputIndex)
+        ? globalThis.Number(object.outputIndex)
+        : isSet(object.output_index)
+        ? globalThis.Number(object.output_index)
+        : 0,
+      delivered: isSet(object.delivered) ? globalThis.Boolean(object.delivered) : false,
+      durationMs: isSet(object.durationMs)
+        ? BigInt(object.durationMs)
+        : isSet(object.duration_ms)
+        ? BigInt(object.duration_ms)
+        : 0n,
+      hasAudio: isSet(object.hasAudio)
+        ? globalThis.Boolean(object.hasAudio)
+        : isSet(object.has_audio)
+        ? globalThis.Boolean(object.has_audio)
+        : false,
+      width: isSet(object.width) ? globalThis.Number(object.width) : 0,
+      height: isSet(object.height) ? globalThis.Number(object.height) : 0,
+      failureCode: isSet(object.failureCode)
+        ? globalThis.String(object.failureCode)
+        : isSet(object.failure_code)
+        ? globalThis.String(object.failure_code)
+        : "",
+    };
+  },
+
+  toJSON(message: MediaOutputSettlementItem): unknown {
+    const obj: any = {};
+    if (message.outputId !== "") {
+      obj.outputId = message.outputId;
+    }
+    if (message.outputIndex !== 0) {
+      obj.outputIndex = Math.round(message.outputIndex);
+    }
+    if (message.delivered !== false) {
+      obj.delivered = message.delivered;
+    }
+    if (message.durationMs !== 0n) {
+      obj.durationMs = message.durationMs.toString();
+    }
+    if (message.hasAudio !== false) {
+      obj.hasAudio = message.hasAudio;
+    }
+    if (message.width !== 0) {
+      obj.width = Math.round(message.width);
+    }
+    if (message.height !== 0) {
+      obj.height = Math.round(message.height);
+    }
+    if (message.failureCode !== "") {
+      obj.failureCode = message.failureCode;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MediaOutputSettlementItem>, I>>(base?: I): MediaOutputSettlementItem {
+    return MediaOutputSettlementItem.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MediaOutputSettlementItem>, I>>(object: I): MediaOutputSettlementItem {
+    const message = createBaseMediaOutputSettlementItem();
+    message.outputId = object.outputId ?? "";
+    message.outputIndex = object.outputIndex ?? 0;
+    message.delivered = object.delivered ?? false;
+    message.durationMs = (object.durationMs !== undefined && object.durationMs !== null)
+      ? BigInt(object.durationMs)
+      : 0n;
+    message.hasAudio = object.hasAudio ?? false;
+    message.width = object.width ?? 0;
+    message.height = object.height ?? 0;
+    message.failureCode = object.failureCode ?? "";
     return message;
   },
 };
@@ -1029,10 +5149,14 @@ function createBaseAttemptCostRecord(): AttemptCostRecord {
     attemptId: "",
     offeringId: "",
     nativeRequestId: "",
+    reportedServingEndpoint: "",
     succeeded: false,
-    inputTokens: 0n,
-    outputTokens: 0n,
-    cacheReadTokens: 0n,
+    errorClass: 0,
+    usage: undefined,
+    providerReportedCostUsdDec: "",
+    dispatchedAtUnixMs: 0n,
+    firstTokenAtUnixMs: 0n,
+    completedAtUnixMs: 0n,
   };
 }
 
@@ -1047,26 +5171,38 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     if (message.nativeRequestId !== "") {
       writer.uint32(26).string(message.nativeRequestId);
     }
+    if (message.reportedServingEndpoint !== "") {
+      writer.uint32(34).string(message.reportedServingEndpoint);
+    }
     if (message.succeeded !== false) {
-      writer.uint32(32).bool(message.succeeded);
+      writer.uint32(40).bool(message.succeeded);
     }
-    if (message.inputTokens !== 0n) {
-      if (BigInt.asIntN(64, message.inputTokens) !== message.inputTokens) {
-        throw new globalThis.Error("value provided for field message.inputTokens of type int64 too large");
-      }
-      writer.uint32(40).int64(message.inputTokens);
+    if (message.errorClass !== 0) {
+      writer.uint32(48).int32(message.errorClass);
     }
-    if (message.outputTokens !== 0n) {
-      if (BigInt.asIntN(64, message.outputTokens) !== message.outputTokens) {
-        throw new globalThis.Error("value provided for field message.outputTokens of type int64 too large");
-      }
-      writer.uint32(48).int64(message.outputTokens);
+    if (message.usage !== undefined) {
+      UsageBound.encode(message.usage, writer.uint32(58).fork()).join();
     }
-    if (message.cacheReadTokens !== 0n) {
-      if (BigInt.asIntN(64, message.cacheReadTokens) !== message.cacheReadTokens) {
-        throw new globalThis.Error("value provided for field message.cacheReadTokens of type int64 too large");
+    if (message.providerReportedCostUsdDec !== "") {
+      writer.uint32(66).string(message.providerReportedCostUsdDec);
+    }
+    if (message.dispatchedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.dispatchedAtUnixMs) !== message.dispatchedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.dispatchedAtUnixMs of type int64 too large");
       }
-      writer.uint32(56).int64(message.cacheReadTokens);
+      writer.uint32(72).int64(message.dispatchedAtUnixMs);
+    }
+    if (message.firstTokenAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.firstTokenAtUnixMs) !== message.firstTokenAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.firstTokenAtUnixMs of type int64 too large");
+      }
+      writer.uint32(80).int64(message.firstTokenAtUnixMs);
+    }
+    if (message.completedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.completedAtUnixMs) !== message.completedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.completedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(88).int64(message.completedAtUnixMs);
     }
     return writer;
   },
@@ -1109,11 +5245,11 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
             continue;
           }
           case 4: {
-            if (tag !== 32) {
+            if (tag !== 34) {
               break;
             }
 
-            message.succeeded = reader.bool();
+            message.reportedServingEndpoint = reader.string();
             continue;
           }
           case 5: {
@@ -1121,7 +5257,7 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
               break;
             }
 
-            message.inputTokens = reader.int64() as bigint;
+            message.succeeded = reader.bool();
             continue;
           }
           case 6: {
@@ -1129,15 +5265,47 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
               break;
             }
 
-            message.outputTokens = reader.int64() as bigint;
+            message.errorClass = reader.int32() as any;
             continue;
           }
           case 7: {
-            if (tag !== 56) {
+            if (tag !== 58) {
               break;
             }
 
-            message.cacheReadTokens = reader.int64() as bigint;
+            message.usage = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.providerReportedCostUsdDec = reader.string();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.dispatchedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.firstTokenAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.completedAtUnixMs = reader.int64() as bigint;
             continue;
           }
         }
@@ -1169,21 +5337,37 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
         : isSet(object.native_request_id)
         ? globalThis.String(object.native_request_id)
         : "",
+      reportedServingEndpoint: isSet(object.reportedServingEndpoint)
+        ? globalThis.String(object.reportedServingEndpoint)
+        : isSet(object.reported_serving_endpoint)
+        ? globalThis.String(object.reported_serving_endpoint)
+        : "",
       succeeded: isSet(object.succeeded) ? globalThis.Boolean(object.succeeded) : false,
-      inputTokens: isSet(object.inputTokens)
-        ? BigInt(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? BigInt(object.input_tokens)
+      errorClass: isSet(object.errorClass)
+        ? attemptErrorClassFromJSON(object.errorClass)
+        : isSet(object.error_class)
+        ? attemptErrorClassFromJSON(object.error_class)
+        : 0,
+      usage: isSet(object.usage) ? UsageBound.fromJSON(object.usage) : undefined,
+      providerReportedCostUsdDec: isSet(object.providerReportedCostUsdDec)
+        ? globalThis.String(object.providerReportedCostUsdDec)
+        : isSet(object.provider_reported_cost_usd_dec)
+        ? globalThis.String(object.provider_reported_cost_usd_dec)
+        : "",
+      dispatchedAtUnixMs: isSet(object.dispatchedAtUnixMs)
+        ? BigInt(object.dispatchedAtUnixMs)
+        : isSet(object.dispatched_at_unix_ms)
+        ? BigInt(object.dispatched_at_unix_ms)
         : 0n,
-      outputTokens: isSet(object.outputTokens)
-        ? BigInt(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? BigInt(object.output_tokens)
+      firstTokenAtUnixMs: isSet(object.firstTokenAtUnixMs)
+        ? BigInt(object.firstTokenAtUnixMs)
+        : isSet(object.first_token_at_unix_ms)
+        ? BigInt(object.first_token_at_unix_ms)
         : 0n,
-      cacheReadTokens: isSet(object.cacheReadTokens)
-        ? BigInt(object.cacheReadTokens)
-        : isSet(object.cache_read_tokens)
-        ? BigInt(object.cache_read_tokens)
+      completedAtUnixMs: isSet(object.completedAtUnixMs)
+        ? BigInt(object.completedAtUnixMs)
+        : isSet(object.completed_at_unix_ms)
+        ? BigInt(object.completed_at_unix_ms)
         : 0n,
     };
   },
@@ -1199,17 +5383,29 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     if (message.nativeRequestId !== "") {
       obj.nativeRequestId = message.nativeRequestId;
     }
+    if (message.reportedServingEndpoint !== "") {
+      obj.reportedServingEndpoint = message.reportedServingEndpoint;
+    }
     if (message.succeeded !== false) {
       obj.succeeded = message.succeeded;
     }
-    if (message.inputTokens !== 0n) {
-      obj.inputTokens = message.inputTokens.toString();
+    if (message.errorClass !== 0) {
+      obj.errorClass = attemptErrorClassToJSON(message.errorClass);
     }
-    if (message.outputTokens !== 0n) {
-      obj.outputTokens = message.outputTokens.toString();
+    if (message.usage !== undefined) {
+      obj.usage = UsageBound.toJSON(message.usage);
     }
-    if (message.cacheReadTokens !== 0n) {
-      obj.cacheReadTokens = message.cacheReadTokens.toString();
+    if (message.providerReportedCostUsdDec !== "") {
+      obj.providerReportedCostUsdDec = message.providerReportedCostUsdDec;
+    }
+    if (message.dispatchedAtUnixMs !== 0n) {
+      obj.dispatchedAtUnixMs = message.dispatchedAtUnixMs.toString();
+    }
+    if (message.firstTokenAtUnixMs !== 0n) {
+      obj.firstTokenAtUnixMs = message.firstTokenAtUnixMs.toString();
+    }
+    if (message.completedAtUnixMs !== 0n) {
+      obj.completedAtUnixMs = message.completedAtUnixMs.toString();
     }
     return obj;
   },
@@ -1222,15 +5418,21 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     message.attemptId = object.attemptId ?? "";
     message.offeringId = object.offeringId ?? "";
     message.nativeRequestId = object.nativeRequestId ?? "";
+    message.reportedServingEndpoint = object.reportedServingEndpoint ?? "";
     message.succeeded = object.succeeded ?? false;
-    message.inputTokens = (object.inputTokens !== undefined && object.inputTokens !== null)
-      ? BigInt(object.inputTokens)
+    message.errorClass = object.errorClass ?? 0;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? UsageBound.fromPartial(object.usage)
+      : undefined;
+    message.providerReportedCostUsdDec = object.providerReportedCostUsdDec ?? "";
+    message.dispatchedAtUnixMs = (object.dispatchedAtUnixMs !== undefined && object.dispatchedAtUnixMs !== null)
+      ? BigInt(object.dispatchedAtUnixMs)
       : 0n;
-    message.outputTokens = (object.outputTokens !== undefined && object.outputTokens !== null)
-      ? BigInt(object.outputTokens)
+    message.firstTokenAtUnixMs = (object.firstTokenAtUnixMs !== undefined && object.firstTokenAtUnixMs !== null)
+      ? BigInt(object.firstTokenAtUnixMs)
       : 0n;
-    message.cacheReadTokens = (object.cacheReadTokens !== undefined && object.cacheReadTokens !== null)
-      ? BigInt(object.cacheReadTokens)
+    message.completedAtUnixMs = (object.completedAtUnixMs !== undefined && object.completedAtUnixMs !== null)
+      ? BigInt(object.completedAtUnixMs)
       : 0n;
     return message;
   },
@@ -1239,14 +5441,17 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
 function createBaseSettleRequest(): SettleRequest {
   return {
     requestId: "",
+    settlementIdempotencyKey: "",
     leaseToken: "",
     outcome: 0,
     servingOfferingId: "",
     nativeRequestId: "",
-    verifiedInputTokens: 0n,
-    verifiedOutputTokens: 0n,
-    verifiedCacheReadTokens: 0n,
+    reportedServingEndpoint: "",
+    fallbackUsed: false,
+    fallbackReason: "",
+    verifiedUsage: undefined,
     estimatedStreamedOutputTokens: 0n,
+    mediaOutputs: [],
     attempts: [],
   };
 }
@@ -1256,35 +5461,32 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     if (message.requestId !== "") {
       writer.uint32(10).string(message.requestId);
     }
+    if (message.settlementIdempotencyKey !== "") {
+      writer.uint32(18).string(message.settlementIdempotencyKey);
+    }
     if (message.leaseToken !== "") {
-      writer.uint32(18).string(message.leaseToken);
+      writer.uint32(26).string(message.leaseToken);
     }
     if (message.outcome !== 0) {
-      writer.uint32(24).int32(message.outcome);
+      writer.uint32(32).int32(message.outcome);
     }
     if (message.servingOfferingId !== "") {
-      writer.uint32(34).string(message.servingOfferingId);
+      writer.uint32(42).string(message.servingOfferingId);
     }
     if (message.nativeRequestId !== "") {
-      writer.uint32(42).string(message.nativeRequestId);
+      writer.uint32(50).string(message.nativeRequestId);
     }
-    if (message.verifiedInputTokens !== 0n) {
-      if (BigInt.asIntN(64, message.verifiedInputTokens) !== message.verifiedInputTokens) {
-        throw new globalThis.Error("value provided for field message.verifiedInputTokens of type int64 too large");
-      }
-      writer.uint32(48).int64(message.verifiedInputTokens);
+    if (message.reportedServingEndpoint !== "") {
+      writer.uint32(58).string(message.reportedServingEndpoint);
     }
-    if (message.verifiedOutputTokens !== 0n) {
-      if (BigInt.asIntN(64, message.verifiedOutputTokens) !== message.verifiedOutputTokens) {
-        throw new globalThis.Error("value provided for field message.verifiedOutputTokens of type int64 too large");
-      }
-      writer.uint32(56).int64(message.verifiedOutputTokens);
+    if (message.fallbackUsed !== false) {
+      writer.uint32(64).bool(message.fallbackUsed);
     }
-    if (message.verifiedCacheReadTokens !== 0n) {
-      if (BigInt.asIntN(64, message.verifiedCacheReadTokens) !== message.verifiedCacheReadTokens) {
-        throw new globalThis.Error("value provided for field message.verifiedCacheReadTokens of type int64 too large");
-      }
-      writer.uint32(64).int64(message.verifiedCacheReadTokens);
+    if (message.fallbackReason !== "") {
+      writer.uint32(74).string(message.fallbackReason);
+    }
+    if (message.verifiedUsage !== undefined) {
+      UsageBound.encode(message.verifiedUsage, writer.uint32(82).fork()).join();
     }
     if (message.estimatedStreamedOutputTokens !== 0n) {
       if (BigInt.asIntN(64, message.estimatedStreamedOutputTokens) !== message.estimatedStreamedOutputTokens) {
@@ -1292,10 +5494,13 @@ export const SettleRequest: MessageFns<SettleRequest> = {
           "value provided for field message.estimatedStreamedOutputTokens of type int64 too large",
         );
       }
-      writer.uint32(72).int64(message.estimatedStreamedOutputTokens);
+      writer.uint32(88).int64(message.estimatedStreamedOutputTokens);
+    }
+    for (const v of message.mediaOutputs) {
+      MediaOutputSettlementItem.encode(v!, writer.uint32(98).fork()).join();
     }
     for (const v of message.attempts) {
-      AttemptCostRecord.encode(v!, writer.uint32(82).fork()).join();
+      AttemptCostRecord.encode(v!, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -1326,23 +5531,23 @@ export const SettleRequest: MessageFns<SettleRequest> = {
               break;
             }
 
-            message.leaseToken = reader.string();
+            message.settlementIdempotencyKey = reader.string();
             continue;
           }
           case 3: {
-            if (tag !== 24) {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.leaseToken = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
               break;
             }
 
             message.outcome = reader.int32() as any;
-            continue;
-          }
-          case 4: {
-            if (tag !== 34) {
-              break;
-            }
-
-            message.servingOfferingId = reader.string();
             continue;
           }
           case 5: {
@@ -1350,23 +5555,23 @@ export const SettleRequest: MessageFns<SettleRequest> = {
               break;
             }
 
-            message.nativeRequestId = reader.string();
+            message.servingOfferingId = reader.string();
             continue;
           }
           case 6: {
-            if (tag !== 48) {
+            if (tag !== 50) {
               break;
             }
 
-            message.verifiedInputTokens = reader.int64() as bigint;
+            message.nativeRequestId = reader.string();
             continue;
           }
           case 7: {
-            if (tag !== 56) {
+            if (tag !== 58) {
               break;
             }
 
-            message.verifiedOutputTokens = reader.int64() as bigint;
+            message.reportedServingEndpoint = reader.string();
             continue;
           }
           case 8: {
@@ -1374,19 +5579,43 @@ export const SettleRequest: MessageFns<SettleRequest> = {
               break;
             }
 
-            message.verifiedCacheReadTokens = reader.int64() as bigint;
+            message.fallbackUsed = reader.bool();
             continue;
           }
           case 9: {
-            if (tag !== 72) {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.fallbackReason = reader.string();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.verifiedUsage = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
               break;
             }
 
             message.estimatedStreamedOutputTokens = reader.int64() as bigint;
             continue;
           }
-          case 10: {
-            if (tag !== 82) {
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.mediaOutputs.push(MediaOutputSettlementItem.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 13: {
+            if (tag !== 106) {
               break;
             }
 
@@ -1412,6 +5641,11 @@ export const SettleRequest: MessageFns<SettleRequest> = {
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
+      settlementIdempotencyKey: isSet(object.settlementIdempotencyKey)
+        ? globalThis.String(object.settlementIdempotencyKey)
+        : isSet(object.settlement_idempotency_key)
+        ? globalThis.String(object.settlement_idempotency_key)
+        : "",
       leaseToken: isSet(object.leaseToken)
         ? globalThis.String(object.leaseToken)
         : isSet(object.lease_token)
@@ -1428,26 +5662,36 @@ export const SettleRequest: MessageFns<SettleRequest> = {
         : isSet(object.native_request_id)
         ? globalThis.String(object.native_request_id)
         : "",
-      verifiedInputTokens: isSet(object.verifiedInputTokens)
-        ? BigInt(object.verifiedInputTokens)
-        : isSet(object.verified_input_tokens)
-        ? BigInt(object.verified_input_tokens)
-        : 0n,
-      verifiedOutputTokens: isSet(object.verifiedOutputTokens)
-        ? BigInt(object.verifiedOutputTokens)
-        : isSet(object.verified_output_tokens)
-        ? BigInt(object.verified_output_tokens)
-        : 0n,
-      verifiedCacheReadTokens: isSet(object.verifiedCacheReadTokens)
-        ? BigInt(object.verifiedCacheReadTokens)
-        : isSet(object.verified_cache_read_tokens)
-        ? BigInt(object.verified_cache_read_tokens)
-        : 0n,
+      reportedServingEndpoint: isSet(object.reportedServingEndpoint)
+        ? globalThis.String(object.reportedServingEndpoint)
+        : isSet(object.reported_serving_endpoint)
+        ? globalThis.String(object.reported_serving_endpoint)
+        : "",
+      fallbackUsed: isSet(object.fallbackUsed)
+        ? globalThis.Boolean(object.fallbackUsed)
+        : isSet(object.fallback_used)
+        ? globalThis.Boolean(object.fallback_used)
+        : false,
+      fallbackReason: isSet(object.fallbackReason)
+        ? globalThis.String(object.fallbackReason)
+        : isSet(object.fallback_reason)
+        ? globalThis.String(object.fallback_reason)
+        : "",
+      verifiedUsage: isSet(object.verifiedUsage)
+        ? UsageBound.fromJSON(object.verifiedUsage)
+        : isSet(object.verified_usage)
+        ? UsageBound.fromJSON(object.verified_usage)
+        : undefined,
       estimatedStreamedOutputTokens: isSet(object.estimatedStreamedOutputTokens)
         ? BigInt(object.estimatedStreamedOutputTokens)
         : isSet(object.estimated_streamed_output_tokens)
         ? BigInt(object.estimated_streamed_output_tokens)
         : 0n,
+      mediaOutputs: globalThis.Array.isArray(object?.mediaOutputs)
+        ? object.mediaOutputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : globalThis.Array.isArray(object?.media_outputs)
+        ? object.media_outputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : [],
       attempts: globalThis.Array.isArray(object?.attempts)
         ? object.attempts.map((e: any) => AttemptCostRecord.fromJSON(e))
         : [],
@@ -1458,6 +5702,9 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     const obj: any = {};
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
+    }
+    if (message.settlementIdempotencyKey !== "") {
+      obj.settlementIdempotencyKey = message.settlementIdempotencyKey;
     }
     if (message.leaseToken !== "") {
       obj.leaseToken = message.leaseToken;
@@ -1471,17 +5718,23 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     if (message.nativeRequestId !== "") {
       obj.nativeRequestId = message.nativeRequestId;
     }
-    if (message.verifiedInputTokens !== 0n) {
-      obj.verifiedInputTokens = message.verifiedInputTokens.toString();
+    if (message.reportedServingEndpoint !== "") {
+      obj.reportedServingEndpoint = message.reportedServingEndpoint;
     }
-    if (message.verifiedOutputTokens !== 0n) {
-      obj.verifiedOutputTokens = message.verifiedOutputTokens.toString();
+    if (message.fallbackUsed !== false) {
+      obj.fallbackUsed = message.fallbackUsed;
     }
-    if (message.verifiedCacheReadTokens !== 0n) {
-      obj.verifiedCacheReadTokens = message.verifiedCacheReadTokens.toString();
+    if (message.fallbackReason !== "") {
+      obj.fallbackReason = message.fallbackReason;
+    }
+    if (message.verifiedUsage !== undefined) {
+      obj.verifiedUsage = UsageBound.toJSON(message.verifiedUsage);
     }
     if (message.estimatedStreamedOutputTokens !== 0n) {
       obj.estimatedStreamedOutputTokens = message.estimatedStreamedOutputTokens.toString();
+    }
+    if (message.mediaOutputs?.length) {
+      obj.mediaOutputs = message.mediaOutputs.map((e) => MediaOutputSettlementItem.toJSON(e));
     }
     if (message.attempts?.length) {
       obj.attempts = message.attempts.map((e) => AttemptCostRecord.toJSON(e));
@@ -1495,31 +5748,41 @@ export const SettleRequest: MessageFns<SettleRequest> = {
   fromPartial<I extends Exact<DeepPartial<SettleRequest>, I>>(object: I): SettleRequest {
     const message = createBaseSettleRequest();
     message.requestId = object.requestId ?? "";
+    message.settlementIdempotencyKey = object.settlementIdempotencyKey ?? "";
     message.leaseToken = object.leaseToken ?? "";
     message.outcome = object.outcome ?? 0;
     message.servingOfferingId = object.servingOfferingId ?? "";
     message.nativeRequestId = object.nativeRequestId ?? "";
-    message.verifiedInputTokens = (object.verifiedInputTokens !== undefined && object.verifiedInputTokens !== null)
-      ? BigInt(object.verifiedInputTokens)
-      : 0n;
-    message.verifiedOutputTokens = (object.verifiedOutputTokens !== undefined && object.verifiedOutputTokens !== null)
-      ? BigInt(object.verifiedOutputTokens)
-      : 0n;
-    message.verifiedCacheReadTokens =
-      (object.verifiedCacheReadTokens !== undefined && object.verifiedCacheReadTokens !== null)
-        ? BigInt(object.verifiedCacheReadTokens)
-        : 0n;
+    message.reportedServingEndpoint = object.reportedServingEndpoint ?? "";
+    message.fallbackUsed = object.fallbackUsed ?? false;
+    message.fallbackReason = object.fallbackReason ?? "";
+    message.verifiedUsage = (object.verifiedUsage !== undefined && object.verifiedUsage !== null)
+      ? UsageBound.fromPartial(object.verifiedUsage)
+      : undefined;
     message.estimatedStreamedOutputTokens =
       (object.estimatedStreamedOutputTokens !== undefined && object.estimatedStreamedOutputTokens !== null)
         ? BigInt(object.estimatedStreamedOutputTokens)
         : 0n;
+    message.mediaOutputs = object.mediaOutputs?.map((e) => MediaOutputSettlementItem.fromPartial(e)) || [];
     message.attempts = object.attempts?.map((e) => AttemptCostRecord.fromPartial(e)) || [];
     return message;
   },
 };
 
 function createBaseSettleResponse(): SettleResponse {
-  return { settled: false, finalCustomerChargeMicroUsd: 0n, releasedHoldMicroUsd: 0n };
+  return {
+    settled: false,
+    finalCustomerCredits: 0n,
+    finalCustomerChargeMicroUsd: 0n,
+    releasedHoldCredits: 0n,
+    releasedHoldMicroUsd: 0n,
+    shortfallTopUpMicroUsd: 0n,
+    platformBorneDiscrepancyMicroUsd: 0n,
+    settledProviderPayableMicroUsd: 0n,
+    autoReleaseAtUnixMs: 0n,
+    settledBuckets: [],
+    releasedBuckets: [],
+  };
 }
 
 export const SettleResponse: MessageFns<SettleResponse> = {
@@ -1527,19 +5790,65 @@ export const SettleResponse: MessageFns<SettleResponse> = {
     if (message.settled !== false) {
       writer.uint32(8).bool(message.settled);
     }
+    if (message.finalCustomerCredits !== 0n) {
+      if (BigInt.asIntN(64, message.finalCustomerCredits) !== message.finalCustomerCredits) {
+        throw new globalThis.Error("value provided for field message.finalCustomerCredits of type int64 too large");
+      }
+      writer.uint32(16).int64(message.finalCustomerCredits);
+    }
     if (message.finalCustomerChargeMicroUsd !== 0n) {
       if (BigInt.asIntN(64, message.finalCustomerChargeMicroUsd) !== message.finalCustomerChargeMicroUsd) {
         throw new globalThis.Error(
           "value provided for field message.finalCustomerChargeMicroUsd of type int64 too large",
         );
       }
-      writer.uint32(16).int64(message.finalCustomerChargeMicroUsd);
+      writer.uint32(24).int64(message.finalCustomerChargeMicroUsd);
+    }
+    if (message.releasedHoldCredits !== 0n) {
+      if (BigInt.asIntN(64, message.releasedHoldCredits) !== message.releasedHoldCredits) {
+        throw new globalThis.Error("value provided for field message.releasedHoldCredits of type int64 too large");
+      }
+      writer.uint32(32).int64(message.releasedHoldCredits);
     }
     if (message.releasedHoldMicroUsd !== 0n) {
       if (BigInt.asIntN(64, message.releasedHoldMicroUsd) !== message.releasedHoldMicroUsd) {
         throw new globalThis.Error("value provided for field message.releasedHoldMicroUsd of type int64 too large");
       }
-      writer.uint32(24).int64(message.releasedHoldMicroUsd);
+      writer.uint32(40).int64(message.releasedHoldMicroUsd);
+    }
+    if (message.shortfallTopUpMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.shortfallTopUpMicroUsd) !== message.shortfallTopUpMicroUsd) {
+        throw new globalThis.Error("value provided for field message.shortfallTopUpMicroUsd of type int64 too large");
+      }
+      writer.uint32(48).int64(message.shortfallTopUpMicroUsd);
+    }
+    if (message.platformBorneDiscrepancyMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.platformBorneDiscrepancyMicroUsd) !== message.platformBorneDiscrepancyMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.platformBorneDiscrepancyMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(56).int64(message.platformBorneDiscrepancyMicroUsd);
+    }
+    if (message.settledProviderPayableMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.settledProviderPayableMicroUsd) !== message.settledProviderPayableMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.settledProviderPayableMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(64).int64(message.settledProviderPayableMicroUsd);
+    }
+    if (message.autoReleaseAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.autoReleaseAtUnixMs) !== message.autoReleaseAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.autoReleaseAtUnixMs of type int64 too large");
+      }
+      writer.uint32(72).int64(message.autoReleaseAtUnixMs);
+    }
+    for (const v of message.settledBuckets) {
+      BucketAllocationLine.encode(v!, writer.uint32(82).fork()).join();
+    }
+    for (const v of message.releasedBuckets) {
+      BucketAllocationLine.encode(v!, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -1570,7 +5879,7 @@ export const SettleResponse: MessageFns<SettleResponse> = {
               break;
             }
 
-            message.finalCustomerChargeMicroUsd = reader.int64() as bigint;
+            message.finalCustomerCredits = reader.int64() as bigint;
             continue;
           }
           case 3: {
@@ -1578,7 +5887,71 @@ export const SettleResponse: MessageFns<SettleResponse> = {
               break;
             }
 
+            message.finalCustomerChargeMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.releasedHoldCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
             message.releasedHoldMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.shortfallTopUpMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.platformBorneDiscrepancyMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.settledProviderPayableMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.autoReleaseAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.settledBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.releasedBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
             continue;
           }
         }
@@ -1596,16 +5969,56 @@ export const SettleResponse: MessageFns<SettleResponse> = {
   fromJSON(object: any): SettleResponse {
     return {
       settled: isSet(object.settled) ? globalThis.Boolean(object.settled) : false,
+      finalCustomerCredits: isSet(object.finalCustomerCredits)
+        ? BigInt(object.finalCustomerCredits)
+        : isSet(object.final_customer_credits)
+        ? BigInt(object.final_customer_credits)
+        : 0n,
       finalCustomerChargeMicroUsd: isSet(object.finalCustomerChargeMicroUsd)
         ? BigInt(object.finalCustomerChargeMicroUsd)
         : isSet(object.final_customer_charge_micro_usd)
         ? BigInt(object.final_customer_charge_micro_usd)
+        : 0n,
+      releasedHoldCredits: isSet(object.releasedHoldCredits)
+        ? BigInt(object.releasedHoldCredits)
+        : isSet(object.released_hold_credits)
+        ? BigInt(object.released_hold_credits)
         : 0n,
       releasedHoldMicroUsd: isSet(object.releasedHoldMicroUsd)
         ? BigInt(object.releasedHoldMicroUsd)
         : isSet(object.released_hold_micro_usd)
         ? BigInt(object.released_hold_micro_usd)
         : 0n,
+      shortfallTopUpMicroUsd: isSet(object.shortfallTopUpMicroUsd)
+        ? BigInt(object.shortfallTopUpMicroUsd)
+        : isSet(object.shortfall_top_up_micro_usd)
+        ? BigInt(object.shortfall_top_up_micro_usd)
+        : 0n,
+      platformBorneDiscrepancyMicroUsd: isSet(object.platformBorneDiscrepancyMicroUsd)
+        ? BigInt(object.platformBorneDiscrepancyMicroUsd)
+        : isSet(object.platform_borne_discrepancy_micro_usd)
+        ? BigInt(object.platform_borne_discrepancy_micro_usd)
+        : 0n,
+      settledProviderPayableMicroUsd: isSet(object.settledProviderPayableMicroUsd)
+        ? BigInt(object.settledProviderPayableMicroUsd)
+        : isSet(object.settled_provider_payable_micro_usd)
+        ? BigInt(object.settled_provider_payable_micro_usd)
+        : 0n,
+      autoReleaseAtUnixMs: isSet(object.autoReleaseAtUnixMs)
+        ? BigInt(object.autoReleaseAtUnixMs)
+        : isSet(object.auto_release_at_unix_ms)
+        ? BigInt(object.auto_release_at_unix_ms)
+        : 0n,
+      settledBuckets: globalThis.Array.isArray(object?.settledBuckets)
+        ? object.settledBuckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : globalThis.Array.isArray(object?.settled_buckets)
+        ? object.settled_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : [],
+      releasedBuckets: globalThis.Array.isArray(object?.releasedBuckets)
+        ? object.releasedBuckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : globalThis.Array.isArray(object?.released_buckets)
+        ? object.released_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : [],
     };
   },
 
@@ -1614,11 +6027,35 @@ export const SettleResponse: MessageFns<SettleResponse> = {
     if (message.settled !== false) {
       obj.settled = message.settled;
     }
+    if (message.finalCustomerCredits !== 0n) {
+      obj.finalCustomerCredits = message.finalCustomerCredits.toString();
+    }
     if (message.finalCustomerChargeMicroUsd !== 0n) {
       obj.finalCustomerChargeMicroUsd = message.finalCustomerChargeMicroUsd.toString();
     }
+    if (message.releasedHoldCredits !== 0n) {
+      obj.releasedHoldCredits = message.releasedHoldCredits.toString();
+    }
     if (message.releasedHoldMicroUsd !== 0n) {
       obj.releasedHoldMicroUsd = message.releasedHoldMicroUsd.toString();
+    }
+    if (message.shortfallTopUpMicroUsd !== 0n) {
+      obj.shortfallTopUpMicroUsd = message.shortfallTopUpMicroUsd.toString();
+    }
+    if (message.platformBorneDiscrepancyMicroUsd !== 0n) {
+      obj.platformBorneDiscrepancyMicroUsd = message.platformBorneDiscrepancyMicroUsd.toString();
+    }
+    if (message.settledProviderPayableMicroUsd !== 0n) {
+      obj.settledProviderPayableMicroUsd = message.settledProviderPayableMicroUsd.toString();
+    }
+    if (message.autoReleaseAtUnixMs !== 0n) {
+      obj.autoReleaseAtUnixMs = message.autoReleaseAtUnixMs.toString();
+    }
+    if (message.settledBuckets?.length) {
+      obj.settledBuckets = message.settledBuckets.map((e) => BucketAllocationLine.toJSON(e));
+    }
+    if (message.releasedBuckets?.length) {
+      obj.releasedBuckets = message.releasedBuckets.map((e) => BucketAllocationLine.toJSON(e));
     }
     return obj;
   },
@@ -1629,24 +6066,670 @@ export const SettleResponse: MessageFns<SettleResponse> = {
   fromPartial<I extends Exact<DeepPartial<SettleResponse>, I>>(object: I): SettleResponse {
     const message = createBaseSettleResponse();
     message.settled = object.settled ?? false;
+    message.finalCustomerCredits = (object.finalCustomerCredits !== undefined && object.finalCustomerCredits !== null)
+      ? BigInt(object.finalCustomerCredits)
+      : 0n;
     message.finalCustomerChargeMicroUsd =
       (object.finalCustomerChargeMicroUsd !== undefined && object.finalCustomerChargeMicroUsd !== null)
         ? BigInt(object.finalCustomerChargeMicroUsd)
         : 0n;
+    message.releasedHoldCredits = (object.releasedHoldCredits !== undefined && object.releasedHoldCredits !== null)
+      ? BigInt(object.releasedHoldCredits)
+      : 0n;
     message.releasedHoldMicroUsd = (object.releasedHoldMicroUsd !== undefined && object.releasedHoldMicroUsd !== null)
       ? BigInt(object.releasedHoldMicroUsd)
+      : 0n;
+    message.shortfallTopUpMicroUsd =
+      (object.shortfallTopUpMicroUsd !== undefined && object.shortfallTopUpMicroUsd !== null)
+        ? BigInt(object.shortfallTopUpMicroUsd)
+        : 0n;
+    message.platformBorneDiscrepancyMicroUsd =
+      (object.platformBorneDiscrepancyMicroUsd !== undefined && object.platformBorneDiscrepancyMicroUsd !== null)
+        ? BigInt(object.platformBorneDiscrepancyMicroUsd)
+        : 0n;
+    message.settledProviderPayableMicroUsd =
+      (object.settledProviderPayableMicroUsd !== undefined && object.settledProviderPayableMicroUsd !== null)
+        ? BigInt(object.settledProviderPayableMicroUsd)
+        : 0n;
+    message.autoReleaseAtUnixMs = (object.autoReleaseAtUnixMs !== undefined && object.autoReleaseAtUnixMs !== null)
+      ? BigInt(object.autoReleaseAtUnixMs)
+      : 0n;
+    message.settledBuckets = object.settledBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    message.releasedBuckets = object.releasedBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseMarkUncertainRequest(): MarkUncertainRequest {
+  return { requestId: "", studioOperationId: "", leaseToken: "", providerTaskId: "", reason: "" };
+}
+
+export const MarkUncertainRequest: MessageFns<MarkUncertainRequest> = {
+  encode(message: MarkUncertainRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.studioOperationId !== "") {
+      writer.uint32(18).string(message.studioOperationId);
+    }
+    if (message.leaseToken !== "") {
+      writer.uint32(26).string(message.leaseToken);
+    }
+    if (message.providerTaskId !== "") {
+      writer.uint32(34).string(message.providerTaskId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(42).string(message.reason);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MarkUncertainRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMarkUncertainRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.studioOperationId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.leaseToken = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.providerTaskId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MarkUncertainRequest {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      studioOperationId: isSet(object.studioOperationId)
+        ? globalThis.String(object.studioOperationId)
+        : isSet(object.studio_operation_id)
+        ? globalThis.String(object.studio_operation_id)
+        : "",
+      leaseToken: isSet(object.leaseToken)
+        ? globalThis.String(object.leaseToken)
+        : isSet(object.lease_token)
+        ? globalThis.String(object.lease_token)
+        : "",
+      providerTaskId: isSet(object.providerTaskId)
+        ? globalThis.String(object.providerTaskId)
+        : isSet(object.provider_task_id)
+        ? globalThis.String(object.provider_task_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+    };
+  },
+
+  toJSON(message: MarkUncertainRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.studioOperationId !== "") {
+      obj.studioOperationId = message.studioOperationId;
+    }
+    if (message.leaseToken !== "") {
+      obj.leaseToken = message.leaseToken;
+    }
+    if (message.providerTaskId !== "") {
+      obj.providerTaskId = message.providerTaskId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MarkUncertainRequest>, I>>(base?: I): MarkUncertainRequest {
+    return MarkUncertainRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MarkUncertainRequest>, I>>(object: I): MarkUncertainRequest {
+    const message = createBaseMarkUncertainRequest();
+    message.requestId = object.requestId ?? "";
+    message.studioOperationId = object.studioOperationId ?? "";
+    message.leaseToken = object.leaseToken ?? "";
+    message.providerTaskId = object.providerTaskId ?? "";
+    message.reason = object.reason ?? "";
+    return message;
+  },
+};
+
+function createBaseMarkUncertainResponse(): MarkUncertainResponse {
+  return { marked: false, autoReleaseAtUnixMs: 0n };
+}
+
+export const MarkUncertainResponse: MessageFns<MarkUncertainResponse> = {
+  encode(message: MarkUncertainResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.marked !== false) {
+      writer.uint32(8).bool(message.marked);
+    }
+    if (message.autoReleaseAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.autoReleaseAtUnixMs) !== message.autoReleaseAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.autoReleaseAtUnixMs of type int64 too large");
+      }
+      writer.uint32(16).int64(message.autoReleaseAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): MarkUncertainResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseMarkUncertainResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.marked = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.autoReleaseAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): MarkUncertainResponse {
+    return {
+      marked: isSet(object.marked) ? globalThis.Boolean(object.marked) : false,
+      autoReleaseAtUnixMs: isSet(object.autoReleaseAtUnixMs)
+        ? BigInt(object.autoReleaseAtUnixMs)
+        : isSet(object.auto_release_at_unix_ms)
+        ? BigInt(object.auto_release_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: MarkUncertainResponse): unknown {
+    const obj: any = {};
+    if (message.marked !== false) {
+      obj.marked = message.marked;
+    }
+    if (message.autoReleaseAtUnixMs !== 0n) {
+      obj.autoReleaseAtUnixMs = message.autoReleaseAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<MarkUncertainResponse>, I>>(base?: I): MarkUncertainResponse {
+    return MarkUncertainResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<MarkUncertainResponse>, I>>(object: I): MarkUncertainResponse {
+    const message = createBaseMarkUncertainResponse();
+    message.marked = object.marked ?? false;
+    message.autoReleaseAtUnixMs = (object.autoReleaseAtUnixMs !== undefined && object.autoReleaseAtUnixMs !== null)
+      ? BigInt(object.autoReleaseAtUnixMs)
       : 0n;
     return message;
   },
 };
 
+function createBaseResolveUncertainRequest(): ResolveUncertainRequest {
+  return {
+    requestId: "",
+    resolutionIdempotencyKey: "",
+    action: 0,
+    actorId: "",
+    reason: "",
+    servingOfferingId: "",
+    nativeRequestId: "",
+    verifiedUsage: undefined,
+    mediaOutputs: [],
+    lateProviderCostUsdDec: "",
+  };
+}
+
+export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
+  encode(message: ResolveUncertainRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.resolutionIdempotencyKey !== "") {
+      writer.uint32(18).string(message.resolutionIdempotencyKey);
+    }
+    if (message.action !== 0) {
+      writer.uint32(24).int32(message.action);
+    }
+    if (message.actorId !== "") {
+      writer.uint32(34).string(message.actorId);
+    }
+    if (message.reason !== "") {
+      writer.uint32(42).string(message.reason);
+    }
+    if (message.servingOfferingId !== "") {
+      writer.uint32(50).string(message.servingOfferingId);
+    }
+    if (message.nativeRequestId !== "") {
+      writer.uint32(58).string(message.nativeRequestId);
+    }
+    if (message.verifiedUsage !== undefined) {
+      UsageBound.encode(message.verifiedUsage, writer.uint32(66).fork()).join();
+    }
+    for (const v of message.mediaOutputs) {
+      MediaOutputSettlementItem.encode(v!, writer.uint32(74).fork()).join();
+    }
+    if (message.lateProviderCostUsdDec !== "") {
+      writer.uint32(82).string(message.lateProviderCostUsdDec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveUncertainRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveUncertainRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.resolutionIdempotencyKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.action = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.actorId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.servingOfferingId = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.nativeRequestId = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.verifiedUsage = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.mediaOutputs.push(MediaOutputSettlementItem.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.lateProviderCostUsdDec = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveUncertainRequest {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      resolutionIdempotencyKey: isSet(object.resolutionIdempotencyKey)
+        ? globalThis.String(object.resolutionIdempotencyKey)
+        : isSet(object.resolution_idempotency_key)
+        ? globalThis.String(object.resolution_idempotency_key)
+        : "",
+      action: isSet(object.action) ? uncertainResolutionActionFromJSON(object.action) : 0,
+      actorId: isSet(object.actorId)
+        ? globalThis.String(object.actorId)
+        : isSet(object.actor_id)
+        ? globalThis.String(object.actor_id)
+        : "",
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      servingOfferingId: isSet(object.servingOfferingId)
+        ? globalThis.String(object.servingOfferingId)
+        : isSet(object.serving_offering_id)
+        ? globalThis.String(object.serving_offering_id)
+        : "",
+      nativeRequestId: isSet(object.nativeRequestId)
+        ? globalThis.String(object.nativeRequestId)
+        : isSet(object.native_request_id)
+        ? globalThis.String(object.native_request_id)
+        : "",
+      verifiedUsage: isSet(object.verifiedUsage)
+        ? UsageBound.fromJSON(object.verifiedUsage)
+        : isSet(object.verified_usage)
+        ? UsageBound.fromJSON(object.verified_usage)
+        : undefined,
+      mediaOutputs: globalThis.Array.isArray(object?.mediaOutputs)
+        ? object.mediaOutputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : globalThis.Array.isArray(object?.media_outputs)
+        ? object.media_outputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : [],
+      lateProviderCostUsdDec: isSet(object.lateProviderCostUsdDec)
+        ? globalThis.String(object.lateProviderCostUsdDec)
+        : isSet(object.late_provider_cost_usd_dec)
+        ? globalThis.String(object.late_provider_cost_usd_dec)
+        : "",
+    };
+  },
+
+  toJSON(message: ResolveUncertainRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.resolutionIdempotencyKey !== "") {
+      obj.resolutionIdempotencyKey = message.resolutionIdempotencyKey;
+    }
+    if (message.action !== 0) {
+      obj.action = uncertainResolutionActionToJSON(message.action);
+    }
+    if (message.actorId !== "") {
+      obj.actorId = message.actorId;
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.servingOfferingId !== "") {
+      obj.servingOfferingId = message.servingOfferingId;
+    }
+    if (message.nativeRequestId !== "") {
+      obj.nativeRequestId = message.nativeRequestId;
+    }
+    if (message.verifiedUsage !== undefined) {
+      obj.verifiedUsage = UsageBound.toJSON(message.verifiedUsage);
+    }
+    if (message.mediaOutputs?.length) {
+      obj.mediaOutputs = message.mediaOutputs.map((e) => MediaOutputSettlementItem.toJSON(e));
+    }
+    if (message.lateProviderCostUsdDec !== "") {
+      obj.lateProviderCostUsdDec = message.lateProviderCostUsdDec;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveUncertainRequest>, I>>(base?: I): ResolveUncertainRequest {
+    return ResolveUncertainRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveUncertainRequest>, I>>(object: I): ResolveUncertainRequest {
+    const message = createBaseResolveUncertainRequest();
+    message.requestId = object.requestId ?? "";
+    message.resolutionIdempotencyKey = object.resolutionIdempotencyKey ?? "";
+    message.action = object.action ?? 0;
+    message.actorId = object.actorId ?? "";
+    message.reason = object.reason ?? "";
+    message.servingOfferingId = object.servingOfferingId ?? "";
+    message.nativeRequestId = object.nativeRequestId ?? "";
+    message.verifiedUsage = (object.verifiedUsage !== undefined && object.verifiedUsage !== null)
+      ? UsageBound.fromPartial(object.verifiedUsage)
+      : undefined;
+    message.mediaOutputs = object.mediaOutputs?.map((e) => MediaOutputSettlementItem.fromPartial(e)) || [];
+    message.lateProviderCostUsdDec = object.lateProviderCostUsdDec ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveUncertainResponse(): ResolveUncertainResponse {
+  return { resolved: false, settlement: undefined };
+}
+
+export const ResolveUncertainResponse: MessageFns<ResolveUncertainResponse> = {
+  encode(message: ResolveUncertainResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.resolved !== false) {
+      writer.uint32(8).bool(message.resolved);
+    }
+    if (message.settlement !== undefined) {
+      SettleResponse.encode(message.settlement, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveUncertainResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveUncertainResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.resolved = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.settlement = SettleResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveUncertainResponse {
+    return {
+      resolved: isSet(object.resolved) ? globalThis.Boolean(object.resolved) : false,
+      settlement: isSet(object.settlement) ? SettleResponse.fromJSON(object.settlement) : undefined,
+    };
+  },
+
+  toJSON(message: ResolveUncertainResponse): unknown {
+    const obj: any = {};
+    if (message.resolved !== false) {
+      obj.resolved = message.resolved;
+    }
+    if (message.settlement !== undefined) {
+      obj.settlement = SettleResponse.toJSON(message.settlement);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveUncertainResponse>, I>>(base?: I): ResolveUncertainResponse {
+    return ResolveUncertainResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveUncertainResponse>, I>>(object: I): ResolveUncertainResponse {
+    const message = createBaseResolveUncertainResponse();
+    message.resolved = object.resolved ?? false;
+    message.settlement = (object.settlement !== undefined && object.settlement !== null)
+      ? SettleResponse.fromPartial(object.settlement)
+      : undefined;
+    return message;
+  },
+};
+
 /**
- * BillingExecutionService is the intra-Gateway synchronous gRPC contract between
- * Go Data Plane (gateway-dataplane) and TypeScript Billing Service (billing-account-service).
+ * BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
+ * hosted by TypeScript billing-account-service and called by:
+ * 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
+ * 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
+ * 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
  */
 export type BillingExecutionServiceService = typeof BillingExecutionServiceService;
 export const BillingExecutionServiceService = {
-  /** AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold. */
+  /**
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   */
+  resolvePrincipalScope: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/ResolvePrincipalScope" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolvePrincipalScopeRequest): Buffer =>
+      Buffer.from(ResolvePrincipalScopeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolvePrincipalScopeRequest => ResolvePrincipalScopeRequest.decode(value),
+    responseSerialize: (value: ResolvePrincipalScopeResponse): Buffer =>
+      Buffer.from(ResolvePrincipalScopeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolvePrincipalScopeResponse => ResolvePrincipalScopeResponse.decode(value),
+  },
+  /**
+   * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   */
+  previewQuote: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/PreviewQuote" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PreviewQuoteRequest): Buffer => Buffer.from(PreviewQuoteRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PreviewQuoteRequest => PreviewQuoteRequest.decode(value),
+    responseSerialize: (value: PreviewQuoteResponse): Buffer =>
+      Buffer.from(PreviewQuoteResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PreviewQuoteResponse => PreviewQuoteResponse.decode(value),
+  },
+  /**
+   * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   */
   authorizeAndHold: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold" as const,
     requestStream: false as const,
@@ -1668,7 +6751,22 @@ export const BillingExecutionServiceService = {
     responseSerialize: (value: MarkSendingResponse): Buffer => Buffer.from(MarkSendingResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): MarkSendingResponse => MarkSendingResponse.decode(value),
   },
-  /** Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds. */
+  /** ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs. */
+  extendExecutionLease: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/ExtendExecutionLease" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ExtendExecutionLeaseRequest): Buffer =>
+      Buffer.from(ExtendExecutionLeaseRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ExtendExecutionLeaseRequest => ExtendExecutionLeaseRequest.decode(value),
+    responseSerialize: (value: ExtendExecutionLeaseResponse): Buffer =>
+      Buffer.from(ExtendExecutionLeaseResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ExtendExecutionLeaseResponse => ExtendExecutionLeaseResponse.decode(value),
+  },
+  /**
+   * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   */
   settle: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/Settle" as const,
     requestStream: false as const,
@@ -1678,19 +6776,105 @@ export const BillingExecutionServiceService = {
     responseSerialize: (value: SettleResponse): Buffer => Buffer.from(SettleResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): SettleResponse => SettleResponse.decode(value),
   },
+  /** MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue. */
+  markUncertain: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/MarkUncertain" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: MarkUncertainRequest): Buffer => Buffer.from(MarkUncertainRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): MarkUncertainRequest => MarkUncertainRequest.decode(value),
+    responseSerialize: (value: MarkUncertainResponse): Buffer =>
+      Buffer.from(MarkUncertainResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): MarkUncertainResponse => MarkUncertainResponse.decode(value),
+  },
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  resolveUncertain: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolveUncertainRequest): Buffer =>
+      Buffer.from(ResolveUncertainRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveUncertainRequest => ResolveUncertainRequest.decode(value),
+    responseSerialize: (value: ResolveUncertainResponse): Buffer =>
+      Buffer.from(ResolveUncertainResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveUncertainResponse => ResolveUncertainResponse.decode(value),
+  },
 } as const;
 
 export interface BillingExecutionServiceServer extends UntypedServiceImplementation {
-  /** AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold. */
+  /**
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   */
+  resolvePrincipalScope: handleUnaryCall<ResolvePrincipalScopeRequest, ResolvePrincipalScopeResponse>;
+  /**
+   * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   */
+  previewQuote: handleUnaryCall<PreviewQuoteRequest, PreviewQuoteResponse>;
+  /**
+   * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   */
   authorizeAndHold: handleUnaryCall<AuthorizeAndHoldRequest, AuthorizeAndHoldResponse>;
   /** MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes. */
   markSending: handleUnaryCall<MarkSendingRequest, MarkSendingResponse>;
-  /** Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds. */
+  /** ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs. */
+  extendExecutionLease: handleUnaryCall<ExtendExecutionLeaseRequest, ExtendExecutionLeaseResponse>;
+  /**
+   * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   */
   settle: handleUnaryCall<SettleRequest, SettleResponse>;
+  /** MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue. */
+  markUncertain: handleUnaryCall<MarkUncertainRequest, MarkUncertainResponse>;
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  resolveUncertain: handleUnaryCall<ResolveUncertainRequest, ResolveUncertainResponse>;
 }
 
 export interface BillingExecutionServiceClient extends Client {
-  /** AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold. */
+  /**
+   * ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+   * so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+   */
+  resolvePrincipalScope(
+    request: ResolvePrincipalScopeRequest,
+    callback: (error: ServiceError | null, response: ResolvePrincipalScopeResponse) => void,
+  ): ClientUnaryCall;
+  resolvePrincipalScope(
+    request: ResolvePrincipalScopeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolvePrincipalScopeResponse) => void,
+  ): ClientUnaryCall;
+  resolvePrincipalScope(
+    request: ResolvePrincipalScopeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolvePrincipalScopeResponse) => void,
+  ): ClientUnaryCall;
+  /**
+   * PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+   * F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+   */
+  previewQuote(
+    request: PreviewQuoteRequest,
+    callback: (error: ServiceError | null, response: PreviewQuoteResponse) => void,
+  ): ClientUnaryCall;
+  previewQuote(
+    request: PreviewQuoteRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PreviewQuoteResponse) => void,
+  ): ClientUnaryCall;
+  previewQuote(
+    request: PreviewQuoteRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PreviewQuoteResponse) => void,
+  ): ClientUnaryCall;
+  /**
+   * AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+   * and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
+   */
   authorizeAndHold(
     request: AuthorizeAndHoldRequest,
     callback: (error: ServiceError | null, response: AuthorizeAndHoldResponse) => void,
@@ -1722,7 +6906,26 @@ export interface BillingExecutionServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: MarkSendingResponse) => void,
   ): ClientUnaryCall;
-  /** Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds. */
+  /** ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs. */
+  extendExecutionLease(
+    request: ExtendExecutionLeaseRequest,
+    callback: (error: ServiceError | null, response: ExtendExecutionLeaseResponse) => void,
+  ): ClientUnaryCall;
+  extendExecutionLease(
+    request: ExtendExecutionLeaseRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ExtendExecutionLeaseResponse) => void,
+  ): ClientUnaryCall;
+  extendExecutionLease(
+    request: ExtendExecutionLeaseRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ExtendExecutionLeaseResponse) => void,
+  ): ClientUnaryCall;
+  /**
+   * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   */
   settle(
     request: SettleRequest,
     callback: (error: ServiceError | null, response: SettleResponse) => void,
@@ -1737,6 +6940,38 @@ export interface BillingExecutionServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: SettleResponse) => void,
+  ): ClientUnaryCall;
+  /** MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue. */
+  markUncertain(
+    request: MarkUncertainRequest,
+    callback: (error: ServiceError | null, response: MarkUncertainResponse) => void,
+  ): ClientUnaryCall;
+  markUncertain(
+    request: MarkUncertainRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: MarkUncertainResponse) => void,
+  ): ClientUnaryCall;
+  markUncertain(
+    request: MarkUncertainRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: MarkUncertainResponse) => void,
+  ): ClientUnaryCall;
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  resolveUncertain(
+    request: ResolveUncertainRequest,
+    callback: (error: ServiceError | null, response: ResolveUncertainResponse) => void,
+  ): ClientUnaryCall;
+  resolveUncertain(
+    request: ResolveUncertainRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveUncertainResponse) => void,
+  ): ClientUnaryCall;
+  resolveUncertain(
+    request: ResolveUncertainRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveUncertainResponse) => void,
   ): ClientUnaryCall;
 }
 

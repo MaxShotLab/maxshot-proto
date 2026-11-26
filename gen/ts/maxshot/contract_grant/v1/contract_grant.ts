@@ -24,6 +24,58 @@ export const protobufPackage = "maxshot.contract_grant.v1";
 
 export const protobufFileName = "maxshot/contract_grant/v1/contract_grant.proto";
 
+export enum FundedTermStatus {
+  FUNDED_TERM_STATUS_UNSPECIFIED = 0,
+  FUNDED_TERM_STATUS_UPCOMING = 1,
+  FUNDED_TERM_STATUS_ACTIVE = 2,
+  FUNDED_TERM_STATUS_ENDED = 3,
+  /** FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH - TOK-R30: blocks uncovered future grants */
+  FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function fundedTermStatusFromJSON(object: any): FundedTermStatus {
+  switch (object) {
+    case 0:
+    case "FUNDED_TERM_STATUS_UNSPECIFIED":
+      return FundedTermStatus.FUNDED_TERM_STATUS_UNSPECIFIED;
+    case 1:
+    case "FUNDED_TERM_STATUS_UPCOMING":
+      return FundedTermStatus.FUNDED_TERM_STATUS_UPCOMING;
+    case 2:
+    case "FUNDED_TERM_STATUS_ACTIVE":
+      return FundedTermStatus.FUNDED_TERM_STATUS_ACTIVE;
+    case 3:
+    case "FUNDED_TERM_STATUS_ENDED":
+      return FundedTermStatus.FUNDED_TERM_STATUS_ENDED;
+    case 4:
+    case "FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH":
+      return FundedTermStatus.FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FundedTermStatus.UNRECOGNIZED;
+  }
+}
+
+export function fundedTermStatusToJSON(object: FundedTermStatus): string {
+  switch (object) {
+    case FundedTermStatus.FUNDED_TERM_STATUS_UNSPECIFIED:
+      return "FUNDED_TERM_STATUS_UNSPECIFIED";
+    case FundedTermStatus.FUNDED_TERM_STATUS_UPCOMING:
+      return "FUNDED_TERM_STATUS_UPCOMING";
+    case FundedTermStatus.FUNDED_TERM_STATUS_ACTIVE:
+      return "FUNDED_TERM_STATUS_ACTIVE";
+    case FundedTermStatus.FUNDED_TERM_STATUS_ENDED:
+      return "FUNDED_TERM_STATUS_ENDED";
+    case FundedTermStatus.FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH:
+      return "FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH";
+    case FundedTermStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum GrantItemStatus {
   GRANT_ITEM_STATUS_UNSPECIFIED = 0,
   GRANT_ITEM_STATUS_CREDITED = 1,
@@ -34,6 +86,7 @@ export enum GrantItemStatus {
   GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH = 5,
   GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6,
   GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7,
+  GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -63,6 +116,9 @@ export function grantItemStatusFromJSON(object: any): GrantItemStatus {
     case 7:
     case "GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET":
       return GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET;
+    case 8:
+    case "GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH":
+      return GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -88,10 +144,55 @@ export function grantItemStatusToJSON(object: GrantItemStatus): string {
       return "GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED";
     case GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET:
       return "GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET";
+    case GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH:
+      return "GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH";
     case GrantItemStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+/**
+ * FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
+ * and replicated to Contract Backend. The rational N/D rate converts USD face value to integer Credits
+ * at grant issuance time only; spending uses the unified Gateway ledger Credit unit.
+ */
+export interface FundedTermConfig {
+  termId: string;
+  programId: string;
+  fundingReservationId: string;
+  termsVersion: string;
+  startUnixSec: bigint;
+  endUnixSec: bigint;
+  /** decided: 12 (TD-77) */
+  annualBaseUsdNum: bigint;
+  /** decided: 1 */
+  annualBaseUsdDen: bigint;
+  /** decided: 1000000 (TD-53), issuance conversion only */
+  creditsPerUsdNum: bigint;
+  /** decided: 1 */
+  creditsPerUsdDen: bigint;
+  allowedCatalogIds: string[];
+  maxTotalGrantCredits: bigint;
+  status: FundedTermStatus;
+  updatedAtUnixSec: bigint;
+}
+
+export interface PushFundedTermsRequest {
+  batchId: string;
+  terms: FundedTermConfig[];
+}
+
+export interface PushFundedTermsResponse {
+  accepted: boolean;
+}
+
+export interface ListFundedTermsRequest {
+  activeOrUpcomingOnly: boolean;
+}
+
+export interface ListFundedTermsResponse {
+  terms: FundedTermConfig[];
 }
 
 export interface TermAcceptance {
@@ -104,7 +205,13 @@ export interface WalletEligibilityRecord {
   accountId: string;
   /** normalized lowercase 0x-prefixed Ethereum address */
   walletAddress: string;
+  /** 1 (Ethereum mainnet) */
+  chainId: bigint;
   linkedAtUnixSec: bigint;
+  /** audit proof reference for ADM-R21 */
+  siweProofRef: string;
+  isContractWalletErc1271: boolean;
+  /** TOK-R36 */
   excludedTreasuryOrTeam: boolean;
   termAcceptances: TermAcceptance[];
   updatedSequence: bigint;
@@ -129,6 +236,30 @@ export interface PullWalletEligibilityUpdatesResponse {
   page?: CursorPageResponse | undefined;
 }
 
+export interface DirectedBridgeRoutePause {
+  srcChainEid: number;
+  dstChainEid: number;
+  paused: boolean;
+}
+
+export interface GetContractOperationalStatusRequest {
+}
+
+/** GetContractOperationalStatusResponse feeds Gateway Admin read-only pause & finality monitoring (ADM-R22, TOK-R05). */
+export interface GetContractOperationalStatusResponse {
+  mintPaused: boolean;
+  burnPaused: boolean;
+  withdrawPaused: boolean;
+  positionPauseAll: boolean;
+  maxBridgeGlobalPaused: boolean;
+  directedBridgePauses: DirectedBridgeRoutePause[];
+  ethereumHeadBlock: bigint;
+  ethereumFinalizedBlock: bigint;
+  ethereumFinalizedTimestampUnixSec: bigint;
+  activeTermId: string;
+  nextGrantBoundaryUnixSec: bigint;
+}
+
 export interface AitGrantItem {
   /** deterministic: "{term_id}:{boundary_index}:{account_id}" */
   grantId: string;
@@ -136,12 +267,17 @@ export interface AitGrantItem {
   boundaryIndex: number;
   accountId: string;
   walletAddress: string;
-  /** Exact 256-bit integer string: eligible staked AIT wei * eligible seconds from term start to boundary t. */
+  /** Exact 256-bit integer decimal string: eligible staked AIT wei * eligible seconds from term start to boundary t. */
   cumulativeEligibleAitWeiSecondsDec: string;
   previouslyGrantedCredits: bigint;
   grantCredits: bigint;
   finalizedBlockNumber: bigint;
   boundaryTimestampUnixSec: bigint;
+  programId: string;
+  fundingReservationId: string;
+  isFinalShortBoundary: boolean;
+  cumulativeEntitlementCredits: bigint;
+  finalizedBlockHash: string;
 }
 
 export interface IssueAitCreditGrantsRequest {
@@ -155,11 +291,697 @@ export interface AitGrantItemResult {
   grantId: string;
   status: GrantItemStatus;
   detail: string;
+  creditedAmount: bigint;
+  issuedAtUnixSec: bigint;
+  /** issued_at_unix_sec + 7 days (TOK-R24) */
+  expiresAtUnixSec: bigint;
 }
 
 export interface IssueAitCreditGrantsResponse {
   results: AitGrantItemResult[];
 }
+
+function createBaseFundedTermConfig(): FundedTermConfig {
+  return {
+    termId: "",
+    programId: "",
+    fundingReservationId: "",
+    termsVersion: "",
+    startUnixSec: 0n,
+    endUnixSec: 0n,
+    annualBaseUsdNum: 0n,
+    annualBaseUsdDen: 0n,
+    creditsPerUsdNum: 0n,
+    creditsPerUsdDen: 0n,
+    allowedCatalogIds: [],
+    maxTotalGrantCredits: 0n,
+    status: 0,
+    updatedAtUnixSec: 0n,
+  };
+}
+
+export const FundedTermConfig: MessageFns<FundedTermConfig> = {
+  encode(message: FundedTermConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.termId !== "") {
+      writer.uint32(10).string(message.termId);
+    }
+    if (message.programId !== "") {
+      writer.uint32(18).string(message.programId);
+    }
+    if (message.fundingReservationId !== "") {
+      writer.uint32(26).string(message.fundingReservationId);
+    }
+    if (message.termsVersion !== "") {
+      writer.uint32(34).string(message.termsVersion);
+    }
+    if (message.startUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.startUnixSec) !== message.startUnixSec) {
+        throw new globalThis.Error("value provided for field message.startUnixSec of type int64 too large");
+      }
+      writer.uint32(40).int64(message.startUnixSec);
+    }
+    if (message.endUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.endUnixSec) !== message.endUnixSec) {
+        throw new globalThis.Error("value provided for field message.endUnixSec of type int64 too large");
+      }
+      writer.uint32(48).int64(message.endUnixSec);
+    }
+    if (message.annualBaseUsdNum !== 0n) {
+      if (BigInt.asIntN(64, message.annualBaseUsdNum) !== message.annualBaseUsdNum) {
+        throw new globalThis.Error("value provided for field message.annualBaseUsdNum of type int64 too large");
+      }
+      writer.uint32(56).int64(message.annualBaseUsdNum);
+    }
+    if (message.annualBaseUsdDen !== 0n) {
+      if (BigInt.asIntN(64, message.annualBaseUsdDen) !== message.annualBaseUsdDen) {
+        throw new globalThis.Error("value provided for field message.annualBaseUsdDen of type int64 too large");
+      }
+      writer.uint32(64).int64(message.annualBaseUsdDen);
+    }
+    if (message.creditsPerUsdNum !== 0n) {
+      if (BigInt.asIntN(64, message.creditsPerUsdNum) !== message.creditsPerUsdNum) {
+        throw new globalThis.Error("value provided for field message.creditsPerUsdNum of type int64 too large");
+      }
+      writer.uint32(72).int64(message.creditsPerUsdNum);
+    }
+    if (message.creditsPerUsdDen !== 0n) {
+      if (BigInt.asIntN(64, message.creditsPerUsdDen) !== message.creditsPerUsdDen) {
+        throw new globalThis.Error("value provided for field message.creditsPerUsdDen of type int64 too large");
+      }
+      writer.uint32(80).int64(message.creditsPerUsdDen);
+    }
+    for (const v of message.allowedCatalogIds) {
+      writer.uint32(90).string(v!);
+    }
+    if (message.maxTotalGrantCredits !== 0n) {
+      if (BigInt.asIntN(64, message.maxTotalGrantCredits) !== message.maxTotalGrantCredits) {
+        throw new globalThis.Error("value provided for field message.maxTotalGrantCredits of type int64 too large");
+      }
+      writer.uint32(96).int64(message.maxTotalGrantCredits);
+    }
+    if (message.status !== 0) {
+      writer.uint32(104).int32(message.status);
+    }
+    if (message.updatedAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.updatedAtUnixSec) !== message.updatedAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.updatedAtUnixSec of type int64 too large");
+      }
+      writer.uint32(112).int64(message.updatedAtUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): FundedTermConfig {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseFundedTermConfig();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.programId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.fundingReservationId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.termsVersion = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.startUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.endUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.annualBaseUsdNum = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.annualBaseUsdDen = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.creditsPerUsdNum = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.creditsPerUsdDen = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.allowedCatalogIds.push(reader.string());
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.maxTotalGrantCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.status = reader.int32() as any;
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.updatedAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): FundedTermConfig {
+    return {
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+      programId: isSet(object.programId)
+        ? globalThis.String(object.programId)
+        : isSet(object.program_id)
+        ? globalThis.String(object.program_id)
+        : "",
+      fundingReservationId: isSet(object.fundingReservationId)
+        ? globalThis.String(object.fundingReservationId)
+        : isSet(object.funding_reservation_id)
+        ? globalThis.String(object.funding_reservation_id)
+        : "",
+      termsVersion: isSet(object.termsVersion)
+        ? globalThis.String(object.termsVersion)
+        : isSet(object.terms_version)
+        ? globalThis.String(object.terms_version)
+        : "",
+      startUnixSec: isSet(object.startUnixSec)
+        ? BigInt(object.startUnixSec)
+        : isSet(object.start_unix_sec)
+        ? BigInt(object.start_unix_sec)
+        : 0n,
+      endUnixSec: isSet(object.endUnixSec)
+        ? BigInt(object.endUnixSec)
+        : isSet(object.end_unix_sec)
+        ? BigInt(object.end_unix_sec)
+        : 0n,
+      annualBaseUsdNum: isSet(object.annualBaseUsdNum)
+        ? BigInt(object.annualBaseUsdNum)
+        : isSet(object.annual_base_usd_num)
+        ? BigInt(object.annual_base_usd_num)
+        : 0n,
+      annualBaseUsdDen: isSet(object.annualBaseUsdDen)
+        ? BigInt(object.annualBaseUsdDen)
+        : isSet(object.annual_base_usd_den)
+        ? BigInt(object.annual_base_usd_den)
+        : 0n,
+      creditsPerUsdNum: isSet(object.creditsPerUsdNum)
+        ? BigInt(object.creditsPerUsdNum)
+        : isSet(object.credits_per_usd_num)
+        ? BigInt(object.credits_per_usd_num)
+        : 0n,
+      creditsPerUsdDen: isSet(object.creditsPerUsdDen)
+        ? BigInt(object.creditsPerUsdDen)
+        : isSet(object.credits_per_usd_den)
+        ? BigInt(object.credits_per_usd_den)
+        : 0n,
+      allowedCatalogIds: globalThis.Array.isArray(object?.allowedCatalogIds)
+        ? object.allowedCatalogIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.allowed_catalog_ids)
+        ? object.allowed_catalog_ids.map((e: any) => globalThis.String(e))
+        : [],
+      maxTotalGrantCredits: isSet(object.maxTotalGrantCredits)
+        ? BigInt(object.maxTotalGrantCredits)
+        : isSet(object.max_total_grant_credits)
+        ? BigInt(object.max_total_grant_credits)
+        : 0n,
+      status: isSet(object.status) ? fundedTermStatusFromJSON(object.status) : 0,
+      updatedAtUnixSec: isSet(object.updatedAtUnixSec)
+        ? BigInt(object.updatedAtUnixSec)
+        : isSet(object.updated_at_unix_sec)
+        ? BigInt(object.updated_at_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: FundedTermConfig): unknown {
+    const obj: any = {};
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    if (message.programId !== "") {
+      obj.programId = message.programId;
+    }
+    if (message.fundingReservationId !== "") {
+      obj.fundingReservationId = message.fundingReservationId;
+    }
+    if (message.termsVersion !== "") {
+      obj.termsVersion = message.termsVersion;
+    }
+    if (message.startUnixSec !== 0n) {
+      obj.startUnixSec = message.startUnixSec.toString();
+    }
+    if (message.endUnixSec !== 0n) {
+      obj.endUnixSec = message.endUnixSec.toString();
+    }
+    if (message.annualBaseUsdNum !== 0n) {
+      obj.annualBaseUsdNum = message.annualBaseUsdNum.toString();
+    }
+    if (message.annualBaseUsdDen !== 0n) {
+      obj.annualBaseUsdDen = message.annualBaseUsdDen.toString();
+    }
+    if (message.creditsPerUsdNum !== 0n) {
+      obj.creditsPerUsdNum = message.creditsPerUsdNum.toString();
+    }
+    if (message.creditsPerUsdDen !== 0n) {
+      obj.creditsPerUsdDen = message.creditsPerUsdDen.toString();
+    }
+    if (message.allowedCatalogIds?.length) {
+      obj.allowedCatalogIds = message.allowedCatalogIds;
+    }
+    if (message.maxTotalGrantCredits !== 0n) {
+      obj.maxTotalGrantCredits = message.maxTotalGrantCredits.toString();
+    }
+    if (message.status !== 0) {
+      obj.status = fundedTermStatusToJSON(message.status);
+    }
+    if (message.updatedAtUnixSec !== 0n) {
+      obj.updatedAtUnixSec = message.updatedAtUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<FundedTermConfig>, I>>(base?: I): FundedTermConfig {
+    return FundedTermConfig.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<FundedTermConfig>, I>>(object: I): FundedTermConfig {
+    const message = createBaseFundedTermConfig();
+    message.termId = object.termId ?? "";
+    message.programId = object.programId ?? "";
+    message.fundingReservationId = object.fundingReservationId ?? "";
+    message.termsVersion = object.termsVersion ?? "";
+    message.startUnixSec = (object.startUnixSec !== undefined && object.startUnixSec !== null)
+      ? BigInt(object.startUnixSec)
+      : 0n;
+    message.endUnixSec = (object.endUnixSec !== undefined && object.endUnixSec !== null)
+      ? BigInt(object.endUnixSec)
+      : 0n;
+    message.annualBaseUsdNum = (object.annualBaseUsdNum !== undefined && object.annualBaseUsdNum !== null)
+      ? BigInt(object.annualBaseUsdNum)
+      : 0n;
+    message.annualBaseUsdDen = (object.annualBaseUsdDen !== undefined && object.annualBaseUsdDen !== null)
+      ? BigInt(object.annualBaseUsdDen)
+      : 0n;
+    message.creditsPerUsdNum = (object.creditsPerUsdNum !== undefined && object.creditsPerUsdNum !== null)
+      ? BigInt(object.creditsPerUsdNum)
+      : 0n;
+    message.creditsPerUsdDen = (object.creditsPerUsdDen !== undefined && object.creditsPerUsdDen !== null)
+      ? BigInt(object.creditsPerUsdDen)
+      : 0n;
+    message.allowedCatalogIds = object.allowedCatalogIds?.map((e) => e) || [];
+    message.maxTotalGrantCredits = (object.maxTotalGrantCredits !== undefined && object.maxTotalGrantCredits !== null)
+      ? BigInt(object.maxTotalGrantCredits)
+      : 0n;
+    message.status = object.status ?? 0;
+    message.updatedAtUnixSec = (object.updatedAtUnixSec !== undefined && object.updatedAtUnixSec !== null)
+      ? BigInt(object.updatedAtUnixSec)
+      : 0n;
+    return message;
+  },
+};
+
+function createBasePushFundedTermsRequest(): PushFundedTermsRequest {
+  return { batchId: "", terms: [] };
+}
+
+export const PushFundedTermsRequest: MessageFns<PushFundedTermsRequest> = {
+  encode(message: PushFundedTermsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.batchId !== "") {
+      writer.uint32(10).string(message.batchId);
+    }
+    for (const v of message.terms) {
+      FundedTermConfig.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PushFundedTermsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePushFundedTermsRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.batchId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.terms.push(FundedTermConfig.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PushFundedTermsRequest {
+    return {
+      batchId: isSet(object.batchId)
+        ? globalThis.String(object.batchId)
+        : isSet(object.batch_id)
+        ? globalThis.String(object.batch_id)
+        : "",
+      terms: globalThis.Array.isArray(object?.terms) ? object.terms.map((e: any) => FundedTermConfig.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: PushFundedTermsRequest): unknown {
+    const obj: any = {};
+    if (message.batchId !== "") {
+      obj.batchId = message.batchId;
+    }
+    if (message.terms?.length) {
+      obj.terms = message.terms.map((e) => FundedTermConfig.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PushFundedTermsRequest>, I>>(base?: I): PushFundedTermsRequest {
+    return PushFundedTermsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PushFundedTermsRequest>, I>>(object: I): PushFundedTermsRequest {
+    const message = createBasePushFundedTermsRequest();
+    message.batchId = object.batchId ?? "";
+    message.terms = object.terms?.map((e) => FundedTermConfig.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBasePushFundedTermsResponse(): PushFundedTermsResponse {
+  return { accepted: false };
+}
+
+export const PushFundedTermsResponse: MessageFns<PushFundedTermsResponse> = {
+  encode(message: PushFundedTermsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accepted !== false) {
+      writer.uint32(8).bool(message.accepted);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PushFundedTermsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePushFundedTermsResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.accepted = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PushFundedTermsResponse {
+    return { accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false };
+  },
+
+  toJSON(message: PushFundedTermsResponse): unknown {
+    const obj: any = {};
+    if (message.accepted !== false) {
+      obj.accepted = message.accepted;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PushFundedTermsResponse>, I>>(base?: I): PushFundedTermsResponse {
+    return PushFundedTermsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PushFundedTermsResponse>, I>>(object: I): PushFundedTermsResponse {
+    const message = createBasePushFundedTermsResponse();
+    message.accepted = object.accepted ?? false;
+    return message;
+  },
+};
+
+function createBaseListFundedTermsRequest(): ListFundedTermsRequest {
+  return { activeOrUpcomingOnly: false };
+}
+
+export const ListFundedTermsRequest: MessageFns<ListFundedTermsRequest> = {
+  encode(message: ListFundedTermsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.activeOrUpcomingOnly !== false) {
+      writer.uint32(8).bool(message.activeOrUpcomingOnly);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListFundedTermsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListFundedTermsRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.activeOrUpcomingOnly = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListFundedTermsRequest {
+    return {
+      activeOrUpcomingOnly: isSet(object.activeOrUpcomingOnly)
+        ? globalThis.Boolean(object.activeOrUpcomingOnly)
+        : isSet(object.active_or_upcoming_only)
+        ? globalThis.Boolean(object.active_or_upcoming_only)
+        : false,
+    };
+  },
+
+  toJSON(message: ListFundedTermsRequest): unknown {
+    const obj: any = {};
+    if (message.activeOrUpcomingOnly !== false) {
+      obj.activeOrUpcomingOnly = message.activeOrUpcomingOnly;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListFundedTermsRequest>, I>>(base?: I): ListFundedTermsRequest {
+    return ListFundedTermsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListFundedTermsRequest>, I>>(object: I): ListFundedTermsRequest {
+    const message = createBaseListFundedTermsRequest();
+    message.activeOrUpcomingOnly = object.activeOrUpcomingOnly ?? false;
+    return message;
+  },
+};
+
+function createBaseListFundedTermsResponse(): ListFundedTermsResponse {
+  return { terms: [] };
+}
+
+export const ListFundedTermsResponse: MessageFns<ListFundedTermsResponse> = {
+  encode(message: ListFundedTermsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.terms) {
+      FundedTermConfig.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListFundedTermsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListFundedTermsResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.terms.push(FundedTermConfig.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListFundedTermsResponse {
+    return {
+      terms: globalThis.Array.isArray(object?.terms) ? object.terms.map((e: any) => FundedTermConfig.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: ListFundedTermsResponse): unknown {
+    const obj: any = {};
+    if (message.terms?.length) {
+      obj.terms = message.terms.map((e) => FundedTermConfig.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListFundedTermsResponse>, I>>(base?: I): ListFundedTermsResponse {
+    return ListFundedTermsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListFundedTermsResponse>, I>>(object: I): ListFundedTermsResponse {
+    const message = createBaseListFundedTermsResponse();
+    message.terms = object.terms?.map((e) => FundedTermConfig.fromPartial(e)) || [];
+    return message;
+  },
+};
 
 function createBaseTermAcceptance(): TermAcceptance {
   return { termId: "", termsVersion: "", acceptedAtUnixSec: 0n };
@@ -283,7 +1105,10 @@ function createBaseWalletEligibilityRecord(): WalletEligibilityRecord {
   return {
     accountId: "",
     walletAddress: "",
+    chainId: 0n,
     linkedAtUnixSec: 0n,
+    siweProofRef: "",
+    isContractWalletErc1271: false,
     excludedTreasuryOrTeam: false,
     termAcceptances: [],
     updatedSequence: 0n,
@@ -298,23 +1123,35 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
     if (message.walletAddress !== "") {
       writer.uint32(18).string(message.walletAddress);
     }
+    if (message.chainId !== 0n) {
+      if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
+        throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.chainId);
+    }
     if (message.linkedAtUnixSec !== 0n) {
       if (BigInt.asIntN(64, message.linkedAtUnixSec) !== message.linkedAtUnixSec) {
         throw new globalThis.Error("value provided for field message.linkedAtUnixSec of type int64 too large");
       }
-      writer.uint32(24).int64(message.linkedAtUnixSec);
+      writer.uint32(32).int64(message.linkedAtUnixSec);
+    }
+    if (message.siweProofRef !== "") {
+      writer.uint32(42).string(message.siweProofRef);
+    }
+    if (message.isContractWalletErc1271 !== false) {
+      writer.uint32(48).bool(message.isContractWalletErc1271);
     }
     if (message.excludedTreasuryOrTeam !== false) {
-      writer.uint32(32).bool(message.excludedTreasuryOrTeam);
+      writer.uint32(56).bool(message.excludedTreasuryOrTeam);
     }
     for (const v of message.termAcceptances) {
-      TermAcceptance.encode(v!, writer.uint32(42).fork()).join();
+      TermAcceptance.encode(v!, writer.uint32(66).fork()).join();
     }
     if (message.updatedSequence !== 0n) {
       if (BigInt.asIntN(64, message.updatedSequence) !== message.updatedSequence) {
         throw new globalThis.Error("value provided for field message.updatedSequence of type int64 too large");
       }
-      writer.uint32(48).int64(message.updatedSequence);
+      writer.uint32(72).int64(message.updatedSequence);
     }
     return writer;
   },
@@ -353,7 +1190,7 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
               break;
             }
 
-            message.linkedAtUnixSec = reader.int64() as bigint;
+            message.chainId = reader.uint64() as bigint;
             continue;
           }
           case 4: {
@@ -361,7 +1198,7 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
               break;
             }
 
-            message.excludedTreasuryOrTeam = reader.bool();
+            message.linkedAtUnixSec = reader.int64() as bigint;
             continue;
           }
           case 5: {
@@ -369,11 +1206,35 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
               break;
             }
 
-            message.termAcceptances.push(TermAcceptance.decode(reader, reader.uint32()));
+            message.siweProofRef = reader.string();
             continue;
           }
           case 6: {
             if (tag !== 48) {
+              break;
+            }
+
+            message.isContractWalletErc1271 = reader.bool();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.excludedTreasuryOrTeam = reader.bool();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.termAcceptances.push(TermAcceptance.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
               break;
             }
 
@@ -404,11 +1265,22 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
         : isSet(object.wallet_address)
         ? globalThis.String(object.wallet_address)
         : "",
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : isSet(object.chain_id) ? BigInt(object.chain_id) : 0n,
       linkedAtUnixSec: isSet(object.linkedAtUnixSec)
         ? BigInt(object.linkedAtUnixSec)
         : isSet(object.linked_at_unix_sec)
         ? BigInt(object.linked_at_unix_sec)
         : 0n,
+      siweProofRef: isSet(object.siweProofRef)
+        ? globalThis.String(object.siweProofRef)
+        : isSet(object.siwe_proof_ref)
+        ? globalThis.String(object.siwe_proof_ref)
+        : "",
+      isContractWalletErc1271: isSet(object.isContractWalletErc1271)
+        ? globalThis.Boolean(object.isContractWalletErc1271)
+        : isSet(object.is_contract_wallet_erc1271)
+        ? globalThis.Boolean(object.is_contract_wallet_erc1271)
+        : false,
       excludedTreasuryOrTeam: isSet(object.excludedTreasuryOrTeam)
         ? globalThis.Boolean(object.excludedTreasuryOrTeam)
         : isSet(object.excluded_treasury_or_team)
@@ -435,8 +1307,17 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
     if (message.walletAddress !== "") {
       obj.walletAddress = message.walletAddress;
     }
+    if (message.chainId !== 0n) {
+      obj.chainId = message.chainId.toString();
+    }
     if (message.linkedAtUnixSec !== 0n) {
       obj.linkedAtUnixSec = message.linkedAtUnixSec.toString();
+    }
+    if (message.siweProofRef !== "") {
+      obj.siweProofRef = message.siweProofRef;
+    }
+    if (message.isContractWalletErc1271 !== false) {
+      obj.isContractWalletErc1271 = message.isContractWalletErc1271;
     }
     if (message.excludedTreasuryOrTeam !== false) {
       obj.excludedTreasuryOrTeam = message.excludedTreasuryOrTeam;
@@ -457,9 +1338,12 @@ export const WalletEligibilityRecord: MessageFns<WalletEligibilityRecord> = {
     const message = createBaseWalletEligibilityRecord();
     message.accountId = object.accountId ?? "";
     message.walletAddress = object.walletAddress ?? "";
+    message.chainId = (object.chainId !== undefined && object.chainId !== null) ? BigInt(object.chainId) : 0n;
     message.linkedAtUnixSec = (object.linkedAtUnixSec !== undefined && object.linkedAtUnixSec !== null)
       ? BigInt(object.linkedAtUnixSec)
       : 0n;
+    message.siweProofRef = object.siweProofRef ?? "";
+    message.isContractWalletErc1271 = object.isContractWalletErc1271 ?? false;
     message.excludedTreasuryOrTeam = object.excludedTreasuryOrTeam ?? false;
     message.termAcceptances = object.termAcceptances?.map((e) => TermAcceptance.fromPartial(e)) || [];
     message.updatedSequence = (object.updatedSequence !== undefined && object.updatedSequence !== null)
@@ -822,6 +1706,486 @@ export const PullWalletEligibilityUpdatesResponse: MessageFns<PullWalletEligibil
   },
 };
 
+function createBaseDirectedBridgeRoutePause(): DirectedBridgeRoutePause {
+  return { srcChainEid: 0, dstChainEid: 0, paused: false };
+}
+
+export const DirectedBridgeRoutePause: MessageFns<DirectedBridgeRoutePause> = {
+  encode(message: DirectedBridgeRoutePause, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.srcChainEid !== 0) {
+      writer.uint32(8).uint32(message.srcChainEid);
+    }
+    if (message.dstChainEid !== 0) {
+      writer.uint32(16).uint32(message.dstChainEid);
+    }
+    if (message.paused !== false) {
+      writer.uint32(24).bool(message.paused);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DirectedBridgeRoutePause {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseDirectedBridgeRoutePause();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.srcChainEid = reader.uint32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.dstChainEid = reader.uint32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.paused = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): DirectedBridgeRoutePause {
+    return {
+      srcChainEid: isSet(object.srcChainEid)
+        ? globalThis.Number(object.srcChainEid)
+        : isSet(object.src_chain_eid)
+        ? globalThis.Number(object.src_chain_eid)
+        : 0,
+      dstChainEid: isSet(object.dstChainEid)
+        ? globalThis.Number(object.dstChainEid)
+        : isSet(object.dst_chain_eid)
+        ? globalThis.Number(object.dst_chain_eid)
+        : 0,
+      paused: isSet(object.paused) ? globalThis.Boolean(object.paused) : false,
+    };
+  },
+
+  toJSON(message: DirectedBridgeRoutePause): unknown {
+    const obj: any = {};
+    if (message.srcChainEid !== 0) {
+      obj.srcChainEid = Math.round(message.srcChainEid);
+    }
+    if (message.dstChainEid !== 0) {
+      obj.dstChainEid = Math.round(message.dstChainEid);
+    }
+    if (message.paused !== false) {
+      obj.paused = message.paused;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<DirectedBridgeRoutePause>, I>>(base?: I): DirectedBridgeRoutePause {
+    return DirectedBridgeRoutePause.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<DirectedBridgeRoutePause>, I>>(object: I): DirectedBridgeRoutePause {
+    const message = createBaseDirectedBridgeRoutePause();
+    message.srcChainEid = object.srcChainEid ?? 0;
+    message.dstChainEid = object.dstChainEid ?? 0;
+    message.paused = object.paused ?? false;
+    return message;
+  },
+};
+
+function createBaseGetContractOperationalStatusRequest(): GetContractOperationalStatusRequest {
+  return {};
+}
+
+export const GetContractOperationalStatusRequest: MessageFns<GetContractOperationalStatusRequest> = {
+  encode(_: GetContractOperationalStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetContractOperationalStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetContractOperationalStatusRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(_: any): GetContractOperationalStatusRequest {
+    return {};
+  },
+
+  toJSON(_: GetContractOperationalStatusRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetContractOperationalStatusRequest>, I>>(
+    base?: I,
+  ): GetContractOperationalStatusRequest {
+    return GetContractOperationalStatusRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetContractOperationalStatusRequest>, I>>(
+    _: I,
+  ): GetContractOperationalStatusRequest {
+    const message = createBaseGetContractOperationalStatusRequest();
+    return message;
+  },
+};
+
+function createBaseGetContractOperationalStatusResponse(): GetContractOperationalStatusResponse {
+  return {
+    mintPaused: false,
+    burnPaused: false,
+    withdrawPaused: false,
+    positionPauseAll: false,
+    maxBridgeGlobalPaused: false,
+    directedBridgePauses: [],
+    ethereumHeadBlock: 0n,
+    ethereumFinalizedBlock: 0n,
+    ethereumFinalizedTimestampUnixSec: 0n,
+    activeTermId: "",
+    nextGrantBoundaryUnixSec: 0n,
+  };
+}
+
+export const GetContractOperationalStatusResponse: MessageFns<GetContractOperationalStatusResponse> = {
+  encode(message: GetContractOperationalStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mintPaused !== false) {
+      writer.uint32(8).bool(message.mintPaused);
+    }
+    if (message.burnPaused !== false) {
+      writer.uint32(16).bool(message.burnPaused);
+    }
+    if (message.withdrawPaused !== false) {
+      writer.uint32(24).bool(message.withdrawPaused);
+    }
+    if (message.positionPauseAll !== false) {
+      writer.uint32(32).bool(message.positionPauseAll);
+    }
+    if (message.maxBridgeGlobalPaused !== false) {
+      writer.uint32(40).bool(message.maxBridgeGlobalPaused);
+    }
+    for (const v of message.directedBridgePauses) {
+      DirectedBridgeRoutePause.encode(v!, writer.uint32(50).fork()).join();
+    }
+    if (message.ethereumHeadBlock !== 0n) {
+      if (BigInt.asUintN(64, message.ethereumHeadBlock) !== message.ethereumHeadBlock) {
+        throw new globalThis.Error("value provided for field message.ethereumHeadBlock of type uint64 too large");
+      }
+      writer.uint32(56).uint64(message.ethereumHeadBlock);
+    }
+    if (message.ethereumFinalizedBlock !== 0n) {
+      if (BigInt.asUintN(64, message.ethereumFinalizedBlock) !== message.ethereumFinalizedBlock) {
+        throw new globalThis.Error("value provided for field message.ethereumFinalizedBlock of type uint64 too large");
+      }
+      writer.uint32(64).uint64(message.ethereumFinalizedBlock);
+    }
+    if (message.ethereumFinalizedTimestampUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.ethereumFinalizedTimestampUnixSec) !== message.ethereumFinalizedTimestampUnixSec) {
+        throw new globalThis.Error(
+          "value provided for field message.ethereumFinalizedTimestampUnixSec of type int64 too large",
+        );
+      }
+      writer.uint32(72).int64(message.ethereumFinalizedTimestampUnixSec);
+    }
+    if (message.activeTermId !== "") {
+      writer.uint32(82).string(message.activeTermId);
+    }
+    if (message.nextGrantBoundaryUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.nextGrantBoundaryUnixSec) !== message.nextGrantBoundaryUnixSec) {
+        throw new globalThis.Error("value provided for field message.nextGrantBoundaryUnixSec of type int64 too large");
+      }
+      writer.uint32(88).int64(message.nextGrantBoundaryUnixSec);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetContractOperationalStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetContractOperationalStatusResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.mintPaused = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.burnPaused = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.withdrawPaused = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.positionPauseAll = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.maxBridgeGlobalPaused = reader.bool();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.directedBridgePauses.push(DirectedBridgeRoutePause.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.ethereumHeadBlock = reader.uint64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.ethereumFinalizedBlock = reader.uint64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.ethereumFinalizedTimestampUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.activeTermId = reader.string();
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.nextGrantBoundaryUnixSec = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetContractOperationalStatusResponse {
+    return {
+      mintPaused: isSet(object.mintPaused)
+        ? globalThis.Boolean(object.mintPaused)
+        : isSet(object.mint_paused)
+        ? globalThis.Boolean(object.mint_paused)
+        : false,
+      burnPaused: isSet(object.burnPaused)
+        ? globalThis.Boolean(object.burnPaused)
+        : isSet(object.burn_paused)
+        ? globalThis.Boolean(object.burn_paused)
+        : false,
+      withdrawPaused: isSet(object.withdrawPaused)
+        ? globalThis.Boolean(object.withdrawPaused)
+        : isSet(object.withdraw_paused)
+        ? globalThis.Boolean(object.withdraw_paused)
+        : false,
+      positionPauseAll: isSet(object.positionPauseAll)
+        ? globalThis.Boolean(object.positionPauseAll)
+        : isSet(object.position_pause_all)
+        ? globalThis.Boolean(object.position_pause_all)
+        : false,
+      maxBridgeGlobalPaused: isSet(object.maxBridgeGlobalPaused)
+        ? globalThis.Boolean(object.maxBridgeGlobalPaused)
+        : isSet(object.max_bridge_global_paused)
+        ? globalThis.Boolean(object.max_bridge_global_paused)
+        : false,
+      directedBridgePauses: globalThis.Array.isArray(object?.directedBridgePauses)
+        ? object.directedBridgePauses.map((e: any) => DirectedBridgeRoutePause.fromJSON(e))
+        : globalThis.Array.isArray(object?.directed_bridge_pauses)
+        ? object.directed_bridge_pauses.map((e: any) => DirectedBridgeRoutePause.fromJSON(e))
+        : [],
+      ethereumHeadBlock: isSet(object.ethereumHeadBlock)
+        ? BigInt(object.ethereumHeadBlock)
+        : isSet(object.ethereum_head_block)
+        ? BigInt(object.ethereum_head_block)
+        : 0n,
+      ethereumFinalizedBlock: isSet(object.ethereumFinalizedBlock)
+        ? BigInt(object.ethereumFinalizedBlock)
+        : isSet(object.ethereum_finalized_block)
+        ? BigInt(object.ethereum_finalized_block)
+        : 0n,
+      ethereumFinalizedTimestampUnixSec: isSet(object.ethereumFinalizedTimestampUnixSec)
+        ? BigInt(object.ethereumFinalizedTimestampUnixSec)
+        : isSet(object.ethereum_finalized_timestamp_unix_sec)
+        ? BigInt(object.ethereum_finalized_timestamp_unix_sec)
+        : 0n,
+      activeTermId: isSet(object.activeTermId)
+        ? globalThis.String(object.activeTermId)
+        : isSet(object.active_term_id)
+        ? globalThis.String(object.active_term_id)
+        : "",
+      nextGrantBoundaryUnixSec: isSet(object.nextGrantBoundaryUnixSec)
+        ? BigInt(object.nextGrantBoundaryUnixSec)
+        : isSet(object.next_grant_boundary_unix_sec)
+        ? BigInt(object.next_grant_boundary_unix_sec)
+        : 0n,
+    };
+  },
+
+  toJSON(message: GetContractOperationalStatusResponse): unknown {
+    const obj: any = {};
+    if (message.mintPaused !== false) {
+      obj.mintPaused = message.mintPaused;
+    }
+    if (message.burnPaused !== false) {
+      obj.burnPaused = message.burnPaused;
+    }
+    if (message.withdrawPaused !== false) {
+      obj.withdrawPaused = message.withdrawPaused;
+    }
+    if (message.positionPauseAll !== false) {
+      obj.positionPauseAll = message.positionPauseAll;
+    }
+    if (message.maxBridgeGlobalPaused !== false) {
+      obj.maxBridgeGlobalPaused = message.maxBridgeGlobalPaused;
+    }
+    if (message.directedBridgePauses?.length) {
+      obj.directedBridgePauses = message.directedBridgePauses.map((e) => DirectedBridgeRoutePause.toJSON(e));
+    }
+    if (message.ethereumHeadBlock !== 0n) {
+      obj.ethereumHeadBlock = message.ethereumHeadBlock.toString();
+    }
+    if (message.ethereumFinalizedBlock !== 0n) {
+      obj.ethereumFinalizedBlock = message.ethereumFinalizedBlock.toString();
+    }
+    if (message.ethereumFinalizedTimestampUnixSec !== 0n) {
+      obj.ethereumFinalizedTimestampUnixSec = message.ethereumFinalizedTimestampUnixSec.toString();
+    }
+    if (message.activeTermId !== "") {
+      obj.activeTermId = message.activeTermId;
+    }
+    if (message.nextGrantBoundaryUnixSec !== 0n) {
+      obj.nextGrantBoundaryUnixSec = message.nextGrantBoundaryUnixSec.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetContractOperationalStatusResponse>, I>>(
+    base?: I,
+  ): GetContractOperationalStatusResponse {
+    return GetContractOperationalStatusResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetContractOperationalStatusResponse>, I>>(
+    object: I,
+  ): GetContractOperationalStatusResponse {
+    const message = createBaseGetContractOperationalStatusResponse();
+    message.mintPaused = object.mintPaused ?? false;
+    message.burnPaused = object.burnPaused ?? false;
+    message.withdrawPaused = object.withdrawPaused ?? false;
+    message.positionPauseAll = object.positionPauseAll ?? false;
+    message.maxBridgeGlobalPaused = object.maxBridgeGlobalPaused ?? false;
+    message.directedBridgePauses = object.directedBridgePauses?.map((e) => DirectedBridgeRoutePause.fromPartial(e)) ||
+      [];
+    message.ethereumHeadBlock = (object.ethereumHeadBlock !== undefined && object.ethereumHeadBlock !== null)
+      ? BigInt(object.ethereumHeadBlock)
+      : 0n;
+    message.ethereumFinalizedBlock =
+      (object.ethereumFinalizedBlock !== undefined && object.ethereumFinalizedBlock !== null)
+        ? BigInt(object.ethereumFinalizedBlock)
+        : 0n;
+    message.ethereumFinalizedTimestampUnixSec =
+      (object.ethereumFinalizedTimestampUnixSec !== undefined && object.ethereumFinalizedTimestampUnixSec !== null)
+        ? BigInt(object.ethereumFinalizedTimestampUnixSec)
+        : 0n;
+    message.activeTermId = object.activeTermId ?? "";
+    message.nextGrantBoundaryUnixSec =
+      (object.nextGrantBoundaryUnixSec !== undefined && object.nextGrantBoundaryUnixSec !== null)
+        ? BigInt(object.nextGrantBoundaryUnixSec)
+        : 0n;
+    return message;
+  },
+};
+
 function createBaseAitGrantItem(): AitGrantItem {
   return {
     grantId: "",
@@ -834,6 +2198,11 @@ function createBaseAitGrantItem(): AitGrantItem {
     grantCredits: 0n,
     finalizedBlockNumber: 0n,
     boundaryTimestampUnixSec: 0n,
+    programId: "",
+    fundingReservationId: "",
+    isFinalShortBoundary: false,
+    cumulativeEntitlementCredits: 0n,
+    finalizedBlockHash: "",
   };
 }
 
@@ -880,6 +2249,26 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
         throw new globalThis.Error("value provided for field message.boundaryTimestampUnixSec of type int64 too large");
       }
       writer.uint32(80).int64(message.boundaryTimestampUnixSec);
+    }
+    if (message.programId !== "") {
+      writer.uint32(90).string(message.programId);
+    }
+    if (message.fundingReservationId !== "") {
+      writer.uint32(98).string(message.fundingReservationId);
+    }
+    if (message.isFinalShortBoundary !== false) {
+      writer.uint32(104).bool(message.isFinalShortBoundary);
+    }
+    if (message.cumulativeEntitlementCredits !== 0n) {
+      if (BigInt.asIntN(64, message.cumulativeEntitlementCredits) !== message.cumulativeEntitlementCredits) {
+        throw new globalThis.Error(
+          "value provided for field message.cumulativeEntitlementCredits of type int64 too large",
+        );
+      }
+      writer.uint32(112).int64(message.cumulativeEntitlementCredits);
+    }
+    if (message.finalizedBlockHash !== "") {
+      writer.uint32(122).string(message.finalizedBlockHash);
     }
     return writer;
   },
@@ -977,6 +2366,46 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
             message.boundaryTimestampUnixSec = reader.int64() as bigint;
             continue;
           }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.programId = reader.string();
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.fundingReservationId = reader.string();
+            continue;
+          }
+          case 13: {
+            if (tag !== 104) {
+              break;
+            }
+
+            message.isFinalShortBoundary = reader.bool();
+            continue;
+          }
+          case 14: {
+            if (tag !== 112) {
+              break;
+            }
+
+            message.cumulativeEntitlementCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.finalizedBlockHash = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1041,6 +2470,31 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
         : isSet(object.boundary_timestamp_unix_sec)
         ? BigInt(object.boundary_timestamp_unix_sec)
         : 0n,
+      programId: isSet(object.programId)
+        ? globalThis.String(object.programId)
+        : isSet(object.program_id)
+        ? globalThis.String(object.program_id)
+        : "",
+      fundingReservationId: isSet(object.fundingReservationId)
+        ? globalThis.String(object.fundingReservationId)
+        : isSet(object.funding_reservation_id)
+        ? globalThis.String(object.funding_reservation_id)
+        : "",
+      isFinalShortBoundary: isSet(object.isFinalShortBoundary)
+        ? globalThis.Boolean(object.isFinalShortBoundary)
+        : isSet(object.is_final_short_boundary)
+        ? globalThis.Boolean(object.is_final_short_boundary)
+        : false,
+      cumulativeEntitlementCredits: isSet(object.cumulativeEntitlementCredits)
+        ? BigInt(object.cumulativeEntitlementCredits)
+        : isSet(object.cumulative_entitlement_credits)
+        ? BigInt(object.cumulative_entitlement_credits)
+        : 0n,
+      finalizedBlockHash: isSet(object.finalizedBlockHash)
+        ? globalThis.String(object.finalizedBlockHash)
+        : isSet(object.finalized_block_hash)
+        ? globalThis.String(object.finalized_block_hash)
+        : "",
     };
   },
 
@@ -1076,6 +2530,21 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
     if (message.boundaryTimestampUnixSec !== 0n) {
       obj.boundaryTimestampUnixSec = message.boundaryTimestampUnixSec.toString();
     }
+    if (message.programId !== "") {
+      obj.programId = message.programId;
+    }
+    if (message.fundingReservationId !== "") {
+      obj.fundingReservationId = message.fundingReservationId;
+    }
+    if (message.isFinalShortBoundary !== false) {
+      obj.isFinalShortBoundary = message.isFinalShortBoundary;
+    }
+    if (message.cumulativeEntitlementCredits !== 0n) {
+      obj.cumulativeEntitlementCredits = message.cumulativeEntitlementCredits.toString();
+    }
+    if (message.finalizedBlockHash !== "") {
+      obj.finalizedBlockHash = message.finalizedBlockHash;
+    }
     return obj;
   },
 
@@ -1104,6 +2573,14 @@ export const AitGrantItem: MessageFns<AitGrantItem> = {
       (object.boundaryTimestampUnixSec !== undefined && object.boundaryTimestampUnixSec !== null)
         ? BigInt(object.boundaryTimestampUnixSec)
         : 0n;
+    message.programId = object.programId ?? "";
+    message.fundingReservationId = object.fundingReservationId ?? "";
+    message.isFinalShortBoundary = object.isFinalShortBoundary ?? false;
+    message.cumulativeEntitlementCredits =
+      (object.cumulativeEntitlementCredits !== undefined && object.cumulativeEntitlementCredits !== null)
+        ? BigInt(object.cumulativeEntitlementCredits)
+        : 0n;
+    message.finalizedBlockHash = object.finalizedBlockHash ?? "";
     return message;
   },
 };
@@ -1238,7 +2715,7 @@ export const IssueAitCreditGrantsRequest: MessageFns<IssueAitCreditGrantsRequest
 };
 
 function createBaseAitGrantItemResult(): AitGrantItemResult {
-  return { grantId: "", status: 0, detail: "" };
+  return { grantId: "", status: 0, detail: "", creditedAmount: 0n, issuedAtUnixSec: 0n, expiresAtUnixSec: 0n };
 }
 
 export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
@@ -1251,6 +2728,24 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
     }
     if (message.detail !== "") {
       writer.uint32(26).string(message.detail);
+    }
+    if (message.creditedAmount !== 0n) {
+      if (BigInt.asIntN(64, message.creditedAmount) !== message.creditedAmount) {
+        throw new globalThis.Error("value provided for field message.creditedAmount of type int64 too large");
+      }
+      writer.uint32(32).int64(message.creditedAmount);
+    }
+    if (message.issuedAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.issuedAtUnixSec) !== message.issuedAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.issuedAtUnixSec of type int64 too large");
+      }
+      writer.uint32(40).int64(message.issuedAtUnixSec);
+    }
+    if (message.expiresAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.expiresAtUnixSec) !== message.expiresAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.expiresAtUnixSec of type int64 too large");
+      }
+      writer.uint32(48).int64(message.expiresAtUnixSec);
     }
     return writer;
   },
@@ -1292,6 +2787,30 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
             message.detail = reader.string();
             continue;
           }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.creditedAmount = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.issuedAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.expiresAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -1313,6 +2832,21 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
         : "",
       status: isSet(object.status) ? grantItemStatusFromJSON(object.status) : 0,
       detail: isSet(object.detail) ? globalThis.String(object.detail) : "",
+      creditedAmount: isSet(object.creditedAmount)
+        ? BigInt(object.creditedAmount)
+        : isSet(object.credited_amount)
+        ? BigInt(object.credited_amount)
+        : 0n,
+      issuedAtUnixSec: isSet(object.issuedAtUnixSec)
+        ? BigInt(object.issuedAtUnixSec)
+        : isSet(object.issued_at_unix_sec)
+        ? BigInt(object.issued_at_unix_sec)
+        : 0n,
+      expiresAtUnixSec: isSet(object.expiresAtUnixSec)
+        ? BigInt(object.expiresAtUnixSec)
+        : isSet(object.expires_at_unix_sec)
+        ? BigInt(object.expires_at_unix_sec)
+        : 0n,
     };
   },
 
@@ -1327,6 +2861,15 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
     if (message.detail !== "") {
       obj.detail = message.detail;
     }
+    if (message.creditedAmount !== 0n) {
+      obj.creditedAmount = message.creditedAmount.toString();
+    }
+    if (message.issuedAtUnixSec !== 0n) {
+      obj.issuedAtUnixSec = message.issuedAtUnixSec.toString();
+    }
+    if (message.expiresAtUnixSec !== 0n) {
+      obj.expiresAtUnixSec = message.expiresAtUnixSec.toString();
+    }
     return obj;
   },
 
@@ -1338,6 +2881,15 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
     message.grantId = object.grantId ?? "";
     message.status = object.status ?? 0;
     message.detail = object.detail ?? "";
+    message.creditedAmount = (object.creditedAmount !== undefined && object.creditedAmount !== null)
+      ? BigInt(object.creditedAmount)
+      : 0n;
+    message.issuedAtUnixSec = (object.issuedAtUnixSec !== undefined && object.issuedAtUnixSec !== null)
+      ? BigInt(object.issuedAtUnixSec)
+      : 0n;
+    message.expiresAtUnixSec = (object.expiresAtUnixSec !== undefined && object.expiresAtUnixSec !== null)
+      ? BigInt(object.expiresAtUnixSec)
+      : 0n;
     return message;
   },
 };
@@ -1414,14 +2966,26 @@ export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsRespon
 };
 
 /**
- * WalletEligibilityService synchronizes 1:1 verified SIWE/ERC-1271 wallet bindings and
- * Funded Term acceptance timestamps between Gateway Backend and Contract Backend.
+ * ContractBackendService is hosted by Contract Backend and called by Gateway Backend
+ * over WireGuard + TLS + HMAC. Services are cleanly split by hosting side for strict method ACLs.
  */
-export type WalletEligibilityServiceService = typeof WalletEligibilityServiceService;
-export const WalletEligibilityServiceService = {
-  /** PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules. */
+export type ContractBackendServiceService = typeof ContractBackendServiceService;
+export const ContractBackendServiceService = {
+  /** PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend. */
+  pushFundedTerms: {
+    path: "/maxshot.contract_grant.v1.ContractBackendService/PushFundedTerms" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PushFundedTermsRequest): Buffer =>
+      Buffer.from(PushFundedTermsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PushFundedTermsRequest => PushFundedTermsRequest.decode(value),
+    responseSerialize: (value: PushFundedTermsResponse): Buffer =>
+      Buffer.from(PushFundedTermsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PushFundedTermsResponse => PushFundedTermsResponse.decode(value),
+  },
+  /** PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend. */
   pushWalletEligibility: {
-    path: "/maxshot.contract_grant.v1.WalletEligibilityService/PushWalletEligibility" as const,
+    path: "/maxshot.contract_grant.v1.ContractBackendService/PushWalletEligibility" as const,
     requestStream: false as const,
     responseStream: false as const,
     requestSerialize: (value: PushWalletEligibilityRequest): Buffer =>
@@ -1431,9 +2995,119 @@ export const WalletEligibilityServiceService = {
       Buffer.from(PushWalletEligibilityResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): PushWalletEligibilityResponse => PushWalletEligibilityResponse.decode(value),
   },
-  /** PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor. */
+  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  getContractOperationalStatus: {
+    path: "/maxshot.contract_grant.v1.ContractBackendService/GetContractOperationalStatus" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetContractOperationalStatusRequest): Buffer =>
+      Buffer.from(GetContractOperationalStatusRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetContractOperationalStatusRequest =>
+      GetContractOperationalStatusRequest.decode(value),
+    responseSerialize: (value: GetContractOperationalStatusResponse): Buffer =>
+      Buffer.from(GetContractOperationalStatusResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetContractOperationalStatusResponse =>
+      GetContractOperationalStatusResponse.decode(value),
+  },
+} as const;
+
+export interface ContractBackendServiceServer extends UntypedServiceImplementation {
+  /** PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend. */
+  pushFundedTerms: handleUnaryCall<PushFundedTermsRequest, PushFundedTermsResponse>;
+  /** PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend. */
+  pushWalletEligibility: handleUnaryCall<PushWalletEligibilityRequest, PushWalletEligibilityResponse>;
+  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  getContractOperationalStatus: handleUnaryCall<
+    GetContractOperationalStatusRequest,
+    GetContractOperationalStatusResponse
+  >;
+}
+
+export interface ContractBackendServiceClient extends Client {
+  /** PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend. */
+  pushFundedTerms(
+    request: PushFundedTermsRequest,
+    callback: (error: ServiceError | null, response: PushFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  pushFundedTerms(
+    request: PushFundedTermsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PushFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  pushFundedTerms(
+    request: PushFundedTermsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PushFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  /** PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend. */
+  pushWalletEligibility(
+    request: PushWalletEligibilityRequest,
+    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
+  ): ClientUnaryCall;
+  pushWalletEligibility(
+    request: PushWalletEligibilityRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
+  ): ClientUnaryCall;
+  pushWalletEligibility(
+    request: PushWalletEligibilityRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
+  ): ClientUnaryCall;
+  /** GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22). */
+  getContractOperationalStatus(
+    request: GetContractOperationalStatusRequest,
+    callback: (error: ServiceError | null, response: GetContractOperationalStatusResponse) => void,
+  ): ClientUnaryCall;
+  getContractOperationalStatus(
+    request: GetContractOperationalStatusRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetContractOperationalStatusResponse) => void,
+  ): ClientUnaryCall;
+  getContractOperationalStatus(
+    request: GetContractOperationalStatusRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetContractOperationalStatusResponse) => void,
+  ): ClientUnaryCall;
+}
+
+export const ContractBackendServiceClient = makeGenericClientConstructor(
+  ContractBackendServiceService,
+  "maxshot.contract_grant.v1.ContractBackendService",
+) as unknown as {
+  new (
+    address: string,
+    credentials: ChannelCredentials,
+    options?: Partial<ClientOptions>,
+  ): ContractBackendServiceClient;
+  service: typeof ContractBackendServiceService;
+  serviceName: string;
+};
+
+/**
+ * AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend
+ * over WireGuard + TLS + HMAC for startup/reconnect state catch-up and 7-day boundary Credit grants.
+ */
+export type AitCreditGrantServiceService = typeof AitCreditGrantServiceService;
+export const AitCreditGrantServiceService = {
+  /** ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect. */
+  listFundedTerms: {
+    path: "/maxshot.contract_grant.v1.AitCreditGrantService/ListFundedTerms" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListFundedTermsRequest): Buffer =>
+      Buffer.from(ListFundedTermsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListFundedTermsRequest => ListFundedTermsRequest.decode(value),
+    responseSerialize: (value: ListFundedTermsResponse): Buffer =>
+      Buffer.from(ListFundedTermsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListFundedTermsResponse => ListFundedTermsResponse.decode(value),
+  },
+  /** PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor. */
   pullWalletEligibilityUpdates: {
-    path: "/maxshot.contract_grant.v1.WalletEligibilityService/PullWalletEligibilityUpdates" as const,
+    path: "/maxshot.contract_grant.v1.AitCreditGrantService/PullWalletEligibilityUpdates" as const,
     requestStream: false as const,
     responseStream: false as const,
     requestSerialize: (value: PullWalletEligibilityUpdatesRequest): Buffer =>
@@ -1445,70 +3119,11 @@ export const WalletEligibilityServiceService = {
     responseDeserialize: (value: Buffer): PullWalletEligibilityUpdatesResponse =>
       PullWalletEligibilityUpdatesResponse.decode(value),
   },
-} as const;
-
-export interface WalletEligibilityServiceServer extends UntypedServiceImplementation {
-  /** PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules. */
-  pushWalletEligibility: handleUnaryCall<PushWalletEligibilityRequest, PushWalletEligibilityResponse>;
-  /** PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor. */
-  pullWalletEligibilityUpdates: handleUnaryCall<
-    PullWalletEligibilityUpdatesRequest,
-    PullWalletEligibilityUpdatesResponse
-  >;
-}
-
-export interface WalletEligibilityServiceClient extends Client {
-  /** PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules. */
-  pushWalletEligibility(
-    request: PushWalletEligibilityRequest,
-    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
-  ): ClientUnaryCall;
-  pushWalletEligibility(
-    request: PushWalletEligibilityRequest,
-    metadata: Metadata,
-    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
-  ): ClientUnaryCall;
-  pushWalletEligibility(
-    request: PushWalletEligibilityRequest,
-    metadata: Metadata,
-    options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: PushWalletEligibilityResponse) => void,
-  ): ClientUnaryCall;
-  /** PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor. */
-  pullWalletEligibilityUpdates(
-    request: PullWalletEligibilityUpdatesRequest,
-    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
-  ): ClientUnaryCall;
-  pullWalletEligibilityUpdates(
-    request: PullWalletEligibilityUpdatesRequest,
-    metadata: Metadata,
-    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
-  ): ClientUnaryCall;
-  pullWalletEligibilityUpdates(
-    request: PullWalletEligibilityUpdatesRequest,
-    metadata: Metadata,
-    options: Partial<CallOptions>,
-    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
-  ): ClientUnaryCall;
-}
-
-export const WalletEligibilityServiceClient = makeGenericClientConstructor(
-  WalletEligibilityServiceService,
-  "maxshot.contract_grant.v1.WalletEligibilityService",
-) as unknown as {
-  new (
-    address: string,
-    credentials: ChannelCredentials,
-    options?: Partial<ClientOptions>,
-  ): WalletEligibilityServiceClient;
-  service: typeof WalletEligibilityServiceService;
-  serviceName: string;
-};
-
-/** AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend at each 7-day boundary. */
-export type AitCreditGrantServiceService = typeof AitCreditGrantServiceService;
-export const AitCreditGrantServiceService = {
-  /** IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25). */
+  /**
+   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+   * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
+   */
   issueAitCreditGrants: {
     path: "/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants" as const,
     requestStream: false as const,
@@ -1523,12 +3138,59 @@ export const AitCreditGrantServiceService = {
 } as const;
 
 export interface AitCreditGrantServiceServer extends UntypedServiceImplementation {
-  /** IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25). */
+  /** ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect. */
+  listFundedTerms: handleUnaryCall<ListFundedTermsRequest, ListFundedTermsResponse>;
+  /** PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor. */
+  pullWalletEligibilityUpdates: handleUnaryCall<
+    PullWalletEligibilityUpdatesRequest,
+    PullWalletEligibilityUpdatesResponse
+  >;
+  /**
+   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+   * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
+   */
   issueAitCreditGrants: handleUnaryCall<IssueAitCreditGrantsRequest, IssueAitCreditGrantsResponse>;
 }
 
 export interface AitCreditGrantServiceClient extends Client {
-  /** IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25). */
+  /** ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect. */
+  listFundedTerms(
+    request: ListFundedTermsRequest,
+    callback: (error: ServiceError | null, response: ListFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  listFundedTerms(
+    request: ListFundedTermsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  listFundedTerms(
+    request: ListFundedTermsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListFundedTermsResponse) => void,
+  ): ClientUnaryCall;
+  /** PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor. */
+  pullWalletEligibilityUpdates(
+    request: PullWalletEligibilityUpdatesRequest,
+    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
+  ): ClientUnaryCall;
+  pullWalletEligibilityUpdates(
+    request: PullWalletEligibilityUpdatesRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
+  ): ClientUnaryCall;
+  pullWalletEligibilityUpdates(
+    request: PullWalletEligibilityUpdatesRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
+  ): ClientUnaryCall;
+  /**
+   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+   * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
+   */
   issueAitCreditGrants(
     request: IssueAitCreditGrantsRequest,
     callback: (error: ServiceError | null, response: IssueAitCreditGrantsResponse) => void,

@@ -126,10 +126,11 @@ func (AdmissionStatus) EnumDescriptor() ([]byte, []int) {
 type AvailabilityStatus int32
 
 const (
-	AvailabilityStatus_AVAILABILITY_STATUS_UNSPECIFIED AvailabilityStatus = 0
-	AvailabilityStatus_AVAILABILITY_STATUS_AVAILABLE   AvailabilityStatus = 1
-	AvailabilityStatus_AVAILABILITY_STATUS_PAUSED      AvailabilityStatus = 2
-	AvailabilityStatus_AVAILABILITY_STATUS_UNHEALTHY   AvailabilityStatus = 3
+	AvailabilityStatus_AVAILABILITY_STATUS_UNSPECIFIED    AvailabilityStatus = 0
+	AvailabilityStatus_AVAILABILITY_STATUS_AVAILABLE      AvailabilityStatus = 1
+	AvailabilityStatus_AVAILABILITY_STATUS_PAUSED         AvailabilityStatus = 2
+	AvailabilityStatus_AVAILABILITY_STATUS_UNHEALTHY      AvailabilityStatus = 3
+	AvailabilityStatus_AVAILABILITY_STATUS_PENDING_REVIEW AvailabilityStatus = 4 // PRV-R28: auto-paused on price/version/capability/policy change
 )
 
 // Enum value maps for AvailabilityStatus.
@@ -139,12 +140,14 @@ var (
 		1: "AVAILABILITY_STATUS_AVAILABLE",
 		2: "AVAILABILITY_STATUS_PAUSED",
 		3: "AVAILABILITY_STATUS_UNHEALTHY",
+		4: "AVAILABILITY_STATUS_PENDING_REVIEW",
 	}
 	AvailabilityStatus_value = map[string]int32{
-		"AVAILABILITY_STATUS_UNSPECIFIED": 0,
-		"AVAILABILITY_STATUS_AVAILABLE":   1,
-		"AVAILABILITY_STATUS_PAUSED":      2,
-		"AVAILABILITY_STATUS_UNHEALTHY":   3,
+		"AVAILABILITY_STATUS_UNSPECIFIED":    0,
+		"AVAILABILITY_STATUS_AVAILABLE":      1,
+		"AVAILABILITY_STATUS_PAUSED":         2,
+		"AVAILABILITY_STATUS_UNHEALTHY":      3,
+		"AVAILABILITY_STATUS_PENDING_REVIEW": 4,
 	}
 )
 
@@ -227,19 +230,467 @@ func (AutoTaskLabel) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{3}
 }
 
+type SyncEventKind int32
+
+const (
+	SyncEventKind_SYNC_EVENT_KIND_UNSPECIFIED         SyncEventKind = 0
+	SyncEventKind_SYNC_EVENT_KIND_HEARTBEAT           SyncEventKind = 1
+	SyncEventKind_SYNC_EVENT_KIND_CATALOG_PUBLISHED   SyncEventKind = 2
+	SyncEventKind_SYNC_EVENT_KIND_CREDENTIALS_UPDATED SyncEventKind = 3
+)
+
+// Enum value maps for SyncEventKind.
+var (
+	SyncEventKind_name = map[int32]string{
+		0: "SYNC_EVENT_KIND_UNSPECIFIED",
+		1: "SYNC_EVENT_KIND_HEARTBEAT",
+		2: "SYNC_EVENT_KIND_CATALOG_PUBLISHED",
+		3: "SYNC_EVENT_KIND_CREDENTIALS_UPDATED",
+	}
+	SyncEventKind_value = map[string]int32{
+		"SYNC_EVENT_KIND_UNSPECIFIED":         0,
+		"SYNC_EVENT_KIND_HEARTBEAT":           1,
+		"SYNC_EVENT_KIND_CATALOG_PUBLISHED":   2,
+		"SYNC_EVENT_KIND_CREDENTIALS_UPDATED": 3,
+	}
+)
+
+func (x SyncEventKind) Enum() *SyncEventKind {
+	p := new(SyncEventKind)
+	*p = x
+	return p
+}
+
+func (x SyncEventKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SyncEventKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[4].Descriptor()
+}
+
+func (SyncEventKind) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[4]
+}
+
+func (x SyncEventKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SyncEventKind.Descriptor instead.
+func (SyncEventKind) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{4}
+}
+
+type CredentialStatus int32
+
+const (
+	CredentialStatus_CREDENTIAL_STATUS_UNSPECIFIED CredentialStatus = 0
+	CredentialStatus_CREDENTIAL_STATUS_ACTIVE      CredentialStatus = 1
+	CredentialStatus_CREDENTIAL_STATUS_REVOKED     CredentialStatus = 2
+)
+
+// Enum value maps for CredentialStatus.
+var (
+	CredentialStatus_name = map[int32]string{
+		0: "CREDENTIAL_STATUS_UNSPECIFIED",
+		1: "CREDENTIAL_STATUS_ACTIVE",
+		2: "CREDENTIAL_STATUS_REVOKED",
+	}
+	CredentialStatus_value = map[string]int32{
+		"CREDENTIAL_STATUS_UNSPECIFIED": 0,
+		"CREDENTIAL_STATUS_ACTIVE":      1,
+		"CREDENTIAL_STATUS_REVOKED":     2,
+	}
+)
+
+func (x CredentialStatus) Enum() *CredentialStatus {
+	p := new(CredentialStatus)
+	*p = x
+	return p
+}
+
+func (x CredentialStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (CredentialStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[5].Descriptor()
+}
+
+func (CredentialStatus) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[5]
+}
+
+func (x CredentialStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use CredentialStatus.Descriptor instead.
+func (CredentialStatus) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{5}
+}
+
+type PublicKeyAlgorithm int32
+
+const (
+	PublicKeyAlgorithm_PUBLIC_KEY_ALGORITHM_UNSPECIFIED        PublicKeyAlgorithm = 0
+	PublicKeyAlgorithm_PUBLIC_KEY_ALGORITHM_RSA_OAEP_SHA256    PublicKeyAlgorithm = 1
+	PublicKeyAlgorithm_PUBLIC_KEY_ALGORITHM_X25519_HKDF_SHA256 PublicKeyAlgorithm = 2
+)
+
+// Enum value maps for PublicKeyAlgorithm.
+var (
+	PublicKeyAlgorithm_name = map[int32]string{
+		0: "PUBLIC_KEY_ALGORITHM_UNSPECIFIED",
+		1: "PUBLIC_KEY_ALGORITHM_RSA_OAEP_SHA256",
+		2: "PUBLIC_KEY_ALGORITHM_X25519_HKDF_SHA256",
+	}
+	PublicKeyAlgorithm_value = map[string]int32{
+		"PUBLIC_KEY_ALGORITHM_UNSPECIFIED":        0,
+		"PUBLIC_KEY_ALGORITHM_RSA_OAEP_SHA256":    1,
+		"PUBLIC_KEY_ALGORITHM_X25519_HKDF_SHA256": 2,
+	}
+)
+
+func (x PublicKeyAlgorithm) Enum() *PublicKeyAlgorithm {
+	p := new(PublicKeyAlgorithm)
+	*p = x
+	return p
+}
+
+func (x PublicKeyAlgorithm) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PublicKeyAlgorithm) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[6].Descriptor()
+}
+
+func (PublicKeyAlgorithm) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[6]
+}
+
+func (x PublicKeyAlgorithm) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PublicKeyAlgorithm.Descriptor instead.
+func (PublicKeyAlgorithm) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{6}
+}
+
+type BillingComponentKind int32
+
+const (
+	BillingComponentKind_BILLING_COMPONENT_KIND_UNSPECIFIED                   BillingComponentKind = 0
+	BillingComponentKind_BILLING_COMPONENT_KIND_INPUT_TOKENS                  BillingComponentKind = 1
+	BillingComponentKind_BILLING_COMPONENT_KIND_OUTPUT_TOKENS                 BillingComponentKind = 2
+	BillingComponentKind_BILLING_COMPONENT_KIND_CACHE_READ_TOKENS             BillingComponentKind = 3
+	BillingComponentKind_BILLING_COMPONENT_KIND_CACHE_WRITE_TOKENS            BillingComponentKind = 4
+	BillingComponentKind_BILLING_COMPONENT_KIND_INTERNAL_REASONING_TOKENS     BillingComponentKind = 5
+	BillingComponentKind_BILLING_COMPONENT_KIND_INPUT_IMAGE                   BillingComponentKind = 6
+	BillingComponentKind_BILLING_COMPONENT_KIND_INPUT_IMAGE_TOKENS            BillingComponentKind = 7
+	BillingComponentKind_BILLING_COMPONENT_KIND_INPUT_AUDIO_TOKENS            BillingComponentKind = 8
+	BillingComponentKind_BILLING_COMPONENT_KIND_INPUT_AUDIO_CACHE_READ_TOKENS BillingComponentKind = 9
+	BillingComponentKind_BILLING_COMPONENT_KIND_WEB_SEARCH_CALLS              BillingComponentKind = 10
+	BillingComponentKind_BILLING_COMPONENT_KIND_OUTPUT_IMAGE                  BillingComponentKind = 11
+	BillingComponentKind_BILLING_COMPONENT_KIND_OUTPUT_VIDEO                  BillingComponentKind = 12
+	BillingComponentKind_BILLING_COMPONENT_KIND_MEDIA_EDIT_OP                 BillingComponentKind = 13
+	BillingComponentKind_BILLING_COMPONENT_KIND_REQUEST_CALL                  BillingComponentKind = 14
+)
+
+// Enum value maps for BillingComponentKind.
+var (
+	BillingComponentKind_name = map[int32]string{
+		0:  "BILLING_COMPONENT_KIND_UNSPECIFIED",
+		1:  "BILLING_COMPONENT_KIND_INPUT_TOKENS",
+		2:  "BILLING_COMPONENT_KIND_OUTPUT_TOKENS",
+		3:  "BILLING_COMPONENT_KIND_CACHE_READ_TOKENS",
+		4:  "BILLING_COMPONENT_KIND_CACHE_WRITE_TOKENS",
+		5:  "BILLING_COMPONENT_KIND_INTERNAL_REASONING_TOKENS",
+		6:  "BILLING_COMPONENT_KIND_INPUT_IMAGE",
+		7:  "BILLING_COMPONENT_KIND_INPUT_IMAGE_TOKENS",
+		8:  "BILLING_COMPONENT_KIND_INPUT_AUDIO_TOKENS",
+		9:  "BILLING_COMPONENT_KIND_INPUT_AUDIO_CACHE_READ_TOKENS",
+		10: "BILLING_COMPONENT_KIND_WEB_SEARCH_CALLS",
+		11: "BILLING_COMPONENT_KIND_OUTPUT_IMAGE",
+		12: "BILLING_COMPONENT_KIND_OUTPUT_VIDEO",
+		13: "BILLING_COMPONENT_KIND_MEDIA_EDIT_OP",
+		14: "BILLING_COMPONENT_KIND_REQUEST_CALL",
+	}
+	BillingComponentKind_value = map[string]int32{
+		"BILLING_COMPONENT_KIND_UNSPECIFIED":                   0,
+		"BILLING_COMPONENT_KIND_INPUT_TOKENS":                  1,
+		"BILLING_COMPONENT_KIND_OUTPUT_TOKENS":                 2,
+		"BILLING_COMPONENT_KIND_CACHE_READ_TOKENS":             3,
+		"BILLING_COMPONENT_KIND_CACHE_WRITE_TOKENS":            4,
+		"BILLING_COMPONENT_KIND_INTERNAL_REASONING_TOKENS":     5,
+		"BILLING_COMPONENT_KIND_INPUT_IMAGE":                   6,
+		"BILLING_COMPONENT_KIND_INPUT_IMAGE_TOKENS":            7,
+		"BILLING_COMPONENT_KIND_INPUT_AUDIO_TOKENS":            8,
+		"BILLING_COMPONENT_KIND_INPUT_AUDIO_CACHE_READ_TOKENS": 9,
+		"BILLING_COMPONENT_KIND_WEB_SEARCH_CALLS":              10,
+		"BILLING_COMPONENT_KIND_OUTPUT_IMAGE":                  11,
+		"BILLING_COMPONENT_KIND_OUTPUT_VIDEO":                  12,
+		"BILLING_COMPONENT_KIND_MEDIA_EDIT_OP":                 13,
+		"BILLING_COMPONENT_KIND_REQUEST_CALL":                  14,
+	}
+)
+
+func (x BillingComponentKind) Enum() *BillingComponentKind {
+	p := new(BillingComponentKind)
+	*p = x
+	return p
+}
+
+func (x BillingComponentKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BillingComponentKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[7].Descriptor()
+}
+
+func (BillingComponentKind) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[7]
+}
+
+func (x BillingComponentKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BillingComponentKind.Descriptor instead.
+func (BillingComponentKind) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{7}
+}
+
+type BillingUnit int32
+
+const (
+	BillingUnit_BILLING_UNIT_UNSPECIFIED          BillingUnit = 0
+	BillingUnit_BILLING_UNIT_PER_TOKEN            BillingUnit = 1
+	BillingUnit_BILLING_UNIT_PER_1M_TOKENS        BillingUnit = 2
+	BillingUnit_BILLING_UNIT_PER_IMAGE            BillingUnit = 3
+	BillingUnit_BILLING_UNIT_PER_SECOND           BillingUnit = 4
+	BillingUnit_BILLING_UNIT_PER_MEGAPIXEL        BillingUnit = 5
+	BillingUnit_BILLING_UNIT_PER_MEGAPIXEL_SECOND BillingUnit = 6
+	BillingUnit_BILLING_UNIT_PER_CHARACTER        BillingUnit = 7
+	BillingUnit_BILLING_UNIT_PER_SEARCH_UNIT      BillingUnit = 8
+	BillingUnit_BILLING_UNIT_PER_REQUEST          BillingUnit = 9
+)
+
+// Enum value maps for BillingUnit.
+var (
+	BillingUnit_name = map[int32]string{
+		0: "BILLING_UNIT_UNSPECIFIED",
+		1: "BILLING_UNIT_PER_TOKEN",
+		2: "BILLING_UNIT_PER_1M_TOKENS",
+		3: "BILLING_UNIT_PER_IMAGE",
+		4: "BILLING_UNIT_PER_SECOND",
+		5: "BILLING_UNIT_PER_MEGAPIXEL",
+		6: "BILLING_UNIT_PER_MEGAPIXEL_SECOND",
+		7: "BILLING_UNIT_PER_CHARACTER",
+		8: "BILLING_UNIT_PER_SEARCH_UNIT",
+		9: "BILLING_UNIT_PER_REQUEST",
+	}
+	BillingUnit_value = map[string]int32{
+		"BILLING_UNIT_UNSPECIFIED":          0,
+		"BILLING_UNIT_PER_TOKEN":            1,
+		"BILLING_UNIT_PER_1M_TOKENS":        2,
+		"BILLING_UNIT_PER_IMAGE":            3,
+		"BILLING_UNIT_PER_SECOND":           4,
+		"BILLING_UNIT_PER_MEGAPIXEL":        5,
+		"BILLING_UNIT_PER_MEGAPIXEL_SECOND": 6,
+		"BILLING_UNIT_PER_CHARACTER":        7,
+		"BILLING_UNIT_PER_SEARCH_UNIT":      8,
+		"BILLING_UNIT_PER_REQUEST":          9,
+	}
+)
+
+func (x BillingUnit) Enum() *BillingUnit {
+	p := new(BillingUnit)
+	*p = x
+	return p
+}
+
+func (x BillingUnit) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BillingUnit) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[8].Descriptor()
+}
+
+func (BillingUnit) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[8]
+}
+
+func (x BillingUnit) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BillingUnit.Descriptor instead.
+func (BillingUnit) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{8}
+}
+
+type StatementEntryKind int32
+
+const (
+	StatementEntryKind_STATEMENT_ENTRY_KIND_UNSPECIFIED      StatementEntryKind = 0
+	StatementEntryKind_STATEMENT_ENTRY_KIND_BASE_SETTLEMENT  StatementEntryKind = 1
+	StatementEntryKind_STATEMENT_ENTRY_KIND_CORRECTION       StatementEntryKind = 2
+	StatementEntryKind_STATEMENT_ENTRY_KIND_DISPUTE_HOLD     StatementEntryKind = 3
+	StatementEntryKind_STATEMENT_ENTRY_KIND_DISPUTE_RESOLVED StatementEntryKind = 4
+)
+
+// Enum value maps for StatementEntryKind.
+var (
+	StatementEntryKind_name = map[int32]string{
+		0: "STATEMENT_ENTRY_KIND_UNSPECIFIED",
+		1: "STATEMENT_ENTRY_KIND_BASE_SETTLEMENT",
+		2: "STATEMENT_ENTRY_KIND_CORRECTION",
+		3: "STATEMENT_ENTRY_KIND_DISPUTE_HOLD",
+		4: "STATEMENT_ENTRY_KIND_DISPUTE_RESOLVED",
+	}
+	StatementEntryKind_value = map[string]int32{
+		"STATEMENT_ENTRY_KIND_UNSPECIFIED":      0,
+		"STATEMENT_ENTRY_KIND_BASE_SETTLEMENT":  1,
+		"STATEMENT_ENTRY_KIND_CORRECTION":       2,
+		"STATEMENT_ENTRY_KIND_DISPUTE_HOLD":     3,
+		"STATEMENT_ENTRY_KIND_DISPUTE_RESOLVED": 4,
+	}
+)
+
+func (x StatementEntryKind) Enum() *StatementEntryKind {
+	p := new(StatementEntryKind)
+	*p = x
+	return p
+}
+
+func (x StatementEntryKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (StatementEntryKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[9].Descriptor()
+}
+
+func (StatementEntryKind) Type() protoreflect.EnumType {
+	return &file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes[9]
+}
+
+func (x StatementEntryKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use StatementEntryKind.Descriptor instead.
+func (StatementEntryKind) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{9}
+}
+
+// RateCondition expresses long-context tiers, UTC time bands, or Studio media mode/resolution selectors.
+type RateCondition struct {
+	state           protoimpl.MessageState  `protogen:"open.v1"`
+	MinPromptTokens int64                   `protobuf:"varint,1,opt,name=min_prompt_tokens,json=minPromptTokens,proto3" json:"min_prompt_tokens,omitempty"` // applies when prompt_tokens > min_prompt_tokens (0 means unconditional)
+	HasUtcWindow    bool                    `protobuf:"varint,2,opt,name=has_utc_window,json=hasUtcWindow,proto3" json:"has_utc_window,omitempty"`
+	UtcStartHhmm    int32                   `protobuf:"varint,3,opt,name=utc_start_hhmm,json=utcStartHhmm,proto3" json:"utc_start_hhmm,omitempty"` // e.g. 0..2359
+	UtcEndHhmm      int32                   `protobuf:"varint,4,opt,name=utc_end_hhmm,json=utcEndHhmm,proto3" json:"utc_end_hhmm,omitempty"`
+	UtcDays         []string                `protobuf:"bytes,5,rep,name=utc_days,json=utcDays,proto3" json:"utc_days,omitempty"`                         // lowercase "monday".."sunday"
+	MediaAttributes []*v1.KeyValueAttribute `protobuf:"bytes,6,rep,name=media_attributes,json=mediaAttributes,proto3" json:"media_attributes,omitempty"` // e.g. resolution=1080p, has_audio=true, path=i2v, edit_tool=inpaint
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RateCondition) Reset() {
+	*x = RateCondition{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RateCondition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RateCondition) ProtoMessage() {}
+
+func (x *RateCondition) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RateCondition.ProtoReflect.Descriptor instead.
+func (*RateCondition) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *RateCondition) GetMinPromptTokens() int64 {
+	if x != nil {
+		return x.MinPromptTokens
+	}
+	return 0
+}
+
+func (x *RateCondition) GetHasUtcWindow() bool {
+	if x != nil {
+		return x.HasUtcWindow
+	}
+	return false
+}
+
+func (x *RateCondition) GetUtcStartHhmm() int32 {
+	if x != nil {
+		return x.UtcStartHhmm
+	}
+	return 0
+}
+
+func (x *RateCondition) GetUtcEndHhmm() int32 {
+	if x != nil {
+		return x.UtcEndHhmm
+	}
+	return 0
+}
+
+func (x *RateCondition) GetUtcDays() []string {
+	if x != nil {
+		return x.UtcDays
+	}
+	return nil
+}
+
+func (x *RateCondition) GetMediaAttributes() []*v1.KeyValueAttribute {
+	if x != nil {
+		return x.MediaAttributes
+	}
+	return nil
+}
+
+// RateComponent uses exact non-negative decimal USD strings (PRV-R20 & server-core usdLexeme)
+// so sub-micro per-token tariffs never suffer premature integer truncation.
 type RateComponent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`                                        // input_tokens | output_tokens | cache_read_tokens | output_image | output_video
-	MicroUsdRate  int64                  `protobuf:"varint,2,opt,name=micro_usd_rate,json=microUsdRate,proto3" json:"micro_usd_rate,omitempty"` // integer micro-USD per unit (1 USD = 1,000,000 micro-USD)
-	Unit          string                 `protobuf:"bytes,3,opt,name=unit,proto3" json:"unit,omitempty"`                                        // per_1m_tokens | per_image | per_megapixel | per_second
-	Condition     string                 `protobuf:"bytes,4,opt,name=condition,proto3" json:"condition,omitempty"`                              // optional resolution/mode condition, e.g. "1024px" or "1080p"
+	Kind          BillingComponentKind   `protobuf:"varint,1,opt,name=kind,proto3,enum=maxshot.provider_sync.v1.BillingComponentKind" json:"kind,omitempty"`
+	Sku           string                 `protobuf:"bytes,2,opt,name=sku,proto3" json:"sku,omitempty"`
+	RateUsdDec    string                 `protobuf:"bytes,3,opt,name=rate_usd_dec,json=rateUsdDec,proto3" json:"rate_usd_dec,omitempty"` // exact decimal USD string per `unit`, e.g. "1.25" with PER_1M_TOKENS or "0.00000125" with PER_TOKEN
+	Unit          BillingUnit            `protobuf:"varint,4,opt,name=unit,proto3,enum=maxshot.provider_sync.v1.BillingUnit" json:"unit,omitempty"`
+	Condition     *RateCondition         `protobuf:"bytes,5,opt,name=condition,proto3" json:"condition,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RateComponent) Reset() {
 	*x = RateComponent{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[0]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -251,7 +702,7 @@ func (x *RateComponent) String() string {
 func (*RateComponent) ProtoMessage() {}
 
 func (x *RateComponent) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[0]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -264,49 +715,58 @@ func (x *RateComponent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RateComponent.ProtoReflect.Descriptor instead.
 func (*RateComponent) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{0}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *RateComponent) GetKind() string {
+func (x *RateComponent) GetKind() BillingComponentKind {
 	if x != nil {
 		return x.Kind
 	}
+	return BillingComponentKind_BILLING_COMPONENT_KIND_UNSPECIFIED
+}
+
+func (x *RateComponent) GetSku() string {
+	if x != nil {
+		return x.Sku
+	}
 	return ""
 }
 
-func (x *RateComponent) GetMicroUsdRate() int64 {
+func (x *RateComponent) GetRateUsdDec() string {
 	if x != nil {
-		return x.MicroUsdRate
+		return x.RateUsdDec
 	}
-	return 0
+	return ""
 }
 
-func (x *RateComponent) GetUnit() string {
+func (x *RateComponent) GetUnit() BillingUnit {
 	if x != nil {
 		return x.Unit
 	}
-	return ""
+	return BillingUnit_BILLING_UNIT_UNSPECIFIED
 }
 
-func (x *RateComponent) GetCondition() string {
+func (x *RateComponent) GetCondition() *RateCondition {
 	if x != nil {
 		return x.Condition
 	}
-	return ""
+	return nil
 }
 
 type RateCard struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	RateCardVersion   string                 `protobuf:"bytes,1,opt,name=rate_card_version,json=rateCardVersion,proto3" json:"rate_card_version,omitempty"`
-	EffectiveAtUnixMs int64                  `protobuf:"varint,2,opt,name=effective_at_unix_ms,json=effectiveAtUnixMs,proto3" json:"effective_at_unix_ms,omitempty"`
-	Components        []*RateComponent       `protobuf:"bytes,3,rep,name=components,proto3" json:"components,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	RateCardVersion      string                 `protobuf:"bytes,1,opt,name=rate_card_version,json=rateCardVersion,proto3" json:"rate_card_version,omitempty"`
+	Currency             string                 `protobuf:"bytes,2,opt,name=currency,proto3" json:"currency,omitempty"` // "USD"
+	EffectiveAtUnixMs    int64                  `protobuf:"varint,3,opt,name=effective_at_unix_ms,json=effectiveAtUnixMs,proto3" json:"effective_at_unix_ms,omitempty"`
+	BaseComponents       []*RateComponent       `protobuf:"bytes,4,rep,name=base_components,json=baseComponents,proto3" json:"base_components,omitempty"`
+	ConditionalOverrides []*RateComponent       `protobuf:"bytes,5,rep,name=conditional_overrides,json=conditionalOverrides,proto3" json:"conditional_overrides,omitempty"` // evaluated in source order
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *RateCard) Reset() {
 	*x = RateCard{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[1]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +778,7 @@ func (x *RateCard) String() string {
 func (*RateCard) ProtoMessage() {}
 
 func (x *RateCard) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[1]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,12 +791,19 @@ func (x *RateCard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RateCard.ProtoReflect.Descriptor instead.
 func (*RateCard) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{1}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *RateCard) GetRateCardVersion() string {
 	if x != nil {
 		return x.RateCardVersion
+	}
+	return ""
+}
+
+func (x *RateCard) GetCurrency() string {
+	if x != nil {
+		return x.Currency
 	}
 	return ""
 }
@@ -348,28 +815,36 @@ func (x *RateCard) GetEffectiveAtUnixMs() int64 {
 	return 0
 }
 
-func (x *RateCard) GetComponents() []*RateComponent {
+func (x *RateCard) GetBaseComponents() []*RateComponent {
 	if x != nil {
-		return x.Components
+		return x.BaseComponents
+	}
+	return nil
+}
+
+func (x *RateCard) GetConditionalOverrides() []*RateComponent {
+	if x != nil {
+		return x.ConditionalOverrides
 	}
 	return nil
 }
 
 type ProviderRecord struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	ProviderId            string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	DisplayName           string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	RouteType             RouteType              `protobuf:"varint,3,opt,name=route_type,json=routeType,proto3,enum=maxshot.provider_sync.v1.RouteType" json:"route_type,omitempty"`
-	Summary               string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
-	DailyBudgetMicroUsd   int64                  `protobuf:"varint,5,opt,name=daily_budget_micro_usd,json=dailyBudgetMicroUsd,proto3" json:"daily_budget_micro_usd,omitempty"`
-	MonthlyBudgetMicroUsd int64                  `protobuf:"varint,6,opt,name=monthly_budget_micro_usd,json=monthlyBudgetMicroUsd,proto3" json:"monthly_budget_micro_usd,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId    string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	RouteType     RouteType              `protobuf:"varint,3,opt,name=route_type,json=routeType,proto3,enum=maxshot.provider_sync.v1.RouteType" json:"route_type,omitempty"`
+	Summary       string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	BrandMarkUrl  string                 `protobuf:"bytes,5,opt,name=brand_mark_url,json=brandMarkUrl,proto3" json:"brand_mark_url,omitempty"`
+	Enabled       bool                   `protobuf:"varint,6,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	BudgetPeriods []*v1.BudgetPeriodRule `protobuf:"bytes,7,rep,name=budget_periods,json=budgetPeriods,proto3" json:"budget_periods,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ProviderRecord) Reset() {
 	*x = ProviderRecord{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[2]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +856,7 @@ func (x *ProviderRecord) String() string {
 func (*ProviderRecord) ProtoMessage() {}
 
 func (x *ProviderRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[2]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +869,7 @@ func (x *ProviderRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProviderRecord.ProtoReflect.Descriptor instead.
 func (*ProviderRecord) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{2}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ProviderRecord) GetProviderId() string {
@@ -425,23 +900,30 @@ func (x *ProviderRecord) GetSummary() string {
 	return ""
 }
 
-func (x *ProviderRecord) GetDailyBudgetMicroUsd() int64 {
+func (x *ProviderRecord) GetBrandMarkUrl() string {
 	if x != nil {
-		return x.DailyBudgetMicroUsd
+		return x.BrandMarkUrl
 	}
-	return 0
+	return ""
 }
 
-func (x *ProviderRecord) GetMonthlyBudgetMicroUsd() int64 {
+func (x *ProviderRecord) GetEnabled() bool {
 	if x != nil {
-		return x.MonthlyBudgetMicroUsd
+		return x.Enabled
 	}
-	return 0
+	return false
+}
+
+func (x *ProviderRecord) GetBudgetPeriods() []*v1.BudgetPeriodRule {
+	if x != nil {
+		return x.BudgetPeriods
+	}
+	return nil
 }
 
 type CatalogDefinition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	CatalogId     string                 `protobuf:"bytes,1,opt,name=catalog_id,json=catalogId,proto3" json:"catalog_id,omitempty"` // e.g. text_standard, text_frontier, image, video
+	CatalogId     string                 `protobuf:"bytes,1,opt,name=catalog_id,json=catalogId,proto3" json:"catalog_id,omitempty"` // e.g. catalog_text, catalog_image, catalog_video
 	DisplayName   string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	Modality      v1.Modality            `protobuf:"varint,3,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
 	Enabled       bool                   `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
@@ -451,7 +933,7 @@ type CatalogDefinition struct {
 
 func (x *CatalogDefinition) Reset() {
 	*x = CatalogDefinition{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[3]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -463,7 +945,7 @@ func (x *CatalogDefinition) String() string {
 func (*CatalogDefinition) ProtoMessage() {}
 
 func (x *CatalogDefinition) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[3]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -476,7 +958,7 @@ func (x *CatalogDefinition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CatalogDefinition.ProtoReflect.Descriptor instead.
 func (*CatalogDefinition) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{3}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CatalogDefinition) GetCatalogId() string {
@@ -511,19 +993,21 @@ type CustomerModelRecord struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	ModelId                string                 `protobuf:"bytes,1,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
 	DisplayName            string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	VerifiedVersion        string                 `protobuf:"bytes,3,opt,name=verified_version,json=verifiedVersion,proto3" json:"verified_version,omitempty"`
-	Modality               v1.Modality            `protobuf:"varint,4,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
-	CatalogId              string                 `protobuf:"bytes,5,opt,name=catalog_id,json=catalogId,proto3" json:"catalog_id,omitempty"`
-	Tier                   v1.ModelTier           `protobuf:"varint,6,opt,name=tier,proto3,enum=maxshot.common.v1.ModelTier" json:"tier,omitempty"`
-	DefaultMaxOutputTokens int64                  `protobuf:"varint,7,opt,name=default_max_output_tokens,json=defaultMaxOutputTokens,proto3" json:"default_max_output_tokens,omitempty"`
-	OfferingIds            []string               `protobuf:"bytes,8,rep,name=offering_ids,json=offeringIds,proto3" json:"offering_ids,omitempty"`
+	Description            string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	VerifiedVersion        string                 `protobuf:"bytes,4,opt,name=verified_version,json=verifiedVersion,proto3" json:"verified_version,omitempty"`
+	Modality               v1.Modality            `protobuf:"varint,5,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
+	CatalogId              string                 `protobuf:"bytes,6,opt,name=catalog_id,json=catalogId,proto3" json:"catalog_id,omitempty"`
+	Tier                   v1.ModelTier           `protobuf:"varint,7,opt,name=tier,proto3,enum=maxshot.common.v1.ModelTier" json:"tier,omitempty"`
+	DefaultMaxOutputTokens int64                  `protobuf:"varint,8,opt,name=default_max_output_tokens,json=defaultMaxOutputTokens,proto3" json:"default_max_output_tokens,omitempty"`
+	ModelAliases           []string               `protobuf:"bytes,9,rep,name=model_aliases,json=modelAliases,proto3" json:"model_aliases,omitempty"`
+	OfferingIds            []string               `protobuf:"bytes,10,rep,name=offering_ids,json=offeringIds,proto3" json:"offering_ids,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
 
 func (x *CustomerModelRecord) Reset() {
 	*x = CustomerModelRecord{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[4]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -535,7 +1019,7 @@ func (x *CustomerModelRecord) String() string {
 func (*CustomerModelRecord) ProtoMessage() {}
 
 func (x *CustomerModelRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[4]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -548,7 +1032,7 @@ func (x *CustomerModelRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CustomerModelRecord.ProtoReflect.Descriptor instead.
 func (*CustomerModelRecord) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{4}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CustomerModelRecord) GetModelId() string {
@@ -561,6 +1045,13 @@ func (x *CustomerModelRecord) GetModelId() string {
 func (x *CustomerModelRecord) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *CustomerModelRecord) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -600,6 +1091,13 @@ func (x *CustomerModelRecord) GetDefaultMaxOutputTokens() int64 {
 	return 0
 }
 
+func (x *CustomerModelRecord) GetModelAliases() []string {
+	if x != nil {
+		return x.ModelAliases
+	}
+	return nil
+}
+
 func (x *CustomerModelRecord) GetOfferingIds() []string {
 	if x != nil {
 		return x.OfferingIds
@@ -607,35 +1105,158 @@ func (x *CustomerModelRecord) GetOfferingIds() []string {
 	return nil
 }
 
+// ObservedPerformanceSummary embeds 7-day rolling Maxshot-observed performance into CatalogSnapshot (PRV-R18, PRV-R34).
+type ObservedPerformanceSummary struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	WindowStartUnixMs      int64                  `protobuf:"varint,1,opt,name=window_start_unix_ms,json=windowStartUnixMs,proto3" json:"window_start_unix_ms,omitempty"`
+	WindowEndUnixMs        int64                  `protobuf:"varint,2,opt,name=window_end_unix_ms,json=windowEndUnixMs,proto3" json:"window_end_unix_ms,omitempty"`
+	DispatchedAttempts     int64                  `protobuf:"varint,3,opt,name=dispatched_attempts,json=dispatchedAttempts,proto3" json:"dispatched_attempts,omitempty"`
+	SampleSufficient       bool                   `protobuf:"varint,4,opt,name=sample_sufficient,json=sampleSufficient,proto3" json:"sample_sufficient,omitempty"`                      // true only when dispatched_attempts >= configured minimum (PRV-R34)
+	DeliveredSuccessPctDec string                 `protobuf:"bytes,5,opt,name=delivered_success_pct_dec,json=deliveredSuccessPctDec,proto3" json:"delivered_success_pct_dec,omitempty"` // e.g. "99.3", empty when !sample_sufficient
+	IsFirstTokenMetric     bool                   `protobuf:"varint,6,opt,name=is_first_token_metric,json=isFirstTokenMetric,proto3" json:"is_first_token_metric,omitempty"`            // true = first_token (streaming text), false = completion
+	LatencySamples         int64                  `protobuf:"varint,7,opt,name=latency_samples,json=latencySamples,proto3" json:"latency_samples,omitempty"`
+	P50Ms                  int64                  `protobuf:"varint,8,opt,name=p50_ms,json=p50Ms,proto3" json:"p50_ms,omitempty"`
+	P95Ms                  int64                  `protobuf:"varint,9,opt,name=p95_ms,json=p95Ms,proto3" json:"p95_ms,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *ObservedPerformanceSummary) Reset() {
+	*x = ObservedPerformanceSummary{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ObservedPerformanceSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ObservedPerformanceSummary) ProtoMessage() {}
+
+func (x *ObservedPerformanceSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ObservedPerformanceSummary.ProtoReflect.Descriptor instead.
+func (*ObservedPerformanceSummary) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ObservedPerformanceSummary) GetWindowStartUnixMs() int64 {
+	if x != nil {
+		return x.WindowStartUnixMs
+	}
+	return 0
+}
+
+func (x *ObservedPerformanceSummary) GetWindowEndUnixMs() int64 {
+	if x != nil {
+		return x.WindowEndUnixMs
+	}
+	return 0
+}
+
+func (x *ObservedPerformanceSummary) GetDispatchedAttempts() int64 {
+	if x != nil {
+		return x.DispatchedAttempts
+	}
+	return 0
+}
+
+func (x *ObservedPerformanceSummary) GetSampleSufficient() bool {
+	if x != nil {
+		return x.SampleSufficient
+	}
+	return false
+}
+
+func (x *ObservedPerformanceSummary) GetDeliveredSuccessPctDec() string {
+	if x != nil {
+		return x.DeliveredSuccessPctDec
+	}
+	return ""
+}
+
+func (x *ObservedPerformanceSummary) GetIsFirstTokenMetric() bool {
+	if x != nil {
+		return x.IsFirstTokenMetric
+	}
+	return false
+}
+
+func (x *ObservedPerformanceSummary) GetLatencySamples() int64 {
+	if x != nil {
+		return x.LatencySamples
+	}
+	return 0
+}
+
+func (x *ObservedPerformanceSummary) GetP50Ms() int64 {
+	if x != nil {
+		return x.P50Ms
+	}
+	return 0
+}
+
+func (x *ObservedPerformanceSummary) GetP95Ms() int64 {
+	if x != nil {
+		return x.P95Ms
+	}
+	return 0
+}
+
 type OfferingRecord struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	OfferingId              string                 `protobuf:"bytes,1,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
-	ProviderId              string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	ModelId                 string                 `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
-	ProtocolAdapter         string                 `protobuf:"bytes,4,opt,name=protocol_adapter,json=protocolAdapter,proto3" json:"protocol_adapter,omitempty"` // openai-compat | anthropic-native | google-native | openrouter-pinned | media-async
-	EndpointUrl             string                 `protobuf:"bytes,5,opt,name=endpoint_url,json=endpointUrl,proto3" json:"endpoint_url,omitempty"`
-	NativeModelId           string                 `protobuf:"bytes,6,opt,name=native_model_id,json=nativeModelId,proto3" json:"native_model_id,omitempty"`
-	CredentialId            string                 `protobuf:"bytes,7,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
-	DisableUpstreamFallback bool                   `protobuf:"varint,8,opt,name=disable_upstream_fallback,json=disableUpstreamFallback,proto3" json:"disable_upstream_fallback,omitempty"`
-	PinnedUpstreamProvider  string                 `protobuf:"bytes,9,opt,name=pinned_upstream_provider,json=pinnedUpstreamProvider,proto3" json:"pinned_upstream_provider,omitempty"`
-	AdmissionStatus         AdmissionStatus        `protobuf:"varint,10,opt,name=admission_status,json=admissionStatus,proto3,enum=maxshot.provider_sync.v1.AdmissionStatus" json:"admission_status,omitempty"`
-	AvailabilityStatus      AvailabilityStatus     `protobuf:"varint,11,opt,name=availability_status,json=availabilityStatus,proto3,enum=maxshot.provider_sync.v1.AvailabilityStatus" json:"availability_status,omitempty"`
-	Capabilities            []string               `protobuf:"bytes,12,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
-	AllowedRegions          []string               `protobuf:"bytes,13,rep,name=allowed_regions,json=allowedRegions,proto3" json:"allowed_regions,omitempty"`
-	ZeroRetention           bool                   `protobuf:"varint,14,opt,name=zero_retention,json=zeroRetention,proto3" json:"zero_retention,omitempty"`
-	ContextTokens           int64                  `protobuf:"varint,15,opt,name=context_tokens,json=contextTokens,proto3" json:"context_tokens,omitempty"`
-	MaxOutputTokens         int64                  `protobuf:"varint,16,opt,name=max_output_tokens,json=maxOutputTokens,proto3" json:"max_output_tokens,omitempty"`
-	TtftTimeoutMs           int64                  `protobuf:"varint,17,opt,name=ttft_timeout_ms,json=ttftTimeoutMs,proto3" json:"ttft_timeout_ms,omitempty"`
-	MaxJobDurationSeconds   int64                  `protobuf:"varint,18,opt,name=max_job_duration_seconds,json=maxJobDurationSeconds,proto3" json:"max_job_duration_seconds,omitempty"`
-	ProviderCostCard        *RateCard              `protobuf:"bytes,19,opt,name=provider_cost_card,json=providerCostCard,proto3" json:"provider_cost_card,omitempty"`
-	CustomerRateCard        *RateCard              `protobuf:"bytes,20,opt,name=customer_rate_card,json=customerRateCard,proto3" json:"customer_rate_card,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state                       protoimpl.MessageState      `protogen:"open.v1"`
+	OfferingId                  string                      `protobuf:"bytes,1,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
+	ProviderId                  string                      `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	ModelId                     string                      `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	VariantLabel                string                      `protobuf:"bytes,4,opt,name=variant_label,json=variantLabel,proto3" json:"variant_label,omitempty"`
+	ProtocolAdapter             string                      `protobuf:"bytes,5,opt,name=protocol_adapter,json=protocolAdapter,proto3" json:"protocol_adapter,omitempty"` // openai-compat | anthropic-native | google-native | openrouter-pinned | media-async
+	EndpointUrl                 string                      `protobuf:"bytes,6,opt,name=endpoint_url,json=endpointUrl,proto3" json:"endpoint_url,omitempty"`
+	NativeModelId               string                      `protobuf:"bytes,7,opt,name=native_model_id,json=nativeModelId,proto3" json:"native_model_id,omitempty"`
+	VerifiedModelVersion        string                      `protobuf:"bytes,8,opt,name=verified_model_version,json=verifiedModelVersion,proto3" json:"verified_model_version,omitempty"`
+	CredentialId                string                      `protobuf:"bytes,9,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
+	CredentialRevision          string                      `protobuf:"bytes,10,opt,name=credential_revision,json=credentialRevision,proto3" json:"credential_revision,omitempty"`
+	DisableUpstreamFallback     bool                        `protobuf:"varint,11,opt,name=disable_upstream_fallback,json=disableUpstreamFallback,proto3" json:"disable_upstream_fallback,omitempty"`
+	PinnedUpstreamProvider      string                      `protobuf:"bytes,12,opt,name=pinned_upstream_provider,json=pinnedUpstreamProvider,proto3" json:"pinned_upstream_provider,omitempty"`
+	RequireServingEndpointProof bool                        `protobuf:"varint,13,opt,name=require_serving_endpoint_proof,json=requireServingEndpointProof,proto3" json:"require_serving_endpoint_proof,omitempty"` // PRV-R10 upstream router verification
+	AdmissionStatus             AdmissionStatus             `protobuf:"varint,14,opt,name=admission_status,json=admissionStatus,proto3,enum=maxshot.provider_sync.v1.AdmissionStatus" json:"admission_status,omitempty"`
+	AvailabilityStatus          AvailabilityStatus          `protobuf:"varint,15,opt,name=availability_status,json=availabilityStatus,proto3,enum=maxshot.provider_sync.v1.AvailabilityStatus" json:"availability_status,omitempty"`
+	UnavailableReason           string                      `protobuf:"bytes,16,opt,name=unavailable_reason,json=unavailableReason,proto3" json:"unavailable_reason,omitempty"`
+	Capabilities                []string                    `protobuf:"bytes,17,rep,name=capabilities,proto3" json:"capabilities,omitempty"`
+	SupportedParameters         []string                    `protobuf:"bytes,18,rep,name=supported_parameters,json=supportedParameters,proto3" json:"supported_parameters,omitempty"`
+	AllowedRegions              []string                    `protobuf:"bytes,19,rep,name=allowed_regions,json=allowedRegions,proto3" json:"allowed_regions,omitempty"`
+	ZeroRetention               bool                        `protobuf:"varint,20,opt,name=zero_retention,json=zeroRetention,proto3" json:"zero_retention,omitempty"`
+	RetentionLabel              string                      `protobuf:"bytes,21,opt,name=retention_label,json=retentionLabel,proto3" json:"retention_label,omitempty"`
+	ContextTokens               int64                       `protobuf:"varint,22,opt,name=context_tokens,json=contextTokens,proto3" json:"context_tokens,omitempty"`
+	MaxInputTokens              int64                       `protobuf:"varint,23,opt,name=max_input_tokens,json=maxInputTokens,proto3" json:"max_input_tokens,omitempty"`
+	MaxOutputTokens             int64                       `protobuf:"varint,24,opt,name=max_output_tokens,json=maxOutputTokens,proto3" json:"max_output_tokens,omitempty"`
+	TtftTimeoutMs               int64                       `protobuf:"varint,25,opt,name=ttft_timeout_ms,json=ttftTimeoutMs,proto3" json:"ttft_timeout_ms,omitempty"`
+	MaxJobDurationSeconds       int64                       `protobuf:"varint,26,opt,name=max_job_duration_seconds,json=maxJobDurationSeconds,proto3" json:"max_job_duration_seconds,omitempty"`
+	GraceWindowSeconds          int64                       `protobuf:"varint,27,opt,name=grace_window_seconds,json=graceWindowSeconds,proto3" json:"grace_window_seconds,omitempty"`               // PRV-R09 / BIL-R37: max_job_duration_seconds + grace_window_seconds < 86400
+	ProviderCostCeilingBps      int32                       `protobuf:"varint,28,opt,name=provider_cost_ceiling_bps,json=providerCostCeilingBps,proto3" json:"provider_cost_ceiling_bps,omitempty"` // e.g. 15000 = 1.5x customer rate ceiling (PRV-R21, PRV-R24)
+	HealthBackoffFailures       int32                       `protobuf:"varint,29,opt,name=health_backoff_failures,json=healthBackoffFailures,proto3" json:"health_backoff_failures,omitempty"`      // PRV-R27 consecutive 5xx/timeout threshold
+	HealthBackoffWindowSeconds  int32                       `protobuf:"varint,30,opt,name=health_backoff_window_seconds,json=healthBackoffWindowSeconds,proto3" json:"health_backoff_window_seconds,omitempty"`
+	HealthReprobeSeconds        int32                       `protobuf:"varint,31,opt,name=health_reprobe_seconds,json=healthReprobeSeconds,proto3" json:"health_reprobe_seconds,omitempty"`
+	ProviderCostCard            *RateCard                   `protobuf:"bytes,32,opt,name=provider_cost_card,json=providerCostCard,proto3" json:"provider_cost_card,omitempty"`
+	CustomerRateCard            *RateCard                   `protobuf:"bytes,33,opt,name=customer_rate_card,json=customerRateCard,proto3" json:"customer_rate_card,omitempty"`
+	ObservedPerformance         *ObservedPerformanceSummary `protobuf:"bytes,34,opt,name=observed_performance,json=observedPerformance,proto3" json:"observed_performance,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
 }
 
 func (x *OfferingRecord) Reset() {
 	*x = OfferingRecord{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[5]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +1268,7 @@ func (x *OfferingRecord) String() string {
 func (*OfferingRecord) ProtoMessage() {}
 
 func (x *OfferingRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[5]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +1281,7 @@ func (x *OfferingRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfferingRecord.ProtoReflect.Descriptor instead.
 func (*OfferingRecord) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{5}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *OfferingRecord) GetOfferingId() string {
@@ -680,6 +1301,13 @@ func (x *OfferingRecord) GetProviderId() string {
 func (x *OfferingRecord) GetModelId() string {
 	if x != nil {
 		return x.ModelId
+	}
+	return ""
+}
+
+func (x *OfferingRecord) GetVariantLabel() string {
+	if x != nil {
+		return x.VariantLabel
 	}
 	return ""
 }
@@ -705,9 +1333,23 @@ func (x *OfferingRecord) GetNativeModelId() string {
 	return ""
 }
 
+func (x *OfferingRecord) GetVerifiedModelVersion() string {
+	if x != nil {
+		return x.VerifiedModelVersion
+	}
+	return ""
+}
+
 func (x *OfferingRecord) GetCredentialId() string {
 	if x != nil {
 		return x.CredentialId
+	}
+	return ""
+}
+
+func (x *OfferingRecord) GetCredentialRevision() string {
+	if x != nil {
+		return x.CredentialRevision
 	}
 	return ""
 }
@@ -726,6 +1368,13 @@ func (x *OfferingRecord) GetPinnedUpstreamProvider() string {
 	return ""
 }
 
+func (x *OfferingRecord) GetRequireServingEndpointProof() bool {
+	if x != nil {
+		return x.RequireServingEndpointProof
+	}
+	return false
+}
+
 func (x *OfferingRecord) GetAdmissionStatus() AdmissionStatus {
 	if x != nil {
 		return x.AdmissionStatus
@@ -740,9 +1389,23 @@ func (x *OfferingRecord) GetAvailabilityStatus() AvailabilityStatus {
 	return AvailabilityStatus_AVAILABILITY_STATUS_UNSPECIFIED
 }
 
+func (x *OfferingRecord) GetUnavailableReason() string {
+	if x != nil {
+		return x.UnavailableReason
+	}
+	return ""
+}
+
 func (x *OfferingRecord) GetCapabilities() []string {
 	if x != nil {
 		return x.Capabilities
+	}
+	return nil
+}
+
+func (x *OfferingRecord) GetSupportedParameters() []string {
+	if x != nil {
+		return x.SupportedParameters
 	}
 	return nil
 }
@@ -761,9 +1424,23 @@ func (x *OfferingRecord) GetZeroRetention() bool {
 	return false
 }
 
+func (x *OfferingRecord) GetRetentionLabel() string {
+	if x != nil {
+		return x.RetentionLabel
+	}
+	return ""
+}
+
 func (x *OfferingRecord) GetContextTokens() int64 {
 	if x != nil {
 		return x.ContextTokens
+	}
+	return 0
+}
+
+func (x *OfferingRecord) GetMaxInputTokens() int64 {
+	if x != nil {
+		return x.MaxInputTokens
 	}
 	return 0
 }
@@ -789,6 +1466,41 @@ func (x *OfferingRecord) GetMaxJobDurationSeconds() int64 {
 	return 0
 }
 
+func (x *OfferingRecord) GetGraceWindowSeconds() int64 {
+	if x != nil {
+		return x.GraceWindowSeconds
+	}
+	return 0
+}
+
+func (x *OfferingRecord) GetProviderCostCeilingBps() int32 {
+	if x != nil {
+		return x.ProviderCostCeilingBps
+	}
+	return 0
+}
+
+func (x *OfferingRecord) GetHealthBackoffFailures() int32 {
+	if x != nil {
+		return x.HealthBackoffFailures
+	}
+	return 0
+}
+
+func (x *OfferingRecord) GetHealthBackoffWindowSeconds() int32 {
+	if x != nil {
+		return x.HealthBackoffWindowSeconds
+	}
+	return 0
+}
+
+func (x *OfferingRecord) GetHealthReprobeSeconds() int32 {
+	if x != nil {
+		return x.HealthReprobeSeconds
+	}
+	return 0
+}
+
 func (x *OfferingRecord) GetProviderCostCard() *RateCard {
 	if x != nil {
 		return x.ProviderCostCard
@@ -799,6 +1511,251 @@ func (x *OfferingRecord) GetProviderCostCard() *RateCard {
 func (x *OfferingRecord) GetCustomerRateCard() *RateCard {
 	if x != nil {
 		return x.CustomerRateCard
+	}
+	return nil
+}
+
+func (x *OfferingRecord) GetObservedPerformance() *ObservedPerformanceSummary {
+	if x != nil {
+		return x.ObservedPerformance
+	}
+	return nil
+}
+
+// TierGroupRecord carries Provider-computed Basic/Premium model tier groups
+// referenced by subscription plan versions in Gateway Billing (subscription-plan-tiers.ts).
+type TierGroupRecord struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	GroupId        string                 `protobuf:"bytes,1,opt,name=group_id,json=groupId,proto3" json:"group_id,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Modality       v1.Modality            `protobuf:"varint,3,opt,name=modality,proto3,enum=maxshot.common.v1.Modality" json:"modality,omitempty"`
+	TargetTier     v1.ModelTier           `protobuf:"varint,4,opt,name=target_tier,json=targetTier,proto3,enum=maxshot.common.v1.ModelTier" json:"target_tier,omitempty"` // BASIC or PREMIUM
+	MemberModelIds []string               `protobuf:"bytes,5,rep,name=member_model_ids,json=memberModelIds,proto3" json:"member_model_ids,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *TierGroupRecord) Reset() {
+	*x = TierGroupRecord{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TierGroupRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TierGroupRecord) ProtoMessage() {}
+
+func (x *TierGroupRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TierGroupRecord.ProtoReflect.Descriptor instead.
+func (*TierGroupRecord) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *TierGroupRecord) GetGroupId() string {
+	if x != nil {
+		return x.GroupId
+	}
+	return ""
+}
+
+func (x *TierGroupRecord) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *TierGroupRecord) GetModality() v1.Modality {
+	if x != nil {
+		return x.Modality
+	}
+	return v1.Modality(0)
+}
+
+func (x *TierGroupRecord) GetTargetTier() v1.ModelTier {
+	if x != nil {
+		return x.TargetTier
+	}
+	return v1.ModelTier(0)
+}
+
+func (x *TierGroupRecord) GetMemberModelIds() []string {
+	if x != nil {
+		return x.MemberModelIds
+	}
+	return nil
+}
+
+type CuratedModelItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ModelId       string                 `protobuf:"bytes,1,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	Rank          int32                  `protobuf:"varint,2,opt,name=rank,proto3" json:"rank,omitempty"`
+	Recommended   bool                   `protobuf:"varint,3,opt,name=recommended,proto3" json:"recommended,omitempty"`
+	BadgeLabel    string                 `protobuf:"bytes,4,opt,name=badge_label,json=badgeLabel,proto3" json:"badge_label,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CuratedModelItem) Reset() {
+	*x = CuratedModelItem{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CuratedModelItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CuratedModelItem) ProtoMessage() {}
+
+func (x *CuratedModelItem) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CuratedModelItem.ProtoReflect.Descriptor instead.
+func (*CuratedModelItem) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CuratedModelItem) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *CuratedModelItem) GetRank() int32 {
+	if x != nil {
+		return x.Rank
+	}
+	return 0
+}
+
+func (x *CuratedModelItem) GetRecommended() bool {
+	if x != nil {
+		return x.Recommended
+	}
+	return false
+}
+
+func (x *CuratedModelItem) GetBadgeLabel() string {
+	if x != nil {
+		return x.BadgeLabel
+	}
+	return ""
+}
+
+func (x *CuratedModelItem) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+type CurationConfig struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	ChatDefaultModelId        string                 `protobuf:"bytes,1,opt,name=chat_default_model_id,json=chatDefaultModelId,proto3" json:"chat_default_model_id,omitempty"`
+	ChatModels                []*CuratedModelItem    `protobuf:"bytes,2,rep,name=chat_models,json=chatModels,proto3" json:"chat_models,omitempty"`
+	StudioImageDefaultModelId string                 `protobuf:"bytes,3,opt,name=studio_image_default_model_id,json=studioImageDefaultModelId,proto3" json:"studio_image_default_model_id,omitempty"`
+	StudioImageModels         []*CuratedModelItem    `protobuf:"bytes,4,rep,name=studio_image_models,json=studioImageModels,proto3" json:"studio_image_models,omitempty"`
+	StudioVideoDefaultModelId string                 `protobuf:"bytes,5,opt,name=studio_video_default_model_id,json=studioVideoDefaultModelId,proto3" json:"studio_video_default_model_id,omitempty"`
+	StudioVideoModels         []*CuratedModelItem    `protobuf:"bytes,6,rep,name=studio_video_models,json=studioVideoModels,proto3" json:"studio_video_models,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *CurationConfig) Reset() {
+	*x = CurationConfig{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CurationConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CurationConfig) ProtoMessage() {}
+
+func (x *CurationConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CurationConfig.ProtoReflect.Descriptor instead.
+func (*CurationConfig) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CurationConfig) GetChatDefaultModelId() string {
+	if x != nil {
+		return x.ChatDefaultModelId
+	}
+	return ""
+}
+
+func (x *CurationConfig) GetChatModels() []*CuratedModelItem {
+	if x != nil {
+		return x.ChatModels
+	}
+	return nil
+}
+
+func (x *CurationConfig) GetStudioImageDefaultModelId() string {
+	if x != nil {
+		return x.StudioImageDefaultModelId
+	}
+	return ""
+}
+
+func (x *CurationConfig) GetStudioImageModels() []*CuratedModelItem {
+	if x != nil {
+		return x.StudioImageModels
+	}
+	return nil
+}
+
+func (x *CurationConfig) GetStudioVideoDefaultModelId() string {
+	if x != nil {
+		return x.StudioVideoDefaultModelId
+	}
+	return ""
+}
+
+func (x *CurationConfig) GetStudioVideoModels() []*CuratedModelItem {
+	if x != nil {
+		return x.StudioVideoModels
 	}
 	return nil
 }
@@ -816,7 +1773,7 @@ type AutoPoolEntry struct {
 
 func (x *AutoPoolEntry) Reset() {
 	*x = AutoPoolEntry{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[6]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -828,7 +1785,7 @@ func (x *AutoPoolEntry) String() string {
 func (*AutoPoolEntry) ProtoMessage() {}
 
 func (x *AutoPoolEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[6]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -841,7 +1798,7 @@ func (x *AutoPoolEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutoPoolEntry.ProtoReflect.Descriptor instead.
 func (*AutoPoolEntry) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{6}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *AutoPoolEntry) GetOfferingId() string {
@@ -880,17 +1837,19 @@ func (x *AutoPoolEntry) GetPerMessageCeilingMicroUsd() int64 {
 }
 
 type BudgetPolicy struct {
-	state                             protoimpl.MessageState `protogen:"open.v1"`
-	PlatformDailyBudgetMicroUsd       int64                  `protobuf:"varint,1,opt,name=platform_daily_budget_micro_usd,json=platformDailyBudgetMicroUsd,proto3" json:"platform_daily_budget_micro_usd,omitempty"`
-	BusinessChatDailyBudgetMicroUsd   int64                  `protobuf:"varint,2,opt,name=business_chat_daily_budget_micro_usd,json=businessChatDailyBudgetMicroUsd,proto3" json:"business_chat_daily_budget_micro_usd,omitempty"`
-	BusinessStudioDailyBudgetMicroUsd int64                  `protobuf:"varint,3,opt,name=business_studio_daily_budget_micro_usd,json=businessStudioDailyBudgetMicroUsd,proto3" json:"business_studio_daily_budget_micro_usd,omitempty"`
-	unknownFields                     protoimpl.UnknownFields
-	sizeCache                         protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	PlatformPeriods        []*v1.BudgetPeriodRule `protobuf:"bytes,1,rep,name=platform_periods,json=platformPeriods,proto3" json:"platform_periods,omitempty"`
+	DefaultSupplierPeriods []*v1.BudgetPeriodRule `protobuf:"bytes,2,rep,name=default_supplier_periods,json=defaultSupplierPeriods,proto3" json:"default_supplier_periods,omitempty"`
+	BusinessTotalPeriods   []*v1.BudgetPeriodRule `protobuf:"bytes,3,rep,name=business_total_periods,json=businessTotalPeriods,proto3" json:"business_total_periods,omitempty"`
+	BusinessChatPeriods    []*v1.BudgetPeriodRule `protobuf:"bytes,4,rep,name=business_chat_periods,json=businessChatPeriods,proto3" json:"business_chat_periods,omitempty"`
+	BusinessStudioPeriods  []*v1.BudgetPeriodRule `protobuf:"bytes,5,rep,name=business_studio_periods,json=businessStudioPeriods,proto3" json:"business_studio_periods,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *BudgetPolicy) Reset() {
 	*x = BudgetPolicy{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[7]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -902,7 +1861,7 @@ func (x *BudgetPolicy) String() string {
 func (*BudgetPolicy) ProtoMessage() {}
 
 func (x *BudgetPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[7]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -915,28 +1874,42 @@ func (x *BudgetPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BudgetPolicy.ProtoReflect.Descriptor instead.
 func (*BudgetPolicy) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{7}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *BudgetPolicy) GetPlatformDailyBudgetMicroUsd() int64 {
+func (x *BudgetPolicy) GetPlatformPeriods() []*v1.BudgetPeriodRule {
 	if x != nil {
-		return x.PlatformDailyBudgetMicroUsd
+		return x.PlatformPeriods
 	}
-	return 0
+	return nil
 }
 
-func (x *BudgetPolicy) GetBusinessChatDailyBudgetMicroUsd() int64 {
+func (x *BudgetPolicy) GetDefaultSupplierPeriods() []*v1.BudgetPeriodRule {
 	if x != nil {
-		return x.BusinessChatDailyBudgetMicroUsd
+		return x.DefaultSupplierPeriods
 	}
-	return 0
+	return nil
 }
 
-func (x *BudgetPolicy) GetBusinessStudioDailyBudgetMicroUsd() int64 {
+func (x *BudgetPolicy) GetBusinessTotalPeriods() []*v1.BudgetPeriodRule {
 	if x != nil {
-		return x.BusinessStudioDailyBudgetMicroUsd
+		return x.BusinessTotalPeriods
 	}
-	return 0
+	return nil
+}
+
+func (x *BudgetPolicy) GetBusinessChatPeriods() []*v1.BudgetPeriodRule {
+	if x != nil {
+		return x.BusinessChatPeriods
+	}
+	return nil
+}
+
+func (x *BudgetPolicy) GetBusinessStudioPeriods() []*v1.BudgetPeriodRule {
+	if x != nil {
+		return x.BusinessStudioPeriods
+	}
+	return nil
 }
 
 type CatalogSnapshot struct {
@@ -947,15 +1920,17 @@ type CatalogSnapshot struct {
 	Providers         []*ProviderRecord      `protobuf:"bytes,4,rep,name=providers,proto3" json:"providers,omitempty"`
 	Models            []*CustomerModelRecord `protobuf:"bytes,5,rep,name=models,proto3" json:"models,omitempty"`
 	Offerings         []*OfferingRecord      `protobuf:"bytes,6,rep,name=offerings,proto3" json:"offerings,omitempty"`
-	AutoPool          []*AutoPoolEntry       `protobuf:"bytes,7,rep,name=auto_pool,json=autoPool,proto3" json:"auto_pool,omitempty"`
-	BudgetPolicy      *BudgetPolicy          `protobuf:"bytes,8,opt,name=budget_policy,json=budgetPolicy,proto3" json:"budget_policy,omitempty"`
+	TierGroups        []*TierGroupRecord     `protobuf:"bytes,7,rep,name=tier_groups,json=tierGroups,proto3" json:"tier_groups,omitempty"`
+	Curation          *CurationConfig        `protobuf:"bytes,8,opt,name=curation,proto3" json:"curation,omitempty"`
+	AutoPool          []*AutoPoolEntry       `protobuf:"bytes,9,rep,name=auto_pool,json=autoPool,proto3" json:"auto_pool,omitempty"`
+	BudgetPolicy      *BudgetPolicy          `protobuf:"bytes,10,opt,name=budget_policy,json=budgetPolicy,proto3" json:"budget_policy,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CatalogSnapshot) Reset() {
 	*x = CatalogSnapshot{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[8]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -967,7 +1942,7 @@ func (x *CatalogSnapshot) String() string {
 func (*CatalogSnapshot) ProtoMessage() {}
 
 func (x *CatalogSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[8]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -980,7 +1955,7 @@ func (x *CatalogSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CatalogSnapshot.ProtoReflect.Descriptor instead.
 func (*CatalogSnapshot) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{8}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CatalogSnapshot) GetCatalogVersion() string {
@@ -1025,6 +2000,20 @@ func (x *CatalogSnapshot) GetOfferings() []*OfferingRecord {
 	return nil
 }
 
+func (x *CatalogSnapshot) GetTierGroups() []*TierGroupRecord {
+	if x != nil {
+		return x.TierGroups
+	}
+	return nil
+}
+
+func (x *CatalogSnapshot) GetCuration() *CurationConfig {
+	if x != nil {
+		return x.Curation
+	}
+	return nil
+}
+
 func (x *CatalogSnapshot) GetAutoPool() []*AutoPoolEntry {
 	if x != nil {
 		return x.AutoPool
@@ -1039,29 +2028,31 @@ func (x *CatalogSnapshot) GetBudgetPolicy() *BudgetPolicy {
 	return nil
 }
 
-type WatchCatalogSnapshotRequest struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	GatewayNodeId          string                 `protobuf:"bytes,1,opt,name=gateway_node_id,json=gatewayNodeId,proto3" json:"gateway_node_id,omitempty"`
-	LastSeenCatalogVersion string                 `protobuf:"bytes,2,opt,name=last_seen_catalog_version,json=lastSeenCatalogVersion,proto3" json:"last_seen_catalog_version,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+type WatchSyncEventsRequest struct {
+	state                      protoimpl.MessageState `protogen:"open.v1"`
+	GatewayNodeId              string                 `protobuf:"bytes,1,opt,name=gateway_node_id,json=gatewayNodeId,proto3" json:"gateway_node_id,omitempty"`
+	NodeRole                   string                 `protobuf:"bytes,2,opt,name=node_role,json=nodeRole,proto3" json:"node_role,omitempty"` // "dataplane" | "billing"
+	LastSeenCatalogVersion     string                 `protobuf:"bytes,3,opt,name=last_seen_catalog_version,json=lastSeenCatalogVersion,proto3" json:"last_seen_catalog_version,omitempty"`
+	LastSeenCredentialRevision string                 `protobuf:"bytes,4,opt,name=last_seen_credential_revision,json=lastSeenCredentialRevision,proto3" json:"last_seen_credential_revision,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
-func (x *WatchCatalogSnapshotRequest) Reset() {
-	*x = WatchCatalogSnapshotRequest{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[9]
+func (x *WatchSyncEventsRequest) Reset() {
+	*x = WatchSyncEventsRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchCatalogSnapshotRequest) String() string {
+func (x *WatchSyncEventsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchCatalogSnapshotRequest) ProtoMessage() {}
+func (*WatchSyncEventsRequest) ProtoMessage() {}
 
-func (x *WatchCatalogSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[9]
+func (x *WatchSyncEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1072,47 +2063,64 @@ func (x *WatchCatalogSnapshotRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WatchCatalogSnapshotRequest.ProtoReflect.Descriptor instead.
-func (*WatchCatalogSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{9}
+// Deprecated: Use WatchSyncEventsRequest.ProtoReflect.Descriptor instead.
+func (*WatchSyncEventsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *WatchCatalogSnapshotRequest) GetGatewayNodeId() string {
+func (x *WatchSyncEventsRequest) GetGatewayNodeId() string {
 	if x != nil {
 		return x.GatewayNodeId
 	}
 	return ""
 }
 
-func (x *WatchCatalogSnapshotRequest) GetLastSeenCatalogVersion() string {
+func (x *WatchSyncEventsRequest) GetNodeRole() string {
+	if x != nil {
+		return x.NodeRole
+	}
+	return ""
+}
+
+func (x *WatchSyncEventsRequest) GetLastSeenCatalogVersion() string {
 	if x != nil {
 		return x.LastSeenCatalogVersion
 	}
 	return ""
 }
 
-type WatchCatalogSnapshotResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Snapshot      *CatalogSnapshot       `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+func (x *WatchSyncEventsRequest) GetLastSeenCredentialRevision() string {
+	if x != nil {
+		return x.LastSeenCredentialRevision
+	}
+	return ""
 }
 
-func (x *WatchCatalogSnapshotResponse) Reset() {
-	*x = WatchCatalogSnapshotResponse{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[10]
+type WatchSyncEventsResponse struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	EventKind                SyncEventKind          `protobuf:"varint,1,opt,name=event_kind,json=eventKind,proto3,enum=maxshot.provider_sync.v1.SyncEventKind" json:"event_kind,omitempty"`
+	LatestCatalogVersion     string                 `protobuf:"bytes,2,opt,name=latest_catalog_version,json=latestCatalogVersion,proto3" json:"latest_catalog_version,omitempty"`
+	LatestCredentialRevision string                 `protobuf:"bytes,3,opt,name=latest_credential_revision,json=latestCredentialRevision,proto3" json:"latest_credential_revision,omitempty"`
+	PublishedAtUnixMs        int64                  `protobuf:"varint,4,opt,name=published_at_unix_ms,json=publishedAtUnixMs,proto3" json:"published_at_unix_ms,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *WatchSyncEventsResponse) Reset() {
+	*x = WatchSyncEventsResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *WatchCatalogSnapshotResponse) String() string {
+func (x *WatchSyncEventsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*WatchCatalogSnapshotResponse) ProtoMessage() {}
+func (*WatchSyncEventsResponse) ProtoMessage() {}
 
-func (x *WatchCatalogSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[10]
+func (x *WatchSyncEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1123,16 +2131,157 @@ func (x *WatchCatalogSnapshotResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use WatchCatalogSnapshotResponse.ProtoReflect.Descriptor instead.
-func (*WatchCatalogSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{10}
+// Deprecated: Use WatchSyncEventsResponse.ProtoReflect.Descriptor instead.
+func (*WatchSyncEventsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *WatchCatalogSnapshotResponse) GetSnapshot() *CatalogSnapshot {
+func (x *WatchSyncEventsResponse) GetEventKind() SyncEventKind {
 	if x != nil {
-		return x.Snapshot
+		return x.EventKind
 	}
-	return nil
+	return SyncEventKind_SYNC_EVENT_KIND_UNSPECIFIED
+}
+
+func (x *WatchSyncEventsResponse) GetLatestCatalogVersion() string {
+	if x != nil {
+		return x.LatestCatalogVersion
+	}
+	return ""
+}
+
+func (x *WatchSyncEventsResponse) GetLatestCredentialRevision() string {
+	if x != nil {
+		return x.LatestCredentialRevision
+	}
+	return ""
+}
+
+func (x *WatchSyncEventsResponse) GetPublishedAtUnixMs() int64 {
+	if x != nil {
+		return x.PublishedAtUnixMs
+	}
+	return 0
+}
+
+type ReportNodeSyncStateRequest struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	GatewayNodeId             string                 `protobuf:"bytes,1,opt,name=gateway_node_id,json=gatewayNodeId,proto3" json:"gateway_node_id,omitempty"`
+	NodeRole                  string                 `protobuf:"bytes,2,opt,name=node_role,json=nodeRole,proto3" json:"node_role,omitempty"`
+	AppliedCatalogVersion     string                 `protobuf:"bytes,3,opt,name=applied_catalog_version,json=appliedCatalogVersion,proto3" json:"applied_catalog_version,omitempty"`
+	AppliedCredentialRevision string                 `protobuf:"bytes,4,opt,name=applied_credential_revision,json=appliedCredentialRevision,proto3" json:"applied_credential_revision,omitempty"`
+	ReportedAtUnixMs          int64                  `protobuf:"varint,5,opt,name=reported_at_unix_ms,json=reportedAtUnixMs,proto3" json:"reported_at_unix_ms,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *ReportNodeSyncStateRequest) Reset() {
+	*x = ReportNodeSyncStateRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportNodeSyncStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportNodeSyncStateRequest) ProtoMessage() {}
+
+func (x *ReportNodeSyncStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportNodeSyncStateRequest.ProtoReflect.Descriptor instead.
+func (*ReportNodeSyncStateRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ReportNodeSyncStateRequest) GetGatewayNodeId() string {
+	if x != nil {
+		return x.GatewayNodeId
+	}
+	return ""
+}
+
+func (x *ReportNodeSyncStateRequest) GetNodeRole() string {
+	if x != nil {
+		return x.NodeRole
+	}
+	return ""
+}
+
+func (x *ReportNodeSyncStateRequest) GetAppliedCatalogVersion() string {
+	if x != nil {
+		return x.AppliedCatalogVersion
+	}
+	return ""
+}
+
+func (x *ReportNodeSyncStateRequest) GetAppliedCredentialRevision() string {
+	if x != nil {
+		return x.AppliedCredentialRevision
+	}
+	return ""
+}
+
+func (x *ReportNodeSyncStateRequest) GetReportedAtUnixMs() int64 {
+	if x != nil {
+		return x.ReportedAtUnixMs
+	}
+	return 0
+}
+
+type ReportNodeSyncStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Acknowledged  bool                   `protobuf:"varint,1,opt,name=acknowledged,proto3" json:"acknowledged,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReportNodeSyncStateResponse) Reset() {
+	*x = ReportNodeSyncStateResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReportNodeSyncStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReportNodeSyncStateResponse) ProtoMessage() {}
+
+func (x *ReportNodeSyncStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReportNodeSyncStateResponse.ProtoReflect.Descriptor instead.
+func (*ReportNodeSyncStateResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ReportNodeSyncStateResponse) GetAcknowledged() bool {
+	if x != nil {
+		return x.Acknowledged
+	}
+	return false
 }
 
 type GetCatalogSnapshotRequest struct {
@@ -1144,7 +2293,7 @@ type GetCatalogSnapshotRequest struct {
 
 func (x *GetCatalogSnapshotRequest) Reset() {
 	*x = GetCatalogSnapshotRequest{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[11]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +2305,7 @@ func (x *GetCatalogSnapshotRequest) String() string {
 func (*GetCatalogSnapshotRequest) ProtoMessage() {}
 
 func (x *GetCatalogSnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[11]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +2318,7 @@ func (x *GetCatalogSnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCatalogSnapshotRequest.ProtoReflect.Descriptor instead.
 func (*GetCatalogSnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{11}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *GetCatalogSnapshotRequest) GetCatalogVersion() string {
@@ -1188,7 +2337,7 @@ type GetCatalogSnapshotResponse struct {
 
 func (x *GetCatalogSnapshotResponse) Reset() {
 	*x = GetCatalogSnapshotResponse{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[12]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1200,7 +2349,7 @@ func (x *GetCatalogSnapshotResponse) String() string {
 func (*GetCatalogSnapshotResponse) ProtoMessage() {}
 
 func (x *GetCatalogSnapshotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[12]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1213,7 +2362,7 @@ func (x *GetCatalogSnapshotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCatalogSnapshotResponse.ProtoReflect.Descriptor instead.
 func (*GetCatalogSnapshotResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{12}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetCatalogSnapshotResponse) GetSnapshot() *CatalogSnapshot {
@@ -1223,22 +2372,324 @@ func (x *GetCatalogSnapshotResponse) GetSnapshot() *CatalogSnapshot {
 	return nil
 }
 
+type StreamCatalogSnapshotChunksRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CatalogVersion string                 `protobuf:"bytes,1,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	MaxChunkBytes  int32                  `protobuf:"varint,2,opt,name=max_chunk_bytes,json=maxChunkBytes,proto3" json:"max_chunk_bytes,omitempty"` // defaults to 1 MiB when <= 0
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *StreamCatalogSnapshotChunksRequest) Reset() {
+	*x = StreamCatalogSnapshotChunksRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamCatalogSnapshotChunksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamCatalogSnapshotChunksRequest) ProtoMessage() {}
+
+func (x *StreamCatalogSnapshotChunksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamCatalogSnapshotChunksRequest.ProtoReflect.Descriptor instead.
+func (*StreamCatalogSnapshotChunksRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *StreamCatalogSnapshotChunksRequest) GetCatalogVersion() string {
+	if x != nil {
+		return x.CatalogVersion
+	}
+	return ""
+}
+
+func (x *StreamCatalogSnapshotChunksRequest) GetMaxChunkBytes() int32 {
+	if x != nil {
+		return x.MaxChunkBytes
+	}
+	return 0
+}
+
+type StreamCatalogSnapshotChunksResponse struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	CatalogVersion          string                 `protobuf:"bytes,1,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	ChunkIndex              int32                  `protobuf:"varint,2,opt,name=chunk_index,json=chunkIndex,proto3" json:"chunk_index,omitempty"`
+	TotalChunks             int32                  `protobuf:"varint,3,opt,name=total_chunks,json=totalChunks,proto3" json:"total_chunks,omitempty"`
+	FullSha256Hex           string                 `protobuf:"bytes,4,opt,name=full_sha256_hex,json=fullSha256Hex,proto3" json:"full_sha256_hex,omitempty"`
+	SerializedSnapshotChunk []byte                 `protobuf:"bytes,5,opt,name=serialized_snapshot_chunk,json=serializedSnapshotChunk,proto3" json:"serialized_snapshot_chunk,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) Reset() {
+	*x = StreamCatalogSnapshotChunksResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamCatalogSnapshotChunksResponse) ProtoMessage() {}
+
+func (x *StreamCatalogSnapshotChunksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamCatalogSnapshotChunksResponse.ProtoReflect.Descriptor instead.
+func (*StreamCatalogSnapshotChunksResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) GetCatalogVersion() string {
+	if x != nil {
+		return x.CatalogVersion
+	}
+	return ""
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) GetChunkIndex() int32 {
+	if x != nil {
+		return x.ChunkIndex
+	}
+	return 0
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) GetTotalChunks() int32 {
+	if x != nil {
+		return x.TotalChunks
+	}
+	return 0
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) GetFullSha256Hex() string {
+	if x != nil {
+		return x.FullSha256Hex
+	}
+	return ""
+}
+
+func (x *StreamCatalogSnapshotChunksResponse) GetSerializedSnapshotChunk() []byte {
+	if x != nil {
+		return x.SerializedSnapshotChunk
+	}
+	return nil
+}
+
+type GatewayPublicKeyItem struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	GatewayPublicKeyId     string                 `protobuf:"bytes,1,opt,name=gateway_public_key_id,json=gatewayPublicKeyId,proto3" json:"gateway_public_key_id,omitempty"`
+	Algorithm              PublicKeyAlgorithm     `protobuf:"varint,2,opt,name=algorithm,proto3,enum=maxshot.provider_sync.v1.PublicKeyAlgorithm" json:"algorithm,omitempty"`
+	PublicKeyDer           []byte                 `protobuf:"bytes,3,opt,name=public_key_der,json=publicKeyDer,proto3" json:"public_key_der,omitempty"`
+	ActiveForNewEncryption bool                   `protobuf:"varint,4,opt,name=active_for_new_encryption,json=activeForNewEncryption,proto3" json:"active_for_new_encryption,omitempty"`
+	CreatedAtUnixMs        int64                  `protobuf:"varint,5,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GatewayPublicKeyItem) Reset() {
+	*x = GatewayPublicKeyItem{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GatewayPublicKeyItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GatewayPublicKeyItem) ProtoMessage() {}
+
+func (x *GatewayPublicKeyItem) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GatewayPublicKeyItem.ProtoReflect.Descriptor instead.
+func (*GatewayPublicKeyItem) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GatewayPublicKeyItem) GetGatewayPublicKeyId() string {
+	if x != nil {
+		return x.GatewayPublicKeyId
+	}
+	return ""
+}
+
+func (x *GatewayPublicKeyItem) GetAlgorithm() PublicKeyAlgorithm {
+	if x != nil {
+		return x.Algorithm
+	}
+	return PublicKeyAlgorithm_PUBLIC_KEY_ALGORITHM_UNSPECIFIED
+}
+
+func (x *GatewayPublicKeyItem) GetPublicKeyDer() []byte {
+	if x != nil {
+		return x.PublicKeyDer
+	}
+	return nil
+}
+
+func (x *GatewayPublicKeyItem) GetActiveForNewEncryption() bool {
+	if x != nil {
+		return x.ActiveForNewEncryption
+	}
+	return false
+}
+
+func (x *GatewayPublicKeyItem) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+type SyncGatewayPublicKeysRequest struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Keys          []*GatewayPublicKeyItem `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncGatewayPublicKeysRequest) Reset() {
+	*x = SyncGatewayPublicKeysRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncGatewayPublicKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncGatewayPublicKeysRequest) ProtoMessage() {}
+
+func (x *SyncGatewayPublicKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncGatewayPublicKeysRequest.ProtoReflect.Descriptor instead.
+func (*SyncGatewayPublicKeysRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SyncGatewayPublicKeysRequest) GetKeys() []*GatewayPublicKeyItem {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+type SyncGatewayPublicKeysResponse struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	Accepted                 bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	ActiveGatewayPublicKeyId string                 `protobuf:"bytes,2,opt,name=active_gateway_public_key_id,json=activeGatewayPublicKeyId,proto3" json:"active_gateway_public_key_id,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *SyncGatewayPublicKeysResponse) Reset() {
+	*x = SyncGatewayPublicKeysResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncGatewayPublicKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncGatewayPublicKeysResponse) ProtoMessage() {}
+
+func (x *SyncGatewayPublicKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncGatewayPublicKeysResponse.ProtoReflect.Descriptor instead.
+func (*SyncGatewayPublicKeysResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *SyncGatewayPublicKeysResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *SyncGatewayPublicKeysResponse) GetActiveGatewayPublicKeyId() string {
+	if x != nil {
+		return x.ActiveGatewayPublicKeyId
+	}
+	return ""
+}
+
 type EncryptedCredentialItem struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	CredentialId       string                 `protobuf:"bytes,1,opt,name=credential_id,json=credentialId,proto3" json:"credential_id,omitempty"`
-	ProviderId         string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	GatewayPublicKeyId string                 `protobuf:"bytes,3,opt,name=gateway_public_key_id,json=gatewayPublicKeyId,proto3" json:"gateway_public_key_id,omitempty"`
-	EncryptedDek       []byte                 `protobuf:"bytes,4,opt,name=encrypted_dek,json=encryptedDek,proto3" json:"encrypted_dek,omitempty"` // DEK encrypted with Gateway RSA-OAEP / X25519 public key
-	Nonce              []byte                 `protobuf:"bytes,5,opt,name=nonce,proto3" json:"nonce,omitempty"`                                   // AES-256-GCM 12-byte nonce
-	Ciphertext         []byte                 `protobuf:"bytes,6,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`                         // AES-256-GCM encrypted upstream secret + auth tag
-	UpdatedAtUnixMs    int64                  `protobuf:"varint,7,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	CredentialRevision string                 `protobuf:"bytes,2,opt,name=credential_revision,json=credentialRevision,proto3" json:"credential_revision,omitempty"`
+	ProviderId         string                 `protobuf:"bytes,3,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	Status             CredentialStatus       `protobuf:"varint,4,opt,name=status,proto3,enum=maxshot.provider_sync.v1.CredentialStatus" json:"status,omitempty"`
+	GatewayPublicKeyId string                 `protobuf:"bytes,5,opt,name=gateway_public_key_id,json=gatewayPublicKeyId,proto3" json:"gateway_public_key_id,omitempty"`
+	EncryptedDek       []byte                 `protobuf:"bytes,6,opt,name=encrypted_dek,json=encryptedDek,proto3" json:"encrypted_dek,omitempty"` // DEK encrypted with Gateway public key
+	Nonce              []byte                 `protobuf:"bytes,7,opt,name=nonce,proto3" json:"nonce,omitempty"`                                   // AES-256-GCM 12-byte nonce
+	Ciphertext         []byte                 `protobuf:"bytes,8,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`                         // AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED)
+	UpdatedAtUnixMs    int64                  `protobuf:"varint,9,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *EncryptedCredentialItem) Reset() {
 	*x = EncryptedCredentialItem{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[13]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1250,7 +2701,7 @@ func (x *EncryptedCredentialItem) String() string {
 func (*EncryptedCredentialItem) ProtoMessage() {}
 
 func (x *EncryptedCredentialItem) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[13]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1263,7 +2714,7 @@ func (x *EncryptedCredentialItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EncryptedCredentialItem.ProtoReflect.Descriptor instead.
 func (*EncryptedCredentialItem) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{13}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *EncryptedCredentialItem) GetCredentialId() string {
@@ -1273,11 +2724,25 @@ func (x *EncryptedCredentialItem) GetCredentialId() string {
 	return ""
 }
 
+func (x *EncryptedCredentialItem) GetCredentialRevision() string {
+	if x != nil {
+		return x.CredentialRevision
+	}
+	return ""
+}
+
 func (x *EncryptedCredentialItem) GetProviderId() string {
 	if x != nil {
 		return x.ProviderId
 	}
 	return ""
+}
+
+func (x *EncryptedCredentialItem) GetStatus() CredentialStatus {
+	if x != nil {
+		return x.Status
+	}
+	return CredentialStatus_CREDENTIAL_STATUS_UNSPECIFIED
 }
 
 func (x *EncryptedCredentialItem) GetGatewayPublicKeyId() string {
@@ -1324,7 +2789,7 @@ type SyncEncryptedCredentialsRequest struct {
 
 func (x *SyncEncryptedCredentialsRequest) Reset() {
 	*x = SyncEncryptedCredentialsRequest{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[14]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1336,7 +2801,7 @@ func (x *SyncEncryptedCredentialsRequest) String() string {
 func (*SyncEncryptedCredentialsRequest) ProtoMessage() {}
 
 func (x *SyncEncryptedCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[14]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1349,7 +2814,7 @@ func (x *SyncEncryptedCredentialsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncEncryptedCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*SyncEncryptedCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{14}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *SyncEncryptedCredentialsRequest) GetSinceRevision() string {
@@ -1369,7 +2834,7 @@ type SyncEncryptedCredentialsResponse struct {
 
 func (x *SyncEncryptedCredentialsResponse) Reset() {
 	*x = SyncEncryptedCredentialsResponse{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[15]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1381,7 +2846,7 @@ func (x *SyncEncryptedCredentialsResponse) String() string {
 func (*SyncEncryptedCredentialsResponse) ProtoMessage() {}
 
 func (x *SyncEncryptedCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[15]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1394,7 +2859,7 @@ func (x *SyncEncryptedCredentialsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncEncryptedCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*SyncEncryptedCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{15}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SyncEncryptedCredentialsResponse) GetCurrentRevision() string {
@@ -1411,28 +2876,88 @@ func (x *SyncEncryptedCredentialsResponse) GetCredentials() []*EncryptedCredenti
 	return nil
 }
 
+type LatencyHistogramBucket struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UpperBoundMs  int64                  `protobuf:"varint,1,opt,name=upper_bound_ms,json=upperBoundMs,proto3" json:"upper_bound_ms,omitempty"`
+	SampleCount   int64                  `protobuf:"varint,2,opt,name=sample_count,json=sampleCount,proto3" json:"sample_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LatencyHistogramBucket) Reset() {
+	*x = LatencyHistogramBucket{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LatencyHistogramBucket) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LatencyHistogramBucket) ProtoMessage() {}
+
+func (x *LatencyHistogramBucket) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LatencyHistogramBucket.ProtoReflect.Descriptor instead.
+func (*LatencyHistogramBucket) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *LatencyHistogramBucket) GetUpperBoundMs() int64 {
+	if x != nil {
+		return x.UpperBoundMs
+	}
+	return 0
+}
+
+func (x *LatencyHistogramBucket) GetSampleCount() int64 {
+	if x != nil {
+		return x.SampleCount
+	}
+	return 0
+}
+
 type OfferingWindowMetric struct {
-	state                          protoimpl.MessageState `protogen:"open.v1"`
-	OfferingId                     string                 `protobuf:"bytes,1,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
-	WindowStartUnixMs              int64                  `protobuf:"varint,2,opt,name=window_start_unix_ms,json=windowStartUnixMs,proto3" json:"window_start_unix_ms,omitempty"`
-	WindowEndUnixMs                int64                  `protobuf:"varint,3,opt,name=window_end_unix_ms,json=windowEndUnixMs,proto3" json:"window_end_unix_ms,omitempty"`
-	DispatchedAttempts             int64                  `protobuf:"varint,4,opt,name=dispatched_attempts,json=dispatchedAttempts,proto3" json:"dispatched_attempts,omitempty"`
-	DeliveredSuccessCount          int64                  `protobuf:"varint,5,opt,name=delivered_success_count,json=deliveredSuccessCount,proto3" json:"delivered_success_count,omitempty"`
-	Http_429Count                  int64                  `protobuf:"varint,6,opt,name=http_429_count,json=http429Count,proto3" json:"http_429_count,omitempty"`
-	Http_5XxCount                  int64                  `protobuf:"varint,7,opt,name=http_5xx_count,json=http5xxCount,proto3" json:"http_5xx_count,omitempty"`
-	TimeoutCount                   int64                  `protobuf:"varint,8,opt,name=timeout_count,json=timeoutCount,proto3" json:"timeout_count,omitempty"`
-	LatencySampleCount             int64                  `protobuf:"varint,9,opt,name=latency_sample_count,json=latencySampleCount,proto3" json:"latency_sample_count,omitempty"`
-	P50LatencyMs                   int64                  `protobuf:"varint,10,opt,name=p50_latency_ms,json=p50LatencyMs,proto3" json:"p50_latency_ms,omitempty"`
-	P95LatencyMs                   int64                  `protobuf:"varint,11,opt,name=p95_latency_ms,json=p95LatencyMs,proto3" json:"p95_latency_ms,omitempty"`
-	IsFirstTokenMetric             bool                   `protobuf:"varint,12,opt,name=is_first_token_metric,json=isFirstTokenMetric,proto3" json:"is_first_token_metric,omitempty"`
-	SettledProviderPayableMicroUsd int64                  `protobuf:"varint,13,opt,name=settled_provider_payable_micro_usd,json=settledProviderPayableMicroUsd,proto3" json:"settled_provider_payable_micro_usd,omitempty"`
+	state                          protoimpl.MessageState    `protogen:"open.v1"`
+	OfferingId                     string                    `protobuf:"bytes,1,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
+	WindowStartUnixMs              int64                     `protobuf:"varint,2,opt,name=window_start_unix_ms,json=windowStartUnixMs,proto3" json:"window_start_unix_ms,omitempty"`
+	WindowEndUnixMs                int64                     `protobuf:"varint,3,opt,name=window_end_unix_ms,json=windowEndUnixMs,proto3" json:"window_end_unix_ms,omitempty"`
+	DispatchedAttempts             int64                     `protobuf:"varint,4,opt,name=dispatched_attempts,json=dispatchedAttempts,proto3" json:"dispatched_attempts,omitempty"`
+	DeliveredSuccessCount          int64                     `protobuf:"varint,5,opt,name=delivered_success_count,json=deliveredSuccessCount,proto3" json:"delivered_success_count,omitempty"`
+	Http_429Count                  int64                     `protobuf:"varint,6,opt,name=http_429_count,json=http429Count,proto3" json:"http_429_count,omitempty"`
+	Http_5XxCount                  int64                     `protobuf:"varint,7,opt,name=http_5xx_count,json=http5xxCount,proto3" json:"http_5xx_count,omitempty"`
+	TimeoutCount                   int64                     `protobuf:"varint,8,opt,name=timeout_count,json=timeoutCount,proto3" json:"timeout_count,omitempty"`
+	MidStreamOrMalformedCount      int64                     `protobuf:"varint,9,opt,name=mid_stream_or_malformed_count,json=midStreamOrMalformedCount,proto3" json:"mid_stream_or_malformed_count,omitempty"`
+	UserInputErrorCount            int64                     `protobuf:"varint,10,opt,name=user_input_error_count,json=userInputErrorCount,proto3" json:"user_input_error_count,omitempty"`        // PRV-R35: excluded from delivered-success denominator
+	CustomerCancelledCount         int64                     `protobuf:"varint,11,opt,name=customer_cancelled_count,json=customerCancelledCount,proto3" json:"customer_cancelled_count,omitempty"` // PRV-R35: excluded from delivered-success denominator
+	TerminalAttempts               int64                     `protobuf:"varint,12,opt,name=terminal_attempts,json=terminalAttempts,proto3" json:"terminal_attempts,omitempty"`
+	VerifiedUsageAttempts          int64                     `protobuf:"varint,13,opt,name=verified_usage_attempts,json=verifiedUsageAttempts,proto3" json:"verified_usage_attempts,omitempty"` // PRV-R35: metering completeness numerator
+	MissingUsageCount              int64                     `protobuf:"varint,14,opt,name=missing_usage_count,json=missingUsageCount,proto3" json:"missing_usage_count,omitempty"`
+	IsFirstTokenMetric             bool                      `protobuf:"varint,15,opt,name=is_first_token_metric,json=isFirstTokenMetric,proto3" json:"is_first_token_metric,omitempty"`
+	LatencySampleCount             int64                     `protobuf:"varint,16,opt,name=latency_sample_count,json=latencySampleCount,proto3" json:"latency_sample_count,omitempty"`
+	P50LatencyMs                   int64                     `protobuf:"varint,17,opt,name=p50_latency_ms,json=p50LatencyMs,proto3" json:"p50_latency_ms,omitempty"`
+	P95LatencyMs                   int64                     `protobuf:"varint,18,opt,name=p95_latency_ms,json=p95LatencyMs,proto3" json:"p95_latency_ms,omitempty"`
+	LatencyHistogram               []*LatencyHistogramBucket `protobuf:"bytes,19,rep,name=latency_histogram,json=latencyHistogram,proto3" json:"latency_histogram,omitempty"` // mergeable into exact 7-day rolling p50/p95
+	SettledProviderPayableMicroUsd int64                     `protobuf:"varint,20,opt,name=settled_provider_payable_micro_usd,json=settledProviderPayableMicroUsd,proto3" json:"settled_provider_payable_micro_usd,omitempty"`
+	DiscrepancyMicroUsd            int64                     `protobuf:"varint,21,opt,name=discrepancy_micro_usd,json=discrepancyMicroUsd,proto3" json:"discrepancy_micro_usd,omitempty"`
 	unknownFields                  protoimpl.UnknownFields
 	sizeCache                      protoimpl.SizeCache
 }
 
 func (x *OfferingWindowMetric) Reset() {
 	*x = OfferingWindowMetric{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[16]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1444,7 +2969,7 @@ func (x *OfferingWindowMetric) String() string {
 func (*OfferingWindowMetric) ProtoMessage() {}
 
 func (x *OfferingWindowMetric) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[16]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1457,7 +2982,7 @@ func (x *OfferingWindowMetric) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OfferingWindowMetric.ProtoReflect.Descriptor instead.
 func (*OfferingWindowMetric) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{16}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *OfferingWindowMetric) GetOfferingId() string {
@@ -1516,6 +3041,55 @@ func (x *OfferingWindowMetric) GetTimeoutCount() int64 {
 	return 0
 }
 
+func (x *OfferingWindowMetric) GetMidStreamOrMalformedCount() int64 {
+	if x != nil {
+		return x.MidStreamOrMalformedCount
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetUserInputErrorCount() int64 {
+	if x != nil {
+		return x.UserInputErrorCount
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetCustomerCancelledCount() int64 {
+	if x != nil {
+		return x.CustomerCancelledCount
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetTerminalAttempts() int64 {
+	if x != nil {
+		return x.TerminalAttempts
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetVerifiedUsageAttempts() int64 {
+	if x != nil {
+		return x.VerifiedUsageAttempts
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetMissingUsageCount() int64 {
+	if x != nil {
+		return x.MissingUsageCount
+	}
+	return 0
+}
+
+func (x *OfferingWindowMetric) GetIsFirstTokenMetric() bool {
+	if x != nil {
+		return x.IsFirstTokenMetric
+	}
+	return false
+}
+
 func (x *OfferingWindowMetric) GetLatencySampleCount() int64 {
 	if x != nil {
 		return x.LatencySampleCount
@@ -1537,11 +3111,11 @@ func (x *OfferingWindowMetric) GetP95LatencyMs() int64 {
 	return 0
 }
 
-func (x *OfferingWindowMetric) GetIsFirstTokenMetric() bool {
+func (x *OfferingWindowMetric) GetLatencyHistogram() []*LatencyHistogramBucket {
 	if x != nil {
-		return x.IsFirstTokenMetric
+		return x.LatencyHistogram
 	}
-	return false
+	return nil
 }
 
 func (x *OfferingWindowMetric) GetSettledProviderPayableMicroUsd() int64 {
@@ -1551,9 +3125,16 @@ func (x *OfferingWindowMetric) GetSettledProviderPayableMicroUsd() int64 {
 	return 0
 }
 
+func (x *OfferingWindowMetric) GetDiscrepancyMicroUsd() int64 {
+	if x != nil {
+		return x.DiscrepancyMicroUsd
+	}
+	return 0
+}
+
 type ReportOfferingMetricsRequest struct {
 	state         protoimpl.MessageState  `protogen:"open.v1"`
-	BatchId       string                  `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"` // idempotency key for metric batch
+	BatchId       string                  `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
 	GatewayNodeId string                  `protobuf:"bytes,2,opt,name=gateway_node_id,json=gatewayNodeId,proto3" json:"gateway_node_id,omitempty"`
 	Metrics       []*OfferingWindowMetric `protobuf:"bytes,3,rep,name=metrics,proto3" json:"metrics,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1562,7 +3143,7 @@ type ReportOfferingMetricsRequest struct {
 
 func (x *ReportOfferingMetricsRequest) Reset() {
 	*x = ReportOfferingMetricsRequest{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[17]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1574,7 +3155,7 @@ func (x *ReportOfferingMetricsRequest) String() string {
 func (*ReportOfferingMetricsRequest) ProtoMessage() {}
 
 func (x *ReportOfferingMetricsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[17]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1587,7 +3168,7 @@ func (x *ReportOfferingMetricsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportOfferingMetricsRequest.ProtoReflect.Descriptor instead.
 func (*ReportOfferingMetricsRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{17}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ReportOfferingMetricsRequest) GetBatchId() string {
@@ -1620,7 +3201,7 @@ type ReportOfferingMetricsResponse struct {
 
 func (x *ReportOfferingMetricsResponse) Reset() {
 	*x = ReportOfferingMetricsResponse{}
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[18]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1632,7 +3213,7 @@ func (x *ReportOfferingMetricsResponse) String() string {
 func (*ReportOfferingMetricsResponse) ProtoMessage() {}
 
 func (x *ReportOfferingMetricsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[18]
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1645,7 +3226,7 @@ func (x *ReportOfferingMetricsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReportOfferingMetricsResponse.ProtoReflect.Descriptor instead.
 func (*ReportOfferingMetricsResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{18}
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ReportOfferingMetricsResponse) GetAccepted() bool {
@@ -1655,71 +3236,699 @@ func (x *ReportOfferingMetricsResponse) GetAccepted() bool {
 	return false
 }
 
+type ProviderStatementEntry struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	EntryId           string                 `protobuf:"bytes,1,opt,name=entry_id,json=entryId,proto3" json:"entry_id,omitempty"` // append-only ID (PRV-R14 / ADM-R17)
+	StatementId       string                 `protobuf:"bytes,2,opt,name=statement_id,json=statementId,proto3" json:"statement_id,omitempty"`
+	ProviderId        string                 `protobuf:"bytes,3,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	OfferingId        string                 `protobuf:"bytes,4,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
+	Kind              StatementEntryKind     `protobuf:"varint,5,opt,name=kind,proto3,enum=maxshot.provider_sync.v1.StatementEntryKind" json:"kind,omitempty"`
+	LinkedEntryId     string                 `protobuf:"bytes,6,opt,name=linked_entry_id,json=linkedEntryId,proto3" json:"linked_entry_id,omitempty"` // references prior entry for corrections/disputes
+	LinkedRequestId   string                 `protobuf:"bytes,7,opt,name=linked_request_id,json=linkedRequestId,proto3" json:"linked_request_id,omitempty"`
+	PeriodStartUnixMs int64                  `protobuf:"varint,8,opt,name=period_start_unix_ms,json=periodStartUnixMs,proto3" json:"period_start_unix_ms,omitempty"`
+	PeriodEndUnixMs   int64                  `protobuf:"varint,9,opt,name=period_end_unix_ms,json=periodEndUnixMs,proto3" json:"period_end_unix_ms,omitempty"`
+	AttemptCount      int64                  `protobuf:"varint,10,opt,name=attempt_count,json=attemptCount,proto3" json:"attempt_count,omitempty"`
+	AmountMicroUsd    int64                  `protobuf:"varint,11,opt,name=amount_micro_usd,json=amountMicroUsd,proto3" json:"amount_micro_usd,omitempty"` // signed adjustment for corrections/disputes
+	ActorId           string                 `protobuf:"bytes,12,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
+	Reason            string                 `protobuf:"bytes,13,opt,name=reason,proto3" json:"reason,omitempty"`
+	CreatedAtUnixMs   int64                  `protobuf:"varint,14,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ProviderStatementEntry) Reset() {
+	*x = ProviderStatementEntry{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProviderStatementEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProviderStatementEntry) ProtoMessage() {}
+
+func (x *ProviderStatementEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProviderStatementEntry.ProtoReflect.Descriptor instead.
+func (*ProviderStatementEntry) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ProviderStatementEntry) GetEntryId() string {
+	if x != nil {
+		return x.EntryId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetStatementId() string {
+	if x != nil {
+		return x.StatementId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetOfferingId() string {
+	if x != nil {
+		return x.OfferingId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetKind() StatementEntryKind {
+	if x != nil {
+		return x.Kind
+	}
+	return StatementEntryKind_STATEMENT_ENTRY_KIND_UNSPECIFIED
+}
+
+func (x *ProviderStatementEntry) GetLinkedEntryId() string {
+	if x != nil {
+		return x.LinkedEntryId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetLinkedRequestId() string {
+	if x != nil {
+		return x.LinkedRequestId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetPeriodStartUnixMs() int64 {
+	if x != nil {
+		return x.PeriodStartUnixMs
+	}
+	return 0
+}
+
+func (x *ProviderStatementEntry) GetPeriodEndUnixMs() int64 {
+	if x != nil {
+		return x.PeriodEndUnixMs
+	}
+	return 0
+}
+
+func (x *ProviderStatementEntry) GetAttemptCount() int64 {
+	if x != nil {
+		return x.AttemptCount
+	}
+	return 0
+}
+
+func (x *ProviderStatementEntry) GetAmountMicroUsd() int64 {
+	if x != nil {
+		return x.AmountMicroUsd
+	}
+	return 0
+}
+
+func (x *ProviderStatementEntry) GetActorId() string {
+	if x != nil {
+		return x.ActorId
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *ProviderStatementEntry) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+type SyncProviderStatementsRequest struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	BatchId       string                    `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
+	Entries       []*ProviderStatementEntry `protobuf:"bytes,2,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncProviderStatementsRequest) Reset() {
+	*x = SyncProviderStatementsRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncProviderStatementsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncProviderStatementsRequest) ProtoMessage() {}
+
+func (x *SyncProviderStatementsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncProviderStatementsRequest.ProtoReflect.Descriptor instead.
+func (*SyncProviderStatementsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *SyncProviderStatementsRequest) GetBatchId() string {
+	if x != nil {
+		return x.BatchId
+	}
+	return ""
+}
+
+func (x *SyncProviderStatementsRequest) GetEntries() []*ProviderStatementEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+type SyncProviderStatementsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncProviderStatementsResponse) Reset() {
+	*x = SyncProviderStatementsResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncProviderStatementsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncProviderStatementsResponse) ProtoMessage() {}
+
+func (x *SyncProviderStatementsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncProviderStatementsResponse.ProtoReflect.Descriptor instead.
+func (*SyncProviderStatementsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *SyncProviderStatementsResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+type AttemptSettlementRecord struct {
+	state                   protoimpl.MessageState  `protogen:"open.v1"`
+	AttemptId               string                  `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
+	RequestId               string                  `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ProviderId              string                  `protobuf:"bytes,3,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	OfferingId              string                  `protobuf:"bytes,4,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
+	NativeRequestId         string                  `protobuf:"bytes,5,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
+	ReportedServingEndpoint string                  `protobuf:"bytes,6,opt,name=reported_serving_endpoint,json=reportedServingEndpoint,proto3" json:"reported_serving_endpoint,omitempty"`
+	Status                  string                  `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
+	ErrorClass              string                  `protobuf:"bytes,8,opt,name=error_class,json=errorClass,proto3" json:"error_class,omitempty"`
+	ProviderRateCardVersion string                  `protobuf:"bytes,9,opt,name=provider_rate_card_version,json=providerRateCardVersion,proto3" json:"provider_rate_card_version,omitempty"`
+	CustomerRateCardVersion string                  `protobuf:"bytes,10,opt,name=customer_rate_card_version,json=customerRateCardVersion,proto3" json:"customer_rate_card_version,omitempty"`
+	VerifiedUsageUnits      []*v1.KeyValueAttribute `protobuf:"bytes,11,rep,name=verified_usage_units,json=verifiedUsageUnits,proto3" json:"verified_usage_units,omitempty"`
+	ProviderCostUsdDec      string                  `protobuf:"bytes,12,opt,name=provider_cost_usd_dec,json=providerCostUsdDec,proto3" json:"provider_cost_usd_dec,omitempty"`
+	ProviderCostMicroUsd    int64                   `protobuf:"varint,13,opt,name=provider_cost_micro_usd,json=providerCostMicroUsd,proto3" json:"provider_cost_micro_usd,omitempty"`
+	CustomerChargeMicroUsd  int64                   `protobuf:"varint,14,opt,name=customer_charge_micro_usd,json=customerChargeMicroUsd,proto3" json:"customer_charge_micro_usd,omitempty"`
+	DiscrepancyMicroUsd     int64                   `protobuf:"varint,15,opt,name=discrepancy_micro_usd,json=discrepancyMicroUsd,proto3" json:"discrepancy_micro_usd,omitempty"`
+	DispatchedAtUnixMs      int64                   `protobuf:"varint,16,opt,name=dispatched_at_unix_ms,json=dispatchedAtUnixMs,proto3" json:"dispatched_at_unix_ms,omitempty"`
+	CompletedAtUnixMs       int64                   `protobuf:"varint,17,opt,name=completed_at_unix_ms,json=completedAtUnixMs,proto3" json:"completed_at_unix_ms,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *AttemptSettlementRecord) Reset() {
+	*x = AttemptSettlementRecord{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttemptSettlementRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttemptSettlementRecord) ProtoMessage() {}
+
+func (x *AttemptSettlementRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttemptSettlementRecord.ProtoReflect.Descriptor instead.
+func (*AttemptSettlementRecord) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *AttemptSettlementRecord) GetAttemptId() string {
+	if x != nil {
+		return x.AttemptId
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetOfferingId() string {
+	if x != nil {
+		return x.OfferingId
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetNativeRequestId() string {
+	if x != nil {
+		return x.NativeRequestId
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetReportedServingEndpoint() string {
+	if x != nil {
+		return x.ReportedServingEndpoint
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetErrorClass() string {
+	if x != nil {
+		return x.ErrorClass
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetProviderRateCardVersion() string {
+	if x != nil {
+		return x.ProviderRateCardVersion
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetCustomerRateCardVersion() string {
+	if x != nil {
+		return x.CustomerRateCardVersion
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetVerifiedUsageUnits() []*v1.KeyValueAttribute {
+	if x != nil {
+		return x.VerifiedUsageUnits
+	}
+	return nil
+}
+
+func (x *AttemptSettlementRecord) GetProviderCostUsdDec() string {
+	if x != nil {
+		return x.ProviderCostUsdDec
+	}
+	return ""
+}
+
+func (x *AttemptSettlementRecord) GetProviderCostMicroUsd() int64 {
+	if x != nil {
+		return x.ProviderCostMicroUsd
+	}
+	return 0
+}
+
+func (x *AttemptSettlementRecord) GetCustomerChargeMicroUsd() int64 {
+	if x != nil {
+		return x.CustomerChargeMicroUsd
+	}
+	return 0
+}
+
+func (x *AttemptSettlementRecord) GetDiscrepancyMicroUsd() int64 {
+	if x != nil {
+		return x.DiscrepancyMicroUsd
+	}
+	return 0
+}
+
+func (x *AttemptSettlementRecord) GetDispatchedAtUnixMs() int64 {
+	if x != nil {
+		return x.DispatchedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AttemptSettlementRecord) GetCompletedAtUnixMs() int64 {
+	if x != nil {
+		return x.CompletedAtUnixMs
+	}
+	return 0
+}
+
+type ListOfferingAttemptRecordsRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId      string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	OfferingId      string                 `protobuf:"bytes,2,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
+	RequestId       string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	NativeRequestId string                 `protobuf:"bytes,4,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
+	StartUnixMs     int64                  `protobuf:"varint,5,opt,name=start_unix_ms,json=startUnixMs,proto3" json:"start_unix_ms,omitempty"`
+	EndUnixMs       int64                  `protobuf:"varint,6,opt,name=end_unix_ms,json=endUnixMs,proto3" json:"end_unix_ms,omitempty"`
+	DiscrepancyOnly bool                   `protobuf:"varint,7,opt,name=discrepancy_only,json=discrepancyOnly,proto3" json:"discrepancy_only,omitempty"`
+	Page            *v1.CursorPageRequest  `protobuf:"bytes,8,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ListOfferingAttemptRecordsRequest) Reset() {
+	*x = ListOfferingAttemptRecordsRequest{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOfferingAttemptRecordsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOfferingAttemptRecordsRequest) ProtoMessage() {}
+
+func (x *ListOfferingAttemptRecordsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOfferingAttemptRecordsRequest.ProtoReflect.Descriptor instead.
+func (*ListOfferingAttemptRecordsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetOfferingId() string {
+	if x != nil {
+		return x.OfferingId
+	}
+	return ""
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetNativeRequestId() string {
+	if x != nil {
+		return x.NativeRequestId
+	}
+	return ""
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetStartUnixMs() int64 {
+	if x != nil {
+		return x.StartUnixMs
+	}
+	return 0
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetEndUnixMs() int64 {
+	if x != nil {
+		return x.EndUnixMs
+	}
+	return 0
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetDiscrepancyOnly() bool {
+	if x != nil {
+		return x.DiscrepancyOnly
+	}
+	return false
+}
+
+func (x *ListOfferingAttemptRecordsRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListOfferingAttemptRecordsResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Records       []*AttemptSettlementRecord `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	Page          *v1.CursorPageResponse     `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListOfferingAttemptRecordsResponse) Reset() {
+	*x = ListOfferingAttemptRecordsResponse{}
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListOfferingAttemptRecordsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListOfferingAttemptRecordsResponse) ProtoMessage() {}
+
+func (x *ListOfferingAttemptRecordsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListOfferingAttemptRecordsResponse.ProtoReflect.Descriptor instead.
+func (*ListOfferingAttemptRecordsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ListOfferingAttemptRecordsResponse) GetRecords() []*AttemptSettlementRecord {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+func (x *ListOfferingAttemptRecordsResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
 var File_maxshot_provider_sync_v1_provider_sync_proto protoreflect.FileDescriptor
 
 const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\n" +
-	",maxshot/provider_sync/v1/provider_sync.proto\x12\x18maxshot.provider_sync.v1\x1a\x1dmaxshot/common/v1/types.proto\"{\n" +
-	"\rRateComponent\x12\x12\n" +
-	"\x04kind\x18\x01 \x01(\tR\x04kind\x12$\n" +
-	"\x0emicro_usd_rate\x18\x02 \x01(\x03R\fmicroUsdRate\x12\x12\n" +
-	"\x04unit\x18\x03 \x01(\tR\x04unit\x12\x1c\n" +
-	"\tcondition\x18\x04 \x01(\tR\tcondition\"\xb0\x01\n" +
+	",maxshot/provider_sync/v1/provider_sync.proto\x12\x18maxshot.provider_sync.v1\x1a\x1dmaxshot/common/v1/types.proto\"\x95\x02\n" +
+	"\rRateCondition\x12*\n" +
+	"\x11min_prompt_tokens\x18\x01 \x01(\x03R\x0fminPromptTokens\x12$\n" +
+	"\x0ehas_utc_window\x18\x02 \x01(\bR\fhasUtcWindow\x12$\n" +
+	"\x0eutc_start_hhmm\x18\x03 \x01(\x05R\futcStartHhmm\x12 \n" +
+	"\futc_end_hhmm\x18\x04 \x01(\x05R\n" +
+	"utcEndHhmm\x12\x19\n" +
+	"\butc_days\x18\x05 \x03(\tR\autcDays\x12O\n" +
+	"\x10media_attributes\x18\x06 \x03(\v2$.maxshot.common.v1.KeyValueAttributeR\x0fmediaAttributes\"\x89\x02\n" +
+	"\rRateComponent\x12B\n" +
+	"\x04kind\x18\x01 \x01(\x0e2..maxshot.provider_sync.v1.BillingComponentKindR\x04kind\x12\x10\n" +
+	"\x03sku\x18\x02 \x01(\tR\x03sku\x12 \n" +
+	"\frate_usd_dec\x18\x03 \x01(\tR\n" +
+	"rateUsdDec\x129\n" +
+	"\x04unit\x18\x04 \x01(\x0e2%.maxshot.provider_sync.v1.BillingUnitR\x04unit\x12E\n" +
+	"\tcondition\x18\x05 \x01(\v2'.maxshot.provider_sync.v1.RateConditionR\tcondition\"\xb3\x02\n" +
 	"\bRateCard\x12*\n" +
-	"\x11rate_card_version\x18\x01 \x01(\tR\x0frateCardVersion\x12/\n" +
-	"\x14effective_at_unix_ms\x18\x02 \x01(\x03R\x11effectiveAtUnixMs\x12G\n" +
-	"\n" +
-	"components\x18\x03 \x03(\v2'.maxshot.provider_sync.v1.RateComponentR\n" +
-	"components\"\xa0\x02\n" +
+	"\x11rate_card_version\x18\x01 \x01(\tR\x0frateCardVersion\x12\x1a\n" +
+	"\bcurrency\x18\x02 \x01(\tR\bcurrency\x12/\n" +
+	"\x14effective_at_unix_ms\x18\x03 \x01(\x03R\x11effectiveAtUnixMs\x12P\n" +
+	"\x0fbase_components\x18\x04 \x03(\v2'.maxshot.provider_sync.v1.RateComponentR\x0ebaseComponents\x12\\\n" +
+	"\x15conditional_overrides\x18\x05 \x03(\v2'.maxshot.provider_sync.v1.RateComponentR\x14conditionalOverrides\"\xbe\x02\n" +
 	"\x0eProviderRecord\x12\x1f\n" +
 	"\vprovider_id\x18\x01 \x01(\tR\n" +
 	"providerId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12B\n" +
 	"\n" +
 	"route_type\x18\x03 \x01(\x0e2#.maxshot.provider_sync.v1.RouteTypeR\trouteType\x12\x18\n" +
-	"\asummary\x18\x04 \x01(\tR\asummary\x123\n" +
-	"\x16daily_budget_micro_usd\x18\x05 \x01(\x03R\x13dailyBudgetMicroUsd\x127\n" +
-	"\x18monthly_budget_micro_usd\x18\x06 \x01(\x03R\x15monthlyBudgetMicroUsd\"\xa8\x01\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x12$\n" +
+	"\x0ebrand_mark_url\x18\x05 \x01(\tR\fbrandMarkUrl\x12\x18\n" +
+	"\aenabled\x18\x06 \x01(\bR\aenabled\x12J\n" +
+	"\x0ebudget_periods\x18\a \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\rbudgetPeriods\"\xa8\x01\n" +
 	"\x11CatalogDefinition\x12\x1d\n" +
 	"\n" +
 	"catalog_id\x18\x01 \x01(\tR\tcatalogId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x127\n" +
 	"\bmodality\x18\x03 \x01(\x0e2\x1b.maxshot.common.v1.ModalityR\bmodality\x12\x18\n" +
-	"\aenabled\x18\x04 \x01(\bR\aenabled\"\xe6\x02\n" +
+	"\aenabled\x18\x04 \x01(\bR\aenabled\"\xad\x03\n" +
 	"\x13CustomerModelRecord\x12\x19\n" +
 	"\bmodel_id\x18\x01 \x01(\tR\amodelId\x12!\n" +
-	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12)\n" +
-	"\x10verified_version\x18\x03 \x01(\tR\x0fverifiedVersion\x127\n" +
-	"\bmodality\x18\x04 \x01(\x0e2\x1b.maxshot.common.v1.ModalityR\bmodality\x12\x1d\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12)\n" +
+	"\x10verified_version\x18\x04 \x01(\tR\x0fverifiedVersion\x127\n" +
+	"\bmodality\x18\x05 \x01(\x0e2\x1b.maxshot.common.v1.ModalityR\bmodality\x12\x1d\n" +
 	"\n" +
-	"catalog_id\x18\x05 \x01(\tR\tcatalogId\x120\n" +
-	"\x04tier\x18\x06 \x01(\x0e2\x1c.maxshot.common.v1.ModelTierR\x04tier\x129\n" +
-	"\x19default_max_output_tokens\x18\a \x01(\x03R\x16defaultMaxOutputTokens\x12!\n" +
-	"\foffering_ids\x18\b \x03(\tR\vofferingIds\"\xff\a\n" +
+	"catalog_id\x18\x06 \x01(\tR\tcatalogId\x120\n" +
+	"\x04tier\x18\a \x01(\x0e2\x1c.maxshot.common.v1.ModelTierR\x04tier\x129\n" +
+	"\x19default_max_output_tokens\x18\b \x01(\x03R\x16defaultMaxOutputTokens\x12#\n" +
+	"\rmodel_aliases\x18\t \x03(\tR\fmodelAliases\x12!\n" +
+	"\foffering_ids\x18\n" +
+	" \x03(\tR\vofferingIds\"\x9d\x03\n" +
+	"\x1aObservedPerformanceSummary\x12/\n" +
+	"\x14window_start_unix_ms\x18\x01 \x01(\x03R\x11windowStartUnixMs\x12+\n" +
+	"\x12window_end_unix_ms\x18\x02 \x01(\x03R\x0fwindowEndUnixMs\x12/\n" +
+	"\x13dispatched_attempts\x18\x03 \x01(\x03R\x12dispatchedAttempts\x12+\n" +
+	"\x11sample_sufficient\x18\x04 \x01(\bR\x10sampleSufficient\x129\n" +
+	"\x19delivered_success_pct_dec\x18\x05 \x01(\tR\x16deliveredSuccessPctDec\x121\n" +
+	"\x15is_first_token_metric\x18\x06 \x01(\bR\x12isFirstTokenMetric\x12'\n" +
+	"\x0flatency_samples\x18\a \x01(\x03R\x0elatencySamples\x12\x15\n" +
+	"\x06p50_ms\x18\b \x01(\x03R\x05p50Ms\x12\x15\n" +
+	"\x06p95_ms\x18\t \x01(\x03R\x05p95Ms\"\x8c\x0e\n" +
 	"\x0eOfferingRecord\x12\x1f\n" +
 	"\voffering_id\x18\x01 \x01(\tR\n" +
 	"offeringId\x12\x1f\n" +
 	"\vprovider_id\x18\x02 \x01(\tR\n" +
 	"providerId\x12\x19\n" +
-	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x12)\n" +
-	"\x10protocol_adapter\x18\x04 \x01(\tR\x0fprotocolAdapter\x12!\n" +
-	"\fendpoint_url\x18\x05 \x01(\tR\vendpointUrl\x12&\n" +
-	"\x0fnative_model_id\x18\x06 \x01(\tR\rnativeModelId\x12#\n" +
-	"\rcredential_id\x18\a \x01(\tR\fcredentialId\x12:\n" +
-	"\x19disable_upstream_fallback\x18\b \x01(\bR\x17disableUpstreamFallback\x128\n" +
-	"\x18pinned_upstream_provider\x18\t \x01(\tR\x16pinnedUpstreamProvider\x12T\n" +
-	"\x10admission_status\x18\n" +
-	" \x01(\x0e2).maxshot.provider_sync.v1.AdmissionStatusR\x0fadmissionStatus\x12]\n" +
-	"\x13availability_status\x18\v \x01(\x0e2,.maxshot.provider_sync.v1.AvailabilityStatusR\x12availabilityStatus\x12\"\n" +
-	"\fcapabilities\x18\f \x03(\tR\fcapabilities\x12'\n" +
-	"\x0fallowed_regions\x18\r \x03(\tR\x0eallowedRegions\x12%\n" +
-	"\x0ezero_retention\x18\x0e \x01(\bR\rzeroRetention\x12%\n" +
-	"\x0econtext_tokens\x18\x0f \x01(\x03R\rcontextTokens\x12*\n" +
-	"\x11max_output_tokens\x18\x10 \x01(\x03R\x0fmaxOutputTokens\x12&\n" +
-	"\x0fttft_timeout_ms\x18\x11 \x01(\x03R\rttftTimeoutMs\x127\n" +
-	"\x18max_job_duration_seconds\x18\x12 \x01(\x03R\x15maxJobDurationSeconds\x12P\n" +
-	"\x12provider_cost_card\x18\x13 \x01(\v2\".maxshot.provider_sync.v1.RateCardR\x10providerCostCard\x12P\n" +
-	"\x12customer_rate_card\x18\x14 \x01(\v2\".maxshot.provider_sync.v1.RateCardR\x10customerRateCard\"\xfc\x01\n" +
+	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x12#\n" +
+	"\rvariant_label\x18\x04 \x01(\tR\fvariantLabel\x12)\n" +
+	"\x10protocol_adapter\x18\x05 \x01(\tR\x0fprotocolAdapter\x12!\n" +
+	"\fendpoint_url\x18\x06 \x01(\tR\vendpointUrl\x12&\n" +
+	"\x0fnative_model_id\x18\a \x01(\tR\rnativeModelId\x124\n" +
+	"\x16verified_model_version\x18\b \x01(\tR\x14verifiedModelVersion\x12#\n" +
+	"\rcredential_id\x18\t \x01(\tR\fcredentialId\x12/\n" +
+	"\x13credential_revision\x18\n" +
+	" \x01(\tR\x12credentialRevision\x12:\n" +
+	"\x19disable_upstream_fallback\x18\v \x01(\bR\x17disableUpstreamFallback\x128\n" +
+	"\x18pinned_upstream_provider\x18\f \x01(\tR\x16pinnedUpstreamProvider\x12C\n" +
+	"\x1erequire_serving_endpoint_proof\x18\r \x01(\bR\x1brequireServingEndpointProof\x12T\n" +
+	"\x10admission_status\x18\x0e \x01(\x0e2).maxshot.provider_sync.v1.AdmissionStatusR\x0fadmissionStatus\x12]\n" +
+	"\x13availability_status\x18\x0f \x01(\x0e2,.maxshot.provider_sync.v1.AvailabilityStatusR\x12availabilityStatus\x12-\n" +
+	"\x12unavailable_reason\x18\x10 \x01(\tR\x11unavailableReason\x12\"\n" +
+	"\fcapabilities\x18\x11 \x03(\tR\fcapabilities\x121\n" +
+	"\x14supported_parameters\x18\x12 \x03(\tR\x13supportedParameters\x12'\n" +
+	"\x0fallowed_regions\x18\x13 \x03(\tR\x0eallowedRegions\x12%\n" +
+	"\x0ezero_retention\x18\x14 \x01(\bR\rzeroRetention\x12'\n" +
+	"\x0fretention_label\x18\x15 \x01(\tR\x0eretentionLabel\x12%\n" +
+	"\x0econtext_tokens\x18\x16 \x01(\x03R\rcontextTokens\x12(\n" +
+	"\x10max_input_tokens\x18\x17 \x01(\x03R\x0emaxInputTokens\x12*\n" +
+	"\x11max_output_tokens\x18\x18 \x01(\x03R\x0fmaxOutputTokens\x12&\n" +
+	"\x0fttft_timeout_ms\x18\x19 \x01(\x03R\rttftTimeoutMs\x127\n" +
+	"\x18max_job_duration_seconds\x18\x1a \x01(\x03R\x15maxJobDurationSeconds\x120\n" +
+	"\x14grace_window_seconds\x18\x1b \x01(\x03R\x12graceWindowSeconds\x129\n" +
+	"\x19provider_cost_ceiling_bps\x18\x1c \x01(\x05R\x16providerCostCeilingBps\x126\n" +
+	"\x17health_backoff_failures\x18\x1d \x01(\x05R\x15healthBackoffFailures\x12A\n" +
+	"\x1dhealth_backoff_window_seconds\x18\x1e \x01(\x05R\x1ahealthBackoffWindowSeconds\x124\n" +
+	"\x16health_reprobe_seconds\x18\x1f \x01(\x05R\x14healthReprobeSeconds\x12P\n" +
+	"\x12provider_cost_card\x18  \x01(\v2\".maxshot.provider_sync.v1.RateCardR\x10providerCostCard\x12P\n" +
+	"\x12customer_rate_card\x18! \x01(\v2\".maxshot.provider_sync.v1.RateCardR\x10customerRateCard\x12g\n" +
+	"\x14observed_performance\x18\" \x01(\v24.maxshot.provider_sync.v1.ObservedPerformanceSummaryR\x13observedPerformance\"\xf1\x01\n" +
+	"\x0fTierGroupRecord\x12\x19\n" +
+	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x127\n" +
+	"\bmodality\x18\x03 \x01(\x0e2\x1b.maxshot.common.v1.ModalityR\bmodality\x12=\n" +
+	"\vtarget_tier\x18\x04 \x01(\x0e2\x1c.maxshot.common.v1.ModelTierR\n" +
+	"targetTier\x12(\n" +
+	"\x10member_model_ids\x18\x05 \x03(\tR\x0ememberModelIds\"\x98\x01\n" +
+	"\x10CuratedModelItem\x12\x19\n" +
+	"\bmodel_id\x18\x01 \x01(\tR\amodelId\x12\x12\n" +
+	"\x04rank\x18\x02 \x01(\x05R\x04rank\x12 \n" +
+	"\vrecommended\x18\x03 \x01(\bR\vrecommended\x12\x1f\n" +
+	"\vbadge_label\x18\x04 \x01(\tR\n" +
+	"badgeLabel\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"\xcc\x03\n" +
+	"\x0eCurationConfig\x121\n" +
+	"\x15chat_default_model_id\x18\x01 \x01(\tR\x12chatDefaultModelId\x12K\n" +
+	"\vchat_models\x18\x02 \x03(\v2*.maxshot.provider_sync.v1.CuratedModelItemR\n" +
+	"chatModels\x12@\n" +
+	"\x1dstudio_image_default_model_id\x18\x03 \x01(\tR\x19studioImageDefaultModelId\x12Z\n" +
+	"\x13studio_image_models\x18\x04 \x03(\v2*.maxshot.provider_sync.v1.CuratedModelItemR\x11studioImageModels\x12@\n" +
+	"\x1dstudio_video_default_model_id\x18\x05 \x01(\tR\x19studioVideoDefaultModelId\x12Z\n" +
+	"\x13studio_video_models\x18\x06 \x03(\v2*.maxshot.provider_sync.v1.CuratedModelItemR\x11studioVideoModels\"\xfc\x01\n" +
 	"\rAutoPoolEntry\x12\x1f\n" +
 	"\voffering_id\x18\x01 \x01(\tR\n" +
 	"offeringId\x12\x19\n" +
@@ -1727,45 +3936,91 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\vtask_labels\x18\x03 \x03(\x0e2'.maxshot.provider_sync.v1.AutoTaskLabelR\n" +
 	"taskLabels\x12#\n" +
 	"\rpriority_rank\x18\x04 \x01(\x05R\fpriorityRank\x12@\n" +
-	"\x1dper_message_ceiling_micro_usd\x18\x05 \x01(\x03R\x19perMessageCeilingMicroUsd\"\xf6\x01\n" +
-	"\fBudgetPolicy\x12D\n" +
-	"\x1fplatform_daily_budget_micro_usd\x18\x01 \x01(\x03R\x1bplatformDailyBudgetMicroUsd\x12M\n" +
-	"$business_chat_daily_budget_micro_usd\x18\x02 \x01(\x03R\x1fbusinessChatDailyBudgetMicroUsd\x12Q\n" +
-	"&business_studio_daily_budget_micro_usd\x18\x03 \x01(\x03R!businessStudioDailyBudgetMicroUsd\"\x9e\x04\n" +
+	"\x1dper_message_ceiling_micro_usd\x18\x05 \x01(\x03R\x19perMessageCeilingMicroUsd\"\xce\x03\n" +
+	"\fBudgetPolicy\x12N\n" +
+	"\x10platform_periods\x18\x01 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x0fplatformPeriods\x12]\n" +
+	"\x18default_supplier_periods\x18\x02 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x16defaultSupplierPeriods\x12Y\n" +
+	"\x16business_total_periods\x18\x03 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x14businessTotalPeriods\x12W\n" +
+	"\x15business_chat_periods\x18\x04 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x13businessChatPeriods\x12[\n" +
+	"\x17business_studio_periods\x18\x05 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x15businessStudioPeriods\"\xb0\x05\n" +
 	"\x0fCatalogSnapshot\x12'\n" +
 	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\x12/\n" +
 	"\x14generated_at_unix_ms\x18\x02 \x01(\x03R\x11generatedAtUnixMs\x12G\n" +
 	"\bcatalogs\x18\x03 \x03(\v2+.maxshot.provider_sync.v1.CatalogDefinitionR\bcatalogs\x12F\n" +
 	"\tproviders\x18\x04 \x03(\v2(.maxshot.provider_sync.v1.ProviderRecordR\tproviders\x12E\n" +
 	"\x06models\x18\x05 \x03(\v2-.maxshot.provider_sync.v1.CustomerModelRecordR\x06models\x12F\n" +
-	"\tofferings\x18\x06 \x03(\v2(.maxshot.provider_sync.v1.OfferingRecordR\tofferings\x12D\n" +
-	"\tauto_pool\x18\a \x03(\v2'.maxshot.provider_sync.v1.AutoPoolEntryR\bautoPool\x12K\n" +
-	"\rbudget_policy\x18\b \x01(\v2&.maxshot.provider_sync.v1.BudgetPolicyR\fbudgetPolicy\"\x80\x01\n" +
-	"\x1bWatchCatalogSnapshotRequest\x12&\n" +
-	"\x0fgateway_node_id\x18\x01 \x01(\tR\rgatewayNodeId\x129\n" +
-	"\x19last_seen_catalog_version\x18\x02 \x01(\tR\x16lastSeenCatalogVersion\"e\n" +
-	"\x1cWatchCatalogSnapshotResponse\x12E\n" +
-	"\bsnapshot\x18\x01 \x01(\v2).maxshot.provider_sync.v1.CatalogSnapshotR\bsnapshot\"D\n" +
+	"\tofferings\x18\x06 \x03(\v2(.maxshot.provider_sync.v1.OfferingRecordR\tofferings\x12J\n" +
+	"\vtier_groups\x18\a \x03(\v2).maxshot.provider_sync.v1.TierGroupRecordR\n" +
+	"tierGroups\x12D\n" +
+	"\bcuration\x18\b \x01(\v2(.maxshot.provider_sync.v1.CurationConfigR\bcuration\x12D\n" +
+	"\tauto_pool\x18\t \x03(\v2'.maxshot.provider_sync.v1.AutoPoolEntryR\bautoPool\x12K\n" +
+	"\rbudget_policy\x18\n" +
+	" \x01(\v2&.maxshot.provider_sync.v1.BudgetPolicyR\fbudgetPolicy\"\xdb\x01\n" +
+	"\x16WatchSyncEventsRequest\x12&\n" +
+	"\x0fgateway_node_id\x18\x01 \x01(\tR\rgatewayNodeId\x12\x1b\n" +
+	"\tnode_role\x18\x02 \x01(\tR\bnodeRole\x129\n" +
+	"\x19last_seen_catalog_version\x18\x03 \x01(\tR\x16lastSeenCatalogVersion\x12A\n" +
+	"\x1dlast_seen_credential_revision\x18\x04 \x01(\tR\x1alastSeenCredentialRevision\"\x86\x02\n" +
+	"\x17WatchSyncEventsResponse\x12F\n" +
+	"\n" +
+	"event_kind\x18\x01 \x01(\x0e2'.maxshot.provider_sync.v1.SyncEventKindR\teventKind\x124\n" +
+	"\x16latest_catalog_version\x18\x02 \x01(\tR\x14latestCatalogVersion\x12<\n" +
+	"\x1alatest_credential_revision\x18\x03 \x01(\tR\x18latestCredentialRevision\x12/\n" +
+	"\x14published_at_unix_ms\x18\x04 \x01(\x03R\x11publishedAtUnixMs\"\x88\x02\n" +
+	"\x1aReportNodeSyncStateRequest\x12&\n" +
+	"\x0fgateway_node_id\x18\x01 \x01(\tR\rgatewayNodeId\x12\x1b\n" +
+	"\tnode_role\x18\x02 \x01(\tR\bnodeRole\x126\n" +
+	"\x17applied_catalog_version\x18\x03 \x01(\tR\x15appliedCatalogVersion\x12>\n" +
+	"\x1bapplied_credential_revision\x18\x04 \x01(\tR\x19appliedCredentialRevision\x12-\n" +
+	"\x13reported_at_unix_ms\x18\x05 \x01(\x03R\x10reportedAtUnixMs\"A\n" +
+	"\x1bReportNodeSyncStateResponse\x12\"\n" +
+	"\facknowledged\x18\x01 \x01(\bR\facknowledged\"D\n" +
 	"\x19GetCatalogSnapshotRequest\x12'\n" +
 	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\"c\n" +
 	"\x1aGetCatalogSnapshotResponse\x12E\n" +
-	"\bsnapshot\x18\x01 \x01(\v2).maxshot.provider_sync.v1.CatalogSnapshotR\bsnapshot\"\x9a\x02\n" +
+	"\bsnapshot\x18\x01 \x01(\v2).maxshot.provider_sync.v1.CatalogSnapshotR\bsnapshot\"u\n" +
+	"\"StreamCatalogSnapshotChunksRequest\x12'\n" +
+	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\x12&\n" +
+	"\x0fmax_chunk_bytes\x18\x02 \x01(\x05R\rmaxChunkBytes\"\xf6\x01\n" +
+	"#StreamCatalogSnapshotChunksResponse\x12'\n" +
+	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\x12\x1f\n" +
+	"\vchunk_index\x18\x02 \x01(\x05R\n" +
+	"chunkIndex\x12!\n" +
+	"\ftotal_chunks\x18\x03 \x01(\x05R\vtotalChunks\x12&\n" +
+	"\x0ffull_sha256_hex\x18\x04 \x01(\tR\rfullSha256Hex\x12:\n" +
+	"\x19serialized_snapshot_chunk\x18\x05 \x01(\fR\x17serializedSnapshotChunk\"\xa3\x02\n" +
+	"\x14GatewayPublicKeyItem\x121\n" +
+	"\x15gateway_public_key_id\x18\x01 \x01(\tR\x12gatewayPublicKeyId\x12J\n" +
+	"\talgorithm\x18\x02 \x01(\x0e2,.maxshot.provider_sync.v1.PublicKeyAlgorithmR\talgorithm\x12$\n" +
+	"\x0epublic_key_der\x18\x03 \x01(\fR\fpublicKeyDer\x129\n" +
+	"\x19active_for_new_encryption\x18\x04 \x01(\bR\x16activeForNewEncryption\x12+\n" +
+	"\x12created_at_unix_ms\x18\x05 \x01(\x03R\x0fcreatedAtUnixMs\"b\n" +
+	"\x1cSyncGatewayPublicKeysRequest\x12B\n" +
+	"\x04keys\x18\x01 \x03(\v2..maxshot.provider_sync.v1.GatewayPublicKeyItemR\x04keys\"{\n" +
+	"\x1dSyncGatewayPublicKeysResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\x12>\n" +
+	"\x1cactive_gateway_public_key_id\x18\x02 \x01(\tR\x18activeGatewayPublicKeyId\"\x8f\x03\n" +
 	"\x17EncryptedCredentialItem\x12#\n" +
-	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\x12\x1f\n" +
-	"\vprovider_id\x18\x02 \x01(\tR\n" +
-	"providerId\x121\n" +
-	"\x15gateway_public_key_id\x18\x03 \x01(\tR\x12gatewayPublicKeyId\x12#\n" +
-	"\rencrypted_dek\x18\x04 \x01(\fR\fencryptedDek\x12\x14\n" +
-	"\x05nonce\x18\x05 \x01(\fR\x05nonce\x12\x1e\n" +
+	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\x12/\n" +
+	"\x13credential_revision\x18\x02 \x01(\tR\x12credentialRevision\x12\x1f\n" +
+	"\vprovider_id\x18\x03 \x01(\tR\n" +
+	"providerId\x12B\n" +
+	"\x06status\x18\x04 \x01(\x0e2*.maxshot.provider_sync.v1.CredentialStatusR\x06status\x121\n" +
+	"\x15gateway_public_key_id\x18\x05 \x01(\tR\x12gatewayPublicKeyId\x12#\n" +
+	"\rencrypted_dek\x18\x06 \x01(\fR\fencryptedDek\x12\x14\n" +
+	"\x05nonce\x18\a \x01(\fR\x05nonce\x12\x1e\n" +
 	"\n" +
-	"ciphertext\x18\x06 \x01(\fR\n" +
+	"ciphertext\x18\b \x01(\fR\n" +
 	"ciphertext\x12+\n" +
-	"\x12updated_at_unix_ms\x18\a \x01(\x03R\x0fupdatedAtUnixMs\"H\n" +
+	"\x12updated_at_unix_ms\x18\t \x01(\x03R\x0fupdatedAtUnixMs\"H\n" +
 	"\x1fSyncEncryptedCredentialsRequest\x12%\n" +
 	"\x0esince_revision\x18\x01 \x01(\tR\rsinceRevision\"\xa2\x01\n" +
 	" SyncEncryptedCredentialsResponse\x12)\n" +
 	"\x10current_revision\x18\x01 \x01(\tR\x0fcurrentRevision\x12S\n" +
-	"\vcredentials\x18\x02 \x03(\v21.maxshot.provider_sync.v1.EncryptedCredentialItemR\vcredentials\"\xec\x04\n" +
+	"\vcredentials\x18\x02 \x03(\v21.maxshot.provider_sync.v1.EncryptedCredentialItemR\vcredentials\"a\n" +
+	"\x16LatencyHistogramBucket\x12$\n" +
+	"\x0eupper_bound_ms\x18\x01 \x01(\x03R\fupperBoundMs\x12!\n" +
+	"\fsample_count\x18\x02 \x01(\x03R\vsampleCount\"\xc5\b\n" +
 	"\x14OfferingWindowMetric\x12\x1f\n" +
 	"\voffering_id\x18\x01 \x01(\tR\n" +
 	"offeringId\x12/\n" +
@@ -1775,19 +4030,89 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\x17delivered_success_count\x18\x05 \x01(\x03R\x15deliveredSuccessCount\x12$\n" +
 	"\x0ehttp_429_count\x18\x06 \x01(\x03R\fhttp429Count\x12$\n" +
 	"\x0ehttp_5xx_count\x18\a \x01(\x03R\fhttp5xxCount\x12#\n" +
-	"\rtimeout_count\x18\b \x01(\x03R\ftimeoutCount\x120\n" +
-	"\x14latency_sample_count\x18\t \x01(\x03R\x12latencySampleCount\x12$\n" +
-	"\x0ep50_latency_ms\x18\n" +
-	" \x01(\x03R\fp50LatencyMs\x12$\n" +
-	"\x0ep95_latency_ms\x18\v \x01(\x03R\fp95LatencyMs\x121\n" +
-	"\x15is_first_token_metric\x18\f \x01(\bR\x12isFirstTokenMetric\x12J\n" +
-	"\"settled_provider_payable_micro_usd\x18\r \x01(\x03R\x1esettledProviderPayableMicroUsd\"\xab\x01\n" +
+	"\rtimeout_count\x18\b \x01(\x03R\ftimeoutCount\x12@\n" +
+	"\x1dmid_stream_or_malformed_count\x18\t \x01(\x03R\x19midStreamOrMalformedCount\x123\n" +
+	"\x16user_input_error_count\x18\n" +
+	" \x01(\x03R\x13userInputErrorCount\x128\n" +
+	"\x18customer_cancelled_count\x18\v \x01(\x03R\x16customerCancelledCount\x12+\n" +
+	"\x11terminal_attempts\x18\f \x01(\x03R\x10terminalAttempts\x126\n" +
+	"\x17verified_usage_attempts\x18\r \x01(\x03R\x15verifiedUsageAttempts\x12.\n" +
+	"\x13missing_usage_count\x18\x0e \x01(\x03R\x11missingUsageCount\x121\n" +
+	"\x15is_first_token_metric\x18\x0f \x01(\bR\x12isFirstTokenMetric\x120\n" +
+	"\x14latency_sample_count\x18\x10 \x01(\x03R\x12latencySampleCount\x12$\n" +
+	"\x0ep50_latency_ms\x18\x11 \x01(\x03R\fp50LatencyMs\x12$\n" +
+	"\x0ep95_latency_ms\x18\x12 \x01(\x03R\fp95LatencyMs\x12]\n" +
+	"\x11latency_histogram\x18\x13 \x03(\v20.maxshot.provider_sync.v1.LatencyHistogramBucketR\x10latencyHistogram\x12J\n" +
+	"\"settled_provider_payable_micro_usd\x18\x14 \x01(\x03R\x1esettledProviderPayableMicroUsd\x122\n" +
+	"\x15discrepancy_micro_usd\x18\x15 \x01(\x03R\x13discrepancyMicroUsd\"\xab\x01\n" +
 	"\x1cReportOfferingMetricsRequest\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12&\n" +
 	"\x0fgateway_node_id\x18\x02 \x01(\tR\rgatewayNodeId\x12H\n" +
 	"\ametrics\x18\x03 \x03(\v2..maxshot.provider_sync.v1.OfferingWindowMetricR\ametrics\";\n" +
 	"\x1dReportOfferingMetricsResponse\x12\x1a\n" +
-	"\baccepted\x18\x01 \x01(\bR\baccepted*Y\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\"\xbb\x04\n" +
+	"\x16ProviderStatementEntry\x12\x19\n" +
+	"\bentry_id\x18\x01 \x01(\tR\aentryId\x12!\n" +
+	"\fstatement_id\x18\x02 \x01(\tR\vstatementId\x12\x1f\n" +
+	"\vprovider_id\x18\x03 \x01(\tR\n" +
+	"providerId\x12\x1f\n" +
+	"\voffering_id\x18\x04 \x01(\tR\n" +
+	"offeringId\x12@\n" +
+	"\x04kind\x18\x05 \x01(\x0e2,.maxshot.provider_sync.v1.StatementEntryKindR\x04kind\x12&\n" +
+	"\x0flinked_entry_id\x18\x06 \x01(\tR\rlinkedEntryId\x12*\n" +
+	"\x11linked_request_id\x18\a \x01(\tR\x0flinkedRequestId\x12/\n" +
+	"\x14period_start_unix_ms\x18\b \x01(\x03R\x11periodStartUnixMs\x12+\n" +
+	"\x12period_end_unix_ms\x18\t \x01(\x03R\x0fperiodEndUnixMs\x12#\n" +
+	"\rattempt_count\x18\n" +
+	" \x01(\x03R\fattemptCount\x12(\n" +
+	"\x10amount_micro_usd\x18\v \x01(\x03R\x0eamountMicroUsd\x12\x19\n" +
+	"\bactor_id\x18\f \x01(\tR\aactorId\x12\x16\n" +
+	"\x06reason\x18\r \x01(\tR\x06reason\x12+\n" +
+	"\x12created_at_unix_ms\x18\x0e \x01(\x03R\x0fcreatedAtUnixMs\"\x86\x01\n" +
+	"\x1dSyncProviderStatementsRequest\x12\x19\n" +
+	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12J\n" +
+	"\aentries\x18\x02 \x03(\v20.maxshot.provider_sync.v1.ProviderStatementEntryR\aentries\"<\n" +
+	"\x1eSyncProviderStatementsResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\"\xc9\x06\n" +
+	"\x17AttemptSettlementRecord\x12\x1d\n" +
+	"\n" +
+	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x1f\n" +
+	"\vprovider_id\x18\x03 \x01(\tR\n" +
+	"providerId\x12\x1f\n" +
+	"\voffering_id\x18\x04 \x01(\tR\n" +
+	"offeringId\x12*\n" +
+	"\x11native_request_id\x18\x05 \x01(\tR\x0fnativeRequestId\x12:\n" +
+	"\x19reported_serving_endpoint\x18\x06 \x01(\tR\x17reportedServingEndpoint\x12\x16\n" +
+	"\x06status\x18\a \x01(\tR\x06status\x12\x1f\n" +
+	"\verror_class\x18\b \x01(\tR\n" +
+	"errorClass\x12;\n" +
+	"\x1aprovider_rate_card_version\x18\t \x01(\tR\x17providerRateCardVersion\x12;\n" +
+	"\x1acustomer_rate_card_version\x18\n" +
+	" \x01(\tR\x17customerRateCardVersion\x12V\n" +
+	"\x14verified_usage_units\x18\v \x03(\v2$.maxshot.common.v1.KeyValueAttributeR\x12verifiedUsageUnits\x121\n" +
+	"\x15provider_cost_usd_dec\x18\f \x01(\tR\x12providerCostUsdDec\x125\n" +
+	"\x17provider_cost_micro_usd\x18\r \x01(\x03R\x14providerCostMicroUsd\x129\n" +
+	"\x19customer_charge_micro_usd\x18\x0e \x01(\x03R\x16customerChargeMicroUsd\x122\n" +
+	"\x15discrepancy_micro_usd\x18\x0f \x01(\x03R\x13discrepancyMicroUsd\x121\n" +
+	"\x15dispatched_at_unix_ms\x18\x10 \x01(\x03R\x12dispatchedAtUnixMs\x12/\n" +
+	"\x14completed_at_unix_ms\x18\x11 \x01(\x03R\x11completedAtUnixMs\"\xd9\x02\n" +
+	"!ListOfferingAttemptRecordsRequest\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
+	"providerId\x12\x1f\n" +
+	"\voffering_id\x18\x02 \x01(\tR\n" +
+	"offeringId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12*\n" +
+	"\x11native_request_id\x18\x04 \x01(\tR\x0fnativeRequestId\x12\"\n" +
+	"\rstart_unix_ms\x18\x05 \x01(\x03R\vstartUnixMs\x12\x1e\n" +
+	"\vend_unix_ms\x18\x06 \x01(\x03R\tendUnixMs\x12)\n" +
+	"\x10discrepancy_only\x18\a \x01(\bR\x0fdiscrepancyOnly\x128\n" +
+	"\x04page\x18\b \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\"\xac\x01\n" +
+	"\"ListOfferingAttemptRecordsResponse\x12K\n" +
+	"\arecords\x18\x01 \x03(\v21.maxshot.provider_sync.v1.AttemptSettlementRecordR\arecords\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page*Y\n" +
 	"\tRouteType\x12\x1a\n" +
 	"\x16ROUTE_TYPE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11ROUTE_TYPE_DIRECT\x10\x01\x12\x19\n" +
@@ -1796,22 +4121,76 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\x1cADMISSION_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18ADMISSION_STATUS_PENDING\x10\x01\x12\x1b\n" +
 	"\x17ADMISSION_STATUS_PASSED\x10\x02\x12\x1b\n" +
-	"\x17ADMISSION_STATUS_FAILED\x10\x03*\x9f\x01\n" +
+	"\x17ADMISSION_STATUS_FAILED\x10\x03*\xc7\x01\n" +
 	"\x12AvailabilityStatus\x12#\n" +
 	"\x1fAVAILABILITY_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dAVAILABILITY_STATUS_AVAILABLE\x10\x01\x12\x1e\n" +
 	"\x1aAVAILABILITY_STATUS_PAUSED\x10\x02\x12!\n" +
-	"\x1dAVAILABILITY_STATUS_UNHEALTHY\x10\x03*\x96\x01\n" +
+	"\x1dAVAILABILITY_STATUS_UNHEALTHY\x10\x03\x12&\n" +
+	"\"AVAILABILITY_STATUS_PENDING_REVIEW\x10\x04*\x96\x01\n" +
 	"\rAutoTaskLabel\x12\x1f\n" +
 	"\x1bAUTO_TASK_LABEL_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dAUTO_TASK_LABEL_ORDINARY_CHAT\x10\x01\x12\x1a\n" +
 	"\x16AUTO_TASK_LABEL_CODING\x10\x02\x12%\n" +
-	"!AUTO_TASK_LABEL_COMPLEX_REASONING\x10\x032\xbf\x04\n" +
-	"\x13ProviderSyncService\x12\x87\x01\n" +
-	"\x14WatchCatalogSnapshot\x125.maxshot.provider_sync.v1.WatchCatalogSnapshotRequest\x1a6.maxshot.provider_sync.v1.WatchCatalogSnapshotResponse0\x01\x12\x7f\n" +
-	"\x12GetCatalogSnapshot\x123.maxshot.provider_sync.v1.GetCatalogSnapshotRequest\x1a4.maxshot.provider_sync.v1.GetCatalogSnapshotResponse\x12\x91\x01\n" +
+	"!AUTO_TASK_LABEL_COMPLEX_REASONING\x10\x03*\x9f\x01\n" +
+	"\rSyncEventKind\x12\x1f\n" +
+	"\x1bSYNC_EVENT_KIND_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19SYNC_EVENT_KIND_HEARTBEAT\x10\x01\x12%\n" +
+	"!SYNC_EVENT_KIND_CATALOG_PUBLISHED\x10\x02\x12'\n" +
+	"#SYNC_EVENT_KIND_CREDENTIALS_UPDATED\x10\x03*r\n" +
+	"\x10CredentialStatus\x12!\n" +
+	"\x1dCREDENTIAL_STATUS_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18CREDENTIAL_STATUS_ACTIVE\x10\x01\x12\x1d\n" +
+	"\x19CREDENTIAL_STATUS_REVOKED\x10\x02*\x91\x01\n" +
+	"\x12PublicKeyAlgorithm\x12$\n" +
+	" PUBLIC_KEY_ALGORITHM_UNSPECIFIED\x10\x00\x12(\n" +
+	"$PUBLIC_KEY_ALGORITHM_RSA_OAEP_SHA256\x10\x01\x12+\n" +
+	"'PUBLIC_KEY_ALGORITHM_X25519_HKDF_SHA256\x10\x02*\xb6\x05\n" +
+	"\x14BillingComponentKind\x12&\n" +
+	"\"BILLING_COMPONENT_KIND_UNSPECIFIED\x10\x00\x12'\n" +
+	"#BILLING_COMPONENT_KIND_INPUT_TOKENS\x10\x01\x12(\n" +
+	"$BILLING_COMPONENT_KIND_OUTPUT_TOKENS\x10\x02\x12,\n" +
+	"(BILLING_COMPONENT_KIND_CACHE_READ_TOKENS\x10\x03\x12-\n" +
+	")BILLING_COMPONENT_KIND_CACHE_WRITE_TOKENS\x10\x04\x124\n" +
+	"0BILLING_COMPONENT_KIND_INTERNAL_REASONING_TOKENS\x10\x05\x12&\n" +
+	"\"BILLING_COMPONENT_KIND_INPUT_IMAGE\x10\x06\x12-\n" +
+	")BILLING_COMPONENT_KIND_INPUT_IMAGE_TOKENS\x10\a\x12-\n" +
+	")BILLING_COMPONENT_KIND_INPUT_AUDIO_TOKENS\x10\b\x128\n" +
+	"4BILLING_COMPONENT_KIND_INPUT_AUDIO_CACHE_READ_TOKENS\x10\t\x12+\n" +
+	"'BILLING_COMPONENT_KIND_WEB_SEARCH_CALLS\x10\n" +
+	"\x12'\n" +
+	"#BILLING_COMPONENT_KIND_OUTPUT_IMAGE\x10\v\x12'\n" +
+	"#BILLING_COMPONENT_KIND_OUTPUT_VIDEO\x10\f\x12(\n" +
+	"$BILLING_COMPONENT_KIND_MEDIA_EDIT_OP\x10\r\x12'\n" +
+	"#BILLING_COMPONENT_KIND_REQUEST_CALL\x10\x0e*\xc7\x02\n" +
+	"\vBillingUnit\x12\x1c\n" +
+	"\x18BILLING_UNIT_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16BILLING_UNIT_PER_TOKEN\x10\x01\x12\x1e\n" +
+	"\x1aBILLING_UNIT_PER_1M_TOKENS\x10\x02\x12\x1a\n" +
+	"\x16BILLING_UNIT_PER_IMAGE\x10\x03\x12\x1b\n" +
+	"\x17BILLING_UNIT_PER_SECOND\x10\x04\x12\x1e\n" +
+	"\x1aBILLING_UNIT_PER_MEGAPIXEL\x10\x05\x12%\n" +
+	"!BILLING_UNIT_PER_MEGAPIXEL_SECOND\x10\x06\x12\x1e\n" +
+	"\x1aBILLING_UNIT_PER_CHARACTER\x10\a\x12 \n" +
+	"\x1cBILLING_UNIT_PER_SEARCH_UNIT\x10\b\x12\x1c\n" +
+	"\x18BILLING_UNIT_PER_REQUEST\x10\t*\xdb\x01\n" +
+	"\x12StatementEntryKind\x12$\n" +
+	" STATEMENT_ENTRY_KIND_UNSPECIFIED\x10\x00\x12(\n" +
+	"$STATEMENT_ENTRY_KIND_BASE_SETTLEMENT\x10\x01\x12#\n" +
+	"\x1fSTATEMENT_ENTRY_KIND_CORRECTION\x10\x02\x12%\n" +
+	"!STATEMENT_ENTRY_KIND_DISPUTE_HOLD\x10\x03\x12)\n" +
+	"%STATEMENT_ENTRY_KIND_DISPUTE_RESOLVED\x10\x042\xec\b\n" +
+	"\x13ProviderSyncService\x12x\n" +
+	"\x0fWatchSyncEvents\x120.maxshot.provider_sync.v1.WatchSyncEventsRequest\x1a1.maxshot.provider_sync.v1.WatchSyncEventsResponse0\x01\x12\x82\x01\n" +
+	"\x13ReportNodeSyncState\x124.maxshot.provider_sync.v1.ReportNodeSyncStateRequest\x1a5.maxshot.provider_sync.v1.ReportNodeSyncStateResponse\x12\x7f\n" +
+	"\x12GetCatalogSnapshot\x123.maxshot.provider_sync.v1.GetCatalogSnapshotRequest\x1a4.maxshot.provider_sync.v1.GetCatalogSnapshotResponse\x12\x9c\x01\n" +
+	"\x1bStreamCatalogSnapshotChunks\x12<.maxshot.provider_sync.v1.StreamCatalogSnapshotChunksRequest\x1a=.maxshot.provider_sync.v1.StreamCatalogSnapshotChunksResponse0\x01\x12\x88\x01\n" +
+	"\x15SyncGatewayPublicKeys\x126.maxshot.provider_sync.v1.SyncGatewayPublicKeysRequest\x1a7.maxshot.provider_sync.v1.SyncGatewayPublicKeysResponse\x12\x91\x01\n" +
 	"\x18SyncEncryptedCredentials\x129.maxshot.provider_sync.v1.SyncEncryptedCredentialsRequest\x1a:.maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse\x12\x88\x01\n" +
-	"\x15ReportOfferingMetrics\x126.maxshot.provider_sync.v1.ReportOfferingMetricsRequest\x1a7.maxshot.provider_sync.v1.ReportOfferingMetricsResponseBTZRgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/provider_sync/v1;providersyncv1b\x06proto3"
+	"\x15ReportOfferingMetrics\x126.maxshot.provider_sync.v1.ReportOfferingMetricsRequest\x1a7.maxshot.provider_sync.v1.ReportOfferingMetricsResponse\x12\x8b\x01\n" +
+	"\x16SyncProviderStatements\x127.maxshot.provider_sync.v1.SyncProviderStatementsRequest\x1a8.maxshot.provider_sync.v1.SyncProviderStatementsResponse2\xb8\x01\n" +
+	"\x1cGatewayReconciliationService\x12\x97\x01\n" +
+	"\x1aListOfferingAttemptRecords\x12;.maxshot.provider_sync.v1.ListOfferingAttemptRecordsRequest\x1a<.maxshot.provider_sync.v1.ListOfferingAttemptRecordsResponseBTZRgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/provider_sync/v1;providersyncv1b\x06proto3"
 
 var (
 	file_maxshot_provider_sync_v1_provider_sync_proto_rawDescOnce sync.Once
@@ -1825,69 +4204,137 @@ func file_maxshot_provider_sync_v1_provider_sync_proto_rawDescGZIP() []byte {
 	return file_maxshot_provider_sync_v1_provider_sync_proto_rawDescData
 }
 
-var file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_maxshot_provider_sync_v1_provider_sync_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_maxshot_provider_sync_v1_provider_sync_proto_goTypes = []any{
-	(RouteType)(0),                           // 0: maxshot.provider_sync.v1.RouteType
-	(AdmissionStatus)(0),                     // 1: maxshot.provider_sync.v1.AdmissionStatus
-	(AvailabilityStatus)(0),                  // 2: maxshot.provider_sync.v1.AvailabilityStatus
-	(AutoTaskLabel)(0),                       // 3: maxshot.provider_sync.v1.AutoTaskLabel
-	(*RateComponent)(nil),                    // 4: maxshot.provider_sync.v1.RateComponent
-	(*RateCard)(nil),                         // 5: maxshot.provider_sync.v1.RateCard
-	(*ProviderRecord)(nil),                   // 6: maxshot.provider_sync.v1.ProviderRecord
-	(*CatalogDefinition)(nil),                // 7: maxshot.provider_sync.v1.CatalogDefinition
-	(*CustomerModelRecord)(nil),              // 8: maxshot.provider_sync.v1.CustomerModelRecord
-	(*OfferingRecord)(nil),                   // 9: maxshot.provider_sync.v1.OfferingRecord
-	(*AutoPoolEntry)(nil),                    // 10: maxshot.provider_sync.v1.AutoPoolEntry
-	(*BudgetPolicy)(nil),                     // 11: maxshot.provider_sync.v1.BudgetPolicy
-	(*CatalogSnapshot)(nil),                  // 12: maxshot.provider_sync.v1.CatalogSnapshot
-	(*WatchCatalogSnapshotRequest)(nil),      // 13: maxshot.provider_sync.v1.WatchCatalogSnapshotRequest
-	(*WatchCatalogSnapshotResponse)(nil),     // 14: maxshot.provider_sync.v1.WatchCatalogSnapshotResponse
-	(*GetCatalogSnapshotRequest)(nil),        // 15: maxshot.provider_sync.v1.GetCatalogSnapshotRequest
-	(*GetCatalogSnapshotResponse)(nil),       // 16: maxshot.provider_sync.v1.GetCatalogSnapshotResponse
-	(*EncryptedCredentialItem)(nil),          // 17: maxshot.provider_sync.v1.EncryptedCredentialItem
-	(*SyncEncryptedCredentialsRequest)(nil),  // 18: maxshot.provider_sync.v1.SyncEncryptedCredentialsRequest
-	(*SyncEncryptedCredentialsResponse)(nil), // 19: maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse
-	(*OfferingWindowMetric)(nil),             // 20: maxshot.provider_sync.v1.OfferingWindowMetric
-	(*ReportOfferingMetricsRequest)(nil),     // 21: maxshot.provider_sync.v1.ReportOfferingMetricsRequest
-	(*ReportOfferingMetricsResponse)(nil),    // 22: maxshot.provider_sync.v1.ReportOfferingMetricsResponse
-	(v1.Modality)(0),                         // 23: maxshot.common.v1.Modality
-	(v1.ModelTier)(0),                        // 24: maxshot.common.v1.ModelTier
+	(RouteType)(0),                              // 0: maxshot.provider_sync.v1.RouteType
+	(AdmissionStatus)(0),                        // 1: maxshot.provider_sync.v1.AdmissionStatus
+	(AvailabilityStatus)(0),                     // 2: maxshot.provider_sync.v1.AvailabilityStatus
+	(AutoTaskLabel)(0),                          // 3: maxshot.provider_sync.v1.AutoTaskLabel
+	(SyncEventKind)(0),                          // 4: maxshot.provider_sync.v1.SyncEventKind
+	(CredentialStatus)(0),                       // 5: maxshot.provider_sync.v1.CredentialStatus
+	(PublicKeyAlgorithm)(0),                     // 6: maxshot.provider_sync.v1.PublicKeyAlgorithm
+	(BillingComponentKind)(0),                   // 7: maxshot.provider_sync.v1.BillingComponentKind
+	(BillingUnit)(0),                            // 8: maxshot.provider_sync.v1.BillingUnit
+	(StatementEntryKind)(0),                     // 9: maxshot.provider_sync.v1.StatementEntryKind
+	(*RateCondition)(nil),                       // 10: maxshot.provider_sync.v1.RateCondition
+	(*RateComponent)(nil),                       // 11: maxshot.provider_sync.v1.RateComponent
+	(*RateCard)(nil),                            // 12: maxshot.provider_sync.v1.RateCard
+	(*ProviderRecord)(nil),                      // 13: maxshot.provider_sync.v1.ProviderRecord
+	(*CatalogDefinition)(nil),                   // 14: maxshot.provider_sync.v1.CatalogDefinition
+	(*CustomerModelRecord)(nil),                 // 15: maxshot.provider_sync.v1.CustomerModelRecord
+	(*ObservedPerformanceSummary)(nil),          // 16: maxshot.provider_sync.v1.ObservedPerformanceSummary
+	(*OfferingRecord)(nil),                      // 17: maxshot.provider_sync.v1.OfferingRecord
+	(*TierGroupRecord)(nil),                     // 18: maxshot.provider_sync.v1.TierGroupRecord
+	(*CuratedModelItem)(nil),                    // 19: maxshot.provider_sync.v1.CuratedModelItem
+	(*CurationConfig)(nil),                      // 20: maxshot.provider_sync.v1.CurationConfig
+	(*AutoPoolEntry)(nil),                       // 21: maxshot.provider_sync.v1.AutoPoolEntry
+	(*BudgetPolicy)(nil),                        // 22: maxshot.provider_sync.v1.BudgetPolicy
+	(*CatalogSnapshot)(nil),                     // 23: maxshot.provider_sync.v1.CatalogSnapshot
+	(*WatchSyncEventsRequest)(nil),              // 24: maxshot.provider_sync.v1.WatchSyncEventsRequest
+	(*WatchSyncEventsResponse)(nil),             // 25: maxshot.provider_sync.v1.WatchSyncEventsResponse
+	(*ReportNodeSyncStateRequest)(nil),          // 26: maxshot.provider_sync.v1.ReportNodeSyncStateRequest
+	(*ReportNodeSyncStateResponse)(nil),         // 27: maxshot.provider_sync.v1.ReportNodeSyncStateResponse
+	(*GetCatalogSnapshotRequest)(nil),           // 28: maxshot.provider_sync.v1.GetCatalogSnapshotRequest
+	(*GetCatalogSnapshotResponse)(nil),          // 29: maxshot.provider_sync.v1.GetCatalogSnapshotResponse
+	(*StreamCatalogSnapshotChunksRequest)(nil),  // 30: maxshot.provider_sync.v1.StreamCatalogSnapshotChunksRequest
+	(*StreamCatalogSnapshotChunksResponse)(nil), // 31: maxshot.provider_sync.v1.StreamCatalogSnapshotChunksResponse
+	(*GatewayPublicKeyItem)(nil),                // 32: maxshot.provider_sync.v1.GatewayPublicKeyItem
+	(*SyncGatewayPublicKeysRequest)(nil),        // 33: maxshot.provider_sync.v1.SyncGatewayPublicKeysRequest
+	(*SyncGatewayPublicKeysResponse)(nil),       // 34: maxshot.provider_sync.v1.SyncGatewayPublicKeysResponse
+	(*EncryptedCredentialItem)(nil),             // 35: maxshot.provider_sync.v1.EncryptedCredentialItem
+	(*SyncEncryptedCredentialsRequest)(nil),     // 36: maxshot.provider_sync.v1.SyncEncryptedCredentialsRequest
+	(*SyncEncryptedCredentialsResponse)(nil),    // 37: maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse
+	(*LatencyHistogramBucket)(nil),              // 38: maxshot.provider_sync.v1.LatencyHistogramBucket
+	(*OfferingWindowMetric)(nil),                // 39: maxshot.provider_sync.v1.OfferingWindowMetric
+	(*ReportOfferingMetricsRequest)(nil),        // 40: maxshot.provider_sync.v1.ReportOfferingMetricsRequest
+	(*ReportOfferingMetricsResponse)(nil),       // 41: maxshot.provider_sync.v1.ReportOfferingMetricsResponse
+	(*ProviderStatementEntry)(nil),              // 42: maxshot.provider_sync.v1.ProviderStatementEntry
+	(*SyncProviderStatementsRequest)(nil),       // 43: maxshot.provider_sync.v1.SyncProviderStatementsRequest
+	(*SyncProviderStatementsResponse)(nil),      // 44: maxshot.provider_sync.v1.SyncProviderStatementsResponse
+	(*AttemptSettlementRecord)(nil),             // 45: maxshot.provider_sync.v1.AttemptSettlementRecord
+	(*ListOfferingAttemptRecordsRequest)(nil),   // 46: maxshot.provider_sync.v1.ListOfferingAttemptRecordsRequest
+	(*ListOfferingAttemptRecordsResponse)(nil),  // 47: maxshot.provider_sync.v1.ListOfferingAttemptRecordsResponse
+	(*v1.KeyValueAttribute)(nil),                // 48: maxshot.common.v1.KeyValueAttribute
+	(*v1.BudgetPeriodRule)(nil),                 // 49: maxshot.common.v1.BudgetPeriodRule
+	(v1.Modality)(0),                            // 50: maxshot.common.v1.Modality
+	(v1.ModelTier)(0),                           // 51: maxshot.common.v1.ModelTier
+	(*v1.CursorPageRequest)(nil),                // 52: maxshot.common.v1.CursorPageRequest
+	(*v1.CursorPageResponse)(nil),               // 53: maxshot.common.v1.CursorPageResponse
 }
 var file_maxshot_provider_sync_v1_provider_sync_proto_depIdxs = []int32{
-	4,  // 0: maxshot.provider_sync.v1.RateCard.components:type_name -> maxshot.provider_sync.v1.RateComponent
-	0,  // 1: maxshot.provider_sync.v1.ProviderRecord.route_type:type_name -> maxshot.provider_sync.v1.RouteType
-	23, // 2: maxshot.provider_sync.v1.CatalogDefinition.modality:type_name -> maxshot.common.v1.Modality
-	23, // 3: maxshot.provider_sync.v1.CustomerModelRecord.modality:type_name -> maxshot.common.v1.Modality
-	24, // 4: maxshot.provider_sync.v1.CustomerModelRecord.tier:type_name -> maxshot.common.v1.ModelTier
-	1,  // 5: maxshot.provider_sync.v1.OfferingRecord.admission_status:type_name -> maxshot.provider_sync.v1.AdmissionStatus
-	2,  // 6: maxshot.provider_sync.v1.OfferingRecord.availability_status:type_name -> maxshot.provider_sync.v1.AvailabilityStatus
-	5,  // 7: maxshot.provider_sync.v1.OfferingRecord.provider_cost_card:type_name -> maxshot.provider_sync.v1.RateCard
-	5,  // 8: maxshot.provider_sync.v1.OfferingRecord.customer_rate_card:type_name -> maxshot.provider_sync.v1.RateCard
-	3,  // 9: maxshot.provider_sync.v1.AutoPoolEntry.task_labels:type_name -> maxshot.provider_sync.v1.AutoTaskLabel
-	7,  // 10: maxshot.provider_sync.v1.CatalogSnapshot.catalogs:type_name -> maxshot.provider_sync.v1.CatalogDefinition
-	6,  // 11: maxshot.provider_sync.v1.CatalogSnapshot.providers:type_name -> maxshot.provider_sync.v1.ProviderRecord
-	8,  // 12: maxshot.provider_sync.v1.CatalogSnapshot.models:type_name -> maxshot.provider_sync.v1.CustomerModelRecord
-	9,  // 13: maxshot.provider_sync.v1.CatalogSnapshot.offerings:type_name -> maxshot.provider_sync.v1.OfferingRecord
-	10, // 14: maxshot.provider_sync.v1.CatalogSnapshot.auto_pool:type_name -> maxshot.provider_sync.v1.AutoPoolEntry
-	11, // 15: maxshot.provider_sync.v1.CatalogSnapshot.budget_policy:type_name -> maxshot.provider_sync.v1.BudgetPolicy
-	12, // 16: maxshot.provider_sync.v1.WatchCatalogSnapshotResponse.snapshot:type_name -> maxshot.provider_sync.v1.CatalogSnapshot
-	12, // 17: maxshot.provider_sync.v1.GetCatalogSnapshotResponse.snapshot:type_name -> maxshot.provider_sync.v1.CatalogSnapshot
-	17, // 18: maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse.credentials:type_name -> maxshot.provider_sync.v1.EncryptedCredentialItem
-	20, // 19: maxshot.provider_sync.v1.ReportOfferingMetricsRequest.metrics:type_name -> maxshot.provider_sync.v1.OfferingWindowMetric
-	13, // 20: maxshot.provider_sync.v1.ProviderSyncService.WatchCatalogSnapshot:input_type -> maxshot.provider_sync.v1.WatchCatalogSnapshotRequest
-	15, // 21: maxshot.provider_sync.v1.ProviderSyncService.GetCatalogSnapshot:input_type -> maxshot.provider_sync.v1.GetCatalogSnapshotRequest
-	18, // 22: maxshot.provider_sync.v1.ProviderSyncService.SyncEncryptedCredentials:input_type -> maxshot.provider_sync.v1.SyncEncryptedCredentialsRequest
-	21, // 23: maxshot.provider_sync.v1.ProviderSyncService.ReportOfferingMetrics:input_type -> maxshot.provider_sync.v1.ReportOfferingMetricsRequest
-	14, // 24: maxshot.provider_sync.v1.ProviderSyncService.WatchCatalogSnapshot:output_type -> maxshot.provider_sync.v1.WatchCatalogSnapshotResponse
-	16, // 25: maxshot.provider_sync.v1.ProviderSyncService.GetCatalogSnapshot:output_type -> maxshot.provider_sync.v1.GetCatalogSnapshotResponse
-	19, // 26: maxshot.provider_sync.v1.ProviderSyncService.SyncEncryptedCredentials:output_type -> maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse
-	22, // 27: maxshot.provider_sync.v1.ProviderSyncService.ReportOfferingMetrics:output_type -> maxshot.provider_sync.v1.ReportOfferingMetricsResponse
-	24, // [24:28] is the sub-list for method output_type
-	20, // [20:24] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	48, // 0: maxshot.provider_sync.v1.RateCondition.media_attributes:type_name -> maxshot.common.v1.KeyValueAttribute
+	7,  // 1: maxshot.provider_sync.v1.RateComponent.kind:type_name -> maxshot.provider_sync.v1.BillingComponentKind
+	8,  // 2: maxshot.provider_sync.v1.RateComponent.unit:type_name -> maxshot.provider_sync.v1.BillingUnit
+	10, // 3: maxshot.provider_sync.v1.RateComponent.condition:type_name -> maxshot.provider_sync.v1.RateCondition
+	11, // 4: maxshot.provider_sync.v1.RateCard.base_components:type_name -> maxshot.provider_sync.v1.RateComponent
+	11, // 5: maxshot.provider_sync.v1.RateCard.conditional_overrides:type_name -> maxshot.provider_sync.v1.RateComponent
+	0,  // 6: maxshot.provider_sync.v1.ProviderRecord.route_type:type_name -> maxshot.provider_sync.v1.RouteType
+	49, // 7: maxshot.provider_sync.v1.ProviderRecord.budget_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	50, // 8: maxshot.provider_sync.v1.CatalogDefinition.modality:type_name -> maxshot.common.v1.Modality
+	50, // 9: maxshot.provider_sync.v1.CustomerModelRecord.modality:type_name -> maxshot.common.v1.Modality
+	51, // 10: maxshot.provider_sync.v1.CustomerModelRecord.tier:type_name -> maxshot.common.v1.ModelTier
+	1,  // 11: maxshot.provider_sync.v1.OfferingRecord.admission_status:type_name -> maxshot.provider_sync.v1.AdmissionStatus
+	2,  // 12: maxshot.provider_sync.v1.OfferingRecord.availability_status:type_name -> maxshot.provider_sync.v1.AvailabilityStatus
+	12, // 13: maxshot.provider_sync.v1.OfferingRecord.provider_cost_card:type_name -> maxshot.provider_sync.v1.RateCard
+	12, // 14: maxshot.provider_sync.v1.OfferingRecord.customer_rate_card:type_name -> maxshot.provider_sync.v1.RateCard
+	16, // 15: maxshot.provider_sync.v1.OfferingRecord.observed_performance:type_name -> maxshot.provider_sync.v1.ObservedPerformanceSummary
+	50, // 16: maxshot.provider_sync.v1.TierGroupRecord.modality:type_name -> maxshot.common.v1.Modality
+	51, // 17: maxshot.provider_sync.v1.TierGroupRecord.target_tier:type_name -> maxshot.common.v1.ModelTier
+	19, // 18: maxshot.provider_sync.v1.CurationConfig.chat_models:type_name -> maxshot.provider_sync.v1.CuratedModelItem
+	19, // 19: maxshot.provider_sync.v1.CurationConfig.studio_image_models:type_name -> maxshot.provider_sync.v1.CuratedModelItem
+	19, // 20: maxshot.provider_sync.v1.CurationConfig.studio_video_models:type_name -> maxshot.provider_sync.v1.CuratedModelItem
+	3,  // 21: maxshot.provider_sync.v1.AutoPoolEntry.task_labels:type_name -> maxshot.provider_sync.v1.AutoTaskLabel
+	49, // 22: maxshot.provider_sync.v1.BudgetPolicy.platform_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	49, // 23: maxshot.provider_sync.v1.BudgetPolicy.default_supplier_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	49, // 24: maxshot.provider_sync.v1.BudgetPolicy.business_total_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	49, // 25: maxshot.provider_sync.v1.BudgetPolicy.business_chat_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	49, // 26: maxshot.provider_sync.v1.BudgetPolicy.business_studio_periods:type_name -> maxshot.common.v1.BudgetPeriodRule
+	14, // 27: maxshot.provider_sync.v1.CatalogSnapshot.catalogs:type_name -> maxshot.provider_sync.v1.CatalogDefinition
+	13, // 28: maxshot.provider_sync.v1.CatalogSnapshot.providers:type_name -> maxshot.provider_sync.v1.ProviderRecord
+	15, // 29: maxshot.provider_sync.v1.CatalogSnapshot.models:type_name -> maxshot.provider_sync.v1.CustomerModelRecord
+	17, // 30: maxshot.provider_sync.v1.CatalogSnapshot.offerings:type_name -> maxshot.provider_sync.v1.OfferingRecord
+	18, // 31: maxshot.provider_sync.v1.CatalogSnapshot.tier_groups:type_name -> maxshot.provider_sync.v1.TierGroupRecord
+	20, // 32: maxshot.provider_sync.v1.CatalogSnapshot.curation:type_name -> maxshot.provider_sync.v1.CurationConfig
+	21, // 33: maxshot.provider_sync.v1.CatalogSnapshot.auto_pool:type_name -> maxshot.provider_sync.v1.AutoPoolEntry
+	22, // 34: maxshot.provider_sync.v1.CatalogSnapshot.budget_policy:type_name -> maxshot.provider_sync.v1.BudgetPolicy
+	4,  // 35: maxshot.provider_sync.v1.WatchSyncEventsResponse.event_kind:type_name -> maxshot.provider_sync.v1.SyncEventKind
+	23, // 36: maxshot.provider_sync.v1.GetCatalogSnapshotResponse.snapshot:type_name -> maxshot.provider_sync.v1.CatalogSnapshot
+	6,  // 37: maxshot.provider_sync.v1.GatewayPublicKeyItem.algorithm:type_name -> maxshot.provider_sync.v1.PublicKeyAlgorithm
+	32, // 38: maxshot.provider_sync.v1.SyncGatewayPublicKeysRequest.keys:type_name -> maxshot.provider_sync.v1.GatewayPublicKeyItem
+	5,  // 39: maxshot.provider_sync.v1.EncryptedCredentialItem.status:type_name -> maxshot.provider_sync.v1.CredentialStatus
+	35, // 40: maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse.credentials:type_name -> maxshot.provider_sync.v1.EncryptedCredentialItem
+	38, // 41: maxshot.provider_sync.v1.OfferingWindowMetric.latency_histogram:type_name -> maxshot.provider_sync.v1.LatencyHistogramBucket
+	39, // 42: maxshot.provider_sync.v1.ReportOfferingMetricsRequest.metrics:type_name -> maxshot.provider_sync.v1.OfferingWindowMetric
+	9,  // 43: maxshot.provider_sync.v1.ProviderStatementEntry.kind:type_name -> maxshot.provider_sync.v1.StatementEntryKind
+	42, // 44: maxshot.provider_sync.v1.SyncProviderStatementsRequest.entries:type_name -> maxshot.provider_sync.v1.ProviderStatementEntry
+	48, // 45: maxshot.provider_sync.v1.AttemptSettlementRecord.verified_usage_units:type_name -> maxshot.common.v1.KeyValueAttribute
+	52, // 46: maxshot.provider_sync.v1.ListOfferingAttemptRecordsRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	45, // 47: maxshot.provider_sync.v1.ListOfferingAttemptRecordsResponse.records:type_name -> maxshot.provider_sync.v1.AttemptSettlementRecord
+	53, // 48: maxshot.provider_sync.v1.ListOfferingAttemptRecordsResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	24, // 49: maxshot.provider_sync.v1.ProviderSyncService.WatchSyncEvents:input_type -> maxshot.provider_sync.v1.WatchSyncEventsRequest
+	26, // 50: maxshot.provider_sync.v1.ProviderSyncService.ReportNodeSyncState:input_type -> maxshot.provider_sync.v1.ReportNodeSyncStateRequest
+	28, // 51: maxshot.provider_sync.v1.ProviderSyncService.GetCatalogSnapshot:input_type -> maxshot.provider_sync.v1.GetCatalogSnapshotRequest
+	30, // 52: maxshot.provider_sync.v1.ProviderSyncService.StreamCatalogSnapshotChunks:input_type -> maxshot.provider_sync.v1.StreamCatalogSnapshotChunksRequest
+	33, // 53: maxshot.provider_sync.v1.ProviderSyncService.SyncGatewayPublicKeys:input_type -> maxshot.provider_sync.v1.SyncGatewayPublicKeysRequest
+	36, // 54: maxshot.provider_sync.v1.ProviderSyncService.SyncEncryptedCredentials:input_type -> maxshot.provider_sync.v1.SyncEncryptedCredentialsRequest
+	40, // 55: maxshot.provider_sync.v1.ProviderSyncService.ReportOfferingMetrics:input_type -> maxshot.provider_sync.v1.ReportOfferingMetricsRequest
+	43, // 56: maxshot.provider_sync.v1.ProviderSyncService.SyncProviderStatements:input_type -> maxshot.provider_sync.v1.SyncProviderStatementsRequest
+	46, // 57: maxshot.provider_sync.v1.GatewayReconciliationService.ListOfferingAttemptRecords:input_type -> maxshot.provider_sync.v1.ListOfferingAttemptRecordsRequest
+	25, // 58: maxshot.provider_sync.v1.ProviderSyncService.WatchSyncEvents:output_type -> maxshot.provider_sync.v1.WatchSyncEventsResponse
+	27, // 59: maxshot.provider_sync.v1.ProviderSyncService.ReportNodeSyncState:output_type -> maxshot.provider_sync.v1.ReportNodeSyncStateResponse
+	29, // 60: maxshot.provider_sync.v1.ProviderSyncService.GetCatalogSnapshot:output_type -> maxshot.provider_sync.v1.GetCatalogSnapshotResponse
+	31, // 61: maxshot.provider_sync.v1.ProviderSyncService.StreamCatalogSnapshotChunks:output_type -> maxshot.provider_sync.v1.StreamCatalogSnapshotChunksResponse
+	34, // 62: maxshot.provider_sync.v1.ProviderSyncService.SyncGatewayPublicKeys:output_type -> maxshot.provider_sync.v1.SyncGatewayPublicKeysResponse
+	37, // 63: maxshot.provider_sync.v1.ProviderSyncService.SyncEncryptedCredentials:output_type -> maxshot.provider_sync.v1.SyncEncryptedCredentialsResponse
+	41, // 64: maxshot.provider_sync.v1.ProviderSyncService.ReportOfferingMetrics:output_type -> maxshot.provider_sync.v1.ReportOfferingMetricsResponse
+	44, // 65: maxshot.provider_sync.v1.ProviderSyncService.SyncProviderStatements:output_type -> maxshot.provider_sync.v1.SyncProviderStatementsResponse
+	47, // 66: maxshot.provider_sync.v1.GatewayReconciliationService.ListOfferingAttemptRecords:output_type -> maxshot.provider_sync.v1.ListOfferingAttemptRecordsResponse
+	58, // [58:67] is the sub-list for method output_type
+	49, // [49:58] is the sub-list for method input_type
+	49, // [49:49] is the sub-list for extension type_name
+	49, // [49:49] is the sub-list for extension extendee
+	0,  // [0:49] is the sub-list for field type_name
 }
 
 func init() { file_maxshot_provider_sync_v1_provider_sync_proto_init() }
@@ -1900,10 +4347,10 @@ func file_maxshot_provider_sync_v1_provider_sync_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc), len(file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   19,
+			NumEnums:      10,
+			NumMessages:   38,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_maxshot_provider_sync_v1_provider_sync_proto_goTypes,
 		DependencyIndexes: file_maxshot_provider_sync_v1_provider_sync_proto_depIdxs,

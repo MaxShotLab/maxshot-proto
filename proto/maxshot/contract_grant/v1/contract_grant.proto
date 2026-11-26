@@ -6,20 +6,89 @@ import "maxshot/common/v1/types.proto";
 
 option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/contract_grant/v1;contractgrantv1";
 
-// WalletEligibilityService synchronizes 1:1 verified SIWE/ERC-1271 wallet bindings and
-// Funded Term acceptance timestamps between Gateway Backend and Contract Backend.
-service WalletEligibilityService {
-  // PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules.
+// ContractBackendService is hosted by Contract Backend and called by Gateway Backend
+// over WireGuard + TLS + HMAC. Services are cleanly split by hosting side for strict method ACLs.
+service ContractBackendService {
+  // PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend.
+  rpc PushFundedTerms(PushFundedTermsRequest) returns (PushFundedTermsResponse);
+
+  // PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
   rpc PushWalletEligibility(PushWalletEligibilityRequest) returns (PushWalletEligibilityResponse);
 
-  // PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor.
-  rpc PullWalletEligibilityUpdates(PullWalletEligibilityUpdatesRequest) returns (PullWalletEligibilityUpdatesResponse);
+  // GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+  rpc GetContractOperationalStatus(GetContractOperationalStatusRequest) returns (GetContractOperationalStatusResponse);
 }
 
-// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend at each 7-day boundary.
+// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend
+// over WireGuard + TLS + HMAC for startup/reconnect state catch-up and 7-day boundary Credit grants.
 service AitCreditGrantService {
-  // IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25).
+  // ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect.
+  rpc ListFundedTerms(ListFundedTermsRequest) returns (ListFundedTermsResponse);
+
+  // PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
+  rpc PullWalletEligibilityUpdates(PullWalletEligibilityUpdatesRequest) returns (PullWalletEligibilityUpdatesResponse);
+
+  // IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+  // Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+  // and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
   rpc IssueAitCreditGrants(IssueAitCreditGrantsRequest) returns (IssueAitCreditGrantsResponse);
+}
+
+enum FundedTermStatus {
+  FUNDED_TERM_STATUS_UNSPECIFIED = 0;
+  FUNDED_TERM_STATUS_UPCOMING = 1;
+  FUNDED_TERM_STATUS_ACTIVE = 2;
+  FUNDED_TERM_STATUS_ENDED = 3;
+  FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH = 4; // TOK-R30: blocks uncovered future grants
+}
+
+enum GrantItemStatus {
+  GRANT_ITEM_STATUS_UNSPECIFIED = 0;
+  GRANT_ITEM_STATUS_CREDITED = 1;
+  GRANT_ITEM_STATUS_ALREADY_CREDITED = 2; // idempotent replay
+  GRANT_ITEM_STATUS_REJECTED_UNLINKED_WALLET = 3;
+  GRANT_ITEM_STATUS_REJECTED_TERMS_NOT_ACCEPTED = 4;
+  GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH = 5;
+  GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6;
+  GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7;
+  GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH = 8;
+}
+
+// FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
+// and replicated to Contract Backend. The rational N/D rate converts USD face value to integer Credits
+// at grant issuance time only; spending uses the unified Gateway ledger Credit unit.
+message FundedTermConfig {
+  string term_id = 1;
+  string program_id = 2;
+  string funding_reservation_id = 3;
+  string terms_version = 4;
+  int64 start_unix_sec = 5;
+  int64 end_unix_sec = 6;
+  int64 annual_base_usd_num = 7;     // decided: 12 (TD-77)
+  int64 annual_base_usd_den = 8;     // decided: 1
+  int64 credits_per_usd_num = 9;     // decided: 1000000 (TD-53), issuance conversion only
+  int64 credits_per_usd_den = 10;    // decided: 1
+  repeated string allowed_catalog_ids = 11;
+  int64 max_total_grant_credits = 12;
+  FundedTermStatus status = 13;
+  int64 updated_at_unix_sec = 14;
+}
+
+message PushFundedTermsRequest {
+  string batch_id = 1;
+  repeated FundedTermConfig terms = 2;
+}
+
+message PushFundedTermsResponse {
+  bool accepted = 1;
+}
+
+message ListFundedTermsRequest {
+  bool active_or_upcoming_only = 1;
+}
+
+message ListFundedTermsResponse {
+  repeated FundedTermConfig terms = 1;
 }
 
 message TermAcceptance {
@@ -31,10 +100,13 @@ message TermAcceptance {
 message WalletEligibilityRecord {
   string account_id = 1;
   string wallet_address = 2; // normalized lowercase 0x-prefixed Ethereum address
-  int64 linked_at_unix_sec = 3;
-  bool excluded_treasury_or_team = 4;
-  repeated TermAcceptance term_acceptances = 5;
-  int64 updated_sequence = 6;
+  uint64 chain_id = 3;       // 1 (Ethereum mainnet)
+  int64 linked_at_unix_sec = 4;
+  string siwe_proof_ref = 5; // audit proof reference for ADM-R21
+  bool is_contract_wallet_erc1271 = 6;
+  bool excluded_treasury_or_team = 7; // TOK-R36
+  repeated TermAcceptance term_acceptances = 8;
+  int64 updated_sequence = 9;
 }
 
 message PushWalletEligibilityRequest {
@@ -56,15 +128,27 @@ message PullWalletEligibilityUpdatesResponse {
   maxshot.common.v1.CursorPageResponse page = 2;
 }
 
-enum GrantItemStatus {
-  GRANT_ITEM_STATUS_UNSPECIFIED = 0;
-  GRANT_ITEM_STATUS_CREDITED = 1;
-  GRANT_ITEM_STATUS_ALREADY_CREDITED = 2; // idempotent replay
-  GRANT_ITEM_STATUS_REJECTED_UNLINKED_WALLET = 3;
-  GRANT_ITEM_STATUS_REJECTED_TERMS_NOT_ACCEPTED = 4;
-  GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH = 5;
-  GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6;
-  GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7;
+message DirectedBridgeRoutePause {
+  uint32 src_chain_eid = 1;
+  uint32 dst_chain_eid = 2;
+  bool paused = 3;
+}
+
+message GetContractOperationalStatusRequest {}
+
+// GetContractOperationalStatusResponse feeds Gateway Admin read-only pause & finality monitoring (ADM-R22, TOK-R05).
+message GetContractOperationalStatusResponse {
+  bool mint_paused = 1;
+  bool burn_paused = 2;
+  bool withdraw_paused = 3;
+  bool position_pause_all = 4;
+  bool max_bridge_global_paused = 5;
+  repeated DirectedBridgeRoutePause directed_bridge_pauses = 6;
+  uint64 ethereum_head_block = 7;
+  uint64 ethereum_finalized_block = 8;
+  int64 ethereum_finalized_timestamp_unix_sec = 9;
+  string active_term_id = 10;
+  int64 next_grant_boundary_unix_sec = 11;
 }
 
 message AitGrantItem {
@@ -73,12 +157,17 @@ message AitGrantItem {
   int32 boundary_index = 3;
   string account_id = 4;
   string wallet_address = 5;
-  // Exact 256-bit integer string: eligible staked AIT wei * eligible seconds from term start to boundary t.
+  // Exact 256-bit integer decimal string: eligible staked AIT wei * eligible seconds from term start to boundary t.
   string cumulative_eligible_ait_wei_seconds_dec = 6;
   int64 previously_granted_credits = 7;
   int64 grant_credits = 8;
   uint64 finalized_block_number = 9;
   int64 boundary_timestamp_unix_sec = 10;
+  string program_id = 11;
+  string funding_reservation_id = 12;
+  bool is_final_short_boundary = 13;
+  int64 cumulative_entitlement_credits = 14;
+  string finalized_block_hash = 15;
 }
 
 message IssueAitCreditGrantsRequest {
@@ -92,6 +181,9 @@ message AitGrantItemResult {
   string grant_id = 1;
   GrantItemStatus status = 2;
   string detail = 3;
+  int64 credited_amount = 4;
+  int64 issued_at_unix_sec = 5;
+  int64 expires_at_unix_sec = 6; // issued_at_unix_sec + 7 days (TOK-R24)
 }
 
 message IssueAitCreditGrantsResponse {

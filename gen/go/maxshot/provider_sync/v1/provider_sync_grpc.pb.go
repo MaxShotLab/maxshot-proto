@@ -19,27 +19,40 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProviderSyncService_WatchCatalogSnapshot_FullMethodName     = "/maxshot.provider_sync.v1.ProviderSyncService/WatchCatalogSnapshot"
-	ProviderSyncService_GetCatalogSnapshot_FullMethodName       = "/maxshot.provider_sync.v1.ProviderSyncService/GetCatalogSnapshot"
-	ProviderSyncService_SyncEncryptedCredentials_FullMethodName = "/maxshot.provider_sync.v1.ProviderSyncService/SyncEncryptedCredentials"
-	ProviderSyncService_ReportOfferingMetrics_FullMethodName    = "/maxshot.provider_sync.v1.ProviderSyncService/ReportOfferingMetrics"
+	ProviderSyncService_WatchSyncEvents_FullMethodName             = "/maxshot.provider_sync.v1.ProviderSyncService/WatchSyncEvents"
+	ProviderSyncService_ReportNodeSyncState_FullMethodName         = "/maxshot.provider_sync.v1.ProviderSyncService/ReportNodeSyncState"
+	ProviderSyncService_GetCatalogSnapshot_FullMethodName          = "/maxshot.provider_sync.v1.ProviderSyncService/GetCatalogSnapshot"
+	ProviderSyncService_StreamCatalogSnapshotChunks_FullMethodName = "/maxshot.provider_sync.v1.ProviderSyncService/StreamCatalogSnapshotChunks"
+	ProviderSyncService_SyncGatewayPublicKeys_FullMethodName       = "/maxshot.provider_sync.v1.ProviderSyncService/SyncGatewayPublicKeys"
+	ProviderSyncService_SyncEncryptedCredentials_FullMethodName    = "/maxshot.provider_sync.v1.ProviderSyncService/SyncEncryptedCredentials"
+	ProviderSyncService_ReportOfferingMetrics_FullMethodName       = "/maxshot.provider_sync.v1.ProviderSyncService/ReportOfferingMetrics"
+	ProviderSyncService_SyncProviderStatements_FullMethodName      = "/maxshot.provider_sync.v1.ProviderSyncService/SyncProviderStatements"
 )
 
 // ProviderSyncServiceClient is the client API for ProviderSyncService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// ProviderSyncService defines cross-repo communication between Provider Backend and Gateway Backend
-// over the WireGuard overlay network using gRPC + TLS + HMAC.
+// ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
+// (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+// WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
 type ProviderSyncServiceClient interface {
-	// WatchCatalogSnapshot streams immutable catalog snapshot updates from Provider Backend to Gateway.
-	WatchCatalogSnapshot(ctx context.Context, in *WatchCatalogSnapshotRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchCatalogSnapshotResponse], error)
-	// GetCatalogSnapshot fetches a specific or latest immutable catalog snapshot (startup/reconciliation fallback).
+	// WatchSyncEvents streams lightweight catalog/credential version notifications and heartbeats.
+	WatchSyncEvents(ctx context.Context, in *WatchSyncEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchSyncEventsResponse], error)
+	// ReportNodeSyncState reports each Gateway node's currently applied catalog and credential revisions for ADM-R07 freshness monitoring.
+	ReportNodeSyncState(ctx context.Context, in *ReportNodeSyncStateRequest, opts ...grpc.CallOption) (*ReportNodeSyncStateResponse, error)
+	// GetCatalogSnapshot fetches a specific or latest immutable catalog snapshot.
 	GetCatalogSnapshot(ctx context.Context, in *GetCatalogSnapshotRequest, opts ...grpc.CallOption) (*GetCatalogSnapshotResponse, error)
-	// SyncEncryptedCredentials fetches upstream provider credentials asymmetrically encrypted with Gateway's public key.
+	// StreamCatalogSnapshotChunks streams a serialized CatalogSnapshot in bounded chunks when snapshot size exceeds 4 MiB.
+	StreamCatalogSnapshotChunks(ctx context.Context, in *StreamCatalogSnapshotChunksRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamCatalogSnapshotChunksResponse], error)
+	// SyncGatewayPublicKeys registers Gateway active/retiring public keys used by Provider Backend for upstream secret envelope encryption.
+	SyncGatewayPublicKeys(ctx context.Context, in *SyncGatewayPublicKeysRequest, opts ...grpc.CallOption) (*SyncGatewayPublicKeysResponse, error)
+	// SyncEncryptedCredentials pulls active and revoked upstream credentials encrypted with Gateway's public key.
 	SyncEncryptedCredentials(ctx context.Context, in *SyncEncryptedCredentialsRequest, opts ...grpc.CallOption) (*SyncEncryptedCredentialsResponse, error)
-	// ReportOfferingMetrics pushes aggregated 1-5m window Uptime, p50/p95 latency, error counts, and payable totals from Gateway to Provider Backend.
+	// ReportOfferingMetrics pushes 1-5m aggregated Uptime, latency histograms, error classes, metering completeness, and payable totals.
 	ReportOfferingMetrics(ctx context.Context, in *ReportOfferingMetricsRequest, opts ...grpc.CallOption) (*ReportOfferingMetricsResponse, error)
+	// SyncProviderStatements pushes billing-period payable statements, invoice corrections, and dispute records from Gateway Finance to Provider Backend.
+	SyncProviderStatements(ctx context.Context, in *SyncProviderStatementsRequest, opts ...grpc.CallOption) (*SyncProviderStatementsResponse, error)
 }
 
 type providerSyncServiceClient struct {
@@ -50,13 +63,13 @@ func NewProviderSyncServiceClient(cc grpc.ClientConnInterface) ProviderSyncServi
 	return &providerSyncServiceClient{cc}
 }
 
-func (c *providerSyncServiceClient) WatchCatalogSnapshot(ctx context.Context, in *WatchCatalogSnapshotRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchCatalogSnapshotResponse], error) {
+func (c *providerSyncServiceClient) WatchSyncEvents(ctx context.Context, in *WatchSyncEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[WatchSyncEventsResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &ProviderSyncService_ServiceDesc.Streams[0], ProviderSyncService_WatchCatalogSnapshot_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &ProviderSyncService_ServiceDesc.Streams[0], ProviderSyncService_WatchSyncEvents_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[WatchCatalogSnapshotRequest, WatchCatalogSnapshotResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[WatchSyncEventsRequest, WatchSyncEventsResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -67,12 +80,51 @@ func (c *providerSyncServiceClient) WatchCatalogSnapshot(ctx context.Context, in
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProviderSyncService_WatchCatalogSnapshotClient = grpc.ServerStreamingClient[WatchCatalogSnapshotResponse]
+type ProviderSyncService_WatchSyncEventsClient = grpc.ServerStreamingClient[WatchSyncEventsResponse]
+
+func (c *providerSyncServiceClient) ReportNodeSyncState(ctx context.Context, in *ReportNodeSyncStateRequest, opts ...grpc.CallOption) (*ReportNodeSyncStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReportNodeSyncStateResponse)
+	err := c.cc.Invoke(ctx, ProviderSyncService_ReportNodeSyncState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *providerSyncServiceClient) GetCatalogSnapshot(ctx context.Context, in *GetCatalogSnapshotRequest, opts ...grpc.CallOption) (*GetCatalogSnapshotResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetCatalogSnapshotResponse)
 	err := c.cc.Invoke(ctx, ProviderSyncService_GetCatalogSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *providerSyncServiceClient) StreamCatalogSnapshotChunks(ctx context.Context, in *StreamCatalogSnapshotChunksRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StreamCatalogSnapshotChunksResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ProviderSyncService_ServiceDesc.Streams[1], ProviderSyncService_StreamCatalogSnapshotChunks_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamCatalogSnapshotChunksRequest, StreamCatalogSnapshotChunksResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProviderSyncService_StreamCatalogSnapshotChunksClient = grpc.ServerStreamingClient[StreamCatalogSnapshotChunksResponse]
+
+func (c *providerSyncServiceClient) SyncGatewayPublicKeys(ctx context.Context, in *SyncGatewayPublicKeysRequest, opts ...grpc.CallOption) (*SyncGatewayPublicKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncGatewayPublicKeysResponse)
+	err := c.cc.Invoke(ctx, ProviderSyncService_SyncGatewayPublicKeys_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,21 +151,40 @@ func (c *providerSyncServiceClient) ReportOfferingMetrics(ctx context.Context, i
 	return out, nil
 }
 
+func (c *providerSyncServiceClient) SyncProviderStatements(ctx context.Context, in *SyncProviderStatementsRequest, opts ...grpc.CallOption) (*SyncProviderStatementsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncProviderStatementsResponse)
+	err := c.cc.Invoke(ctx, ProviderSyncService_SyncProviderStatements_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderSyncServiceServer is the server API for ProviderSyncService service.
 // All implementations must embed UnimplementedProviderSyncServiceServer
 // for forward compatibility.
 //
-// ProviderSyncService defines cross-repo communication between Provider Backend and Gateway Backend
-// over the WireGuard overlay network using gRPC + TLS + HMAC.
+// ProviderSyncService is hosted by Provider Backend and called by Gateway Backend
+// (Go gateway-dataplane instances and TypeScript billing-account-service) over WireGuard + TLS + HMAC.
+// WatchSyncEvents streams lightweight version notifications only; snapshots and credentials are pulled idempotently by version.
 type ProviderSyncServiceServer interface {
-	// WatchCatalogSnapshot streams immutable catalog snapshot updates from Provider Backend to Gateway.
-	WatchCatalogSnapshot(*WatchCatalogSnapshotRequest, grpc.ServerStreamingServer[WatchCatalogSnapshotResponse]) error
-	// GetCatalogSnapshot fetches a specific or latest immutable catalog snapshot (startup/reconciliation fallback).
+	// WatchSyncEvents streams lightweight catalog/credential version notifications and heartbeats.
+	WatchSyncEvents(*WatchSyncEventsRequest, grpc.ServerStreamingServer[WatchSyncEventsResponse]) error
+	// ReportNodeSyncState reports each Gateway node's currently applied catalog and credential revisions for ADM-R07 freshness monitoring.
+	ReportNodeSyncState(context.Context, *ReportNodeSyncStateRequest) (*ReportNodeSyncStateResponse, error)
+	// GetCatalogSnapshot fetches a specific or latest immutable catalog snapshot.
 	GetCatalogSnapshot(context.Context, *GetCatalogSnapshotRequest) (*GetCatalogSnapshotResponse, error)
-	// SyncEncryptedCredentials fetches upstream provider credentials asymmetrically encrypted with Gateway's public key.
+	// StreamCatalogSnapshotChunks streams a serialized CatalogSnapshot in bounded chunks when snapshot size exceeds 4 MiB.
+	StreamCatalogSnapshotChunks(*StreamCatalogSnapshotChunksRequest, grpc.ServerStreamingServer[StreamCatalogSnapshotChunksResponse]) error
+	// SyncGatewayPublicKeys registers Gateway active/retiring public keys used by Provider Backend for upstream secret envelope encryption.
+	SyncGatewayPublicKeys(context.Context, *SyncGatewayPublicKeysRequest) (*SyncGatewayPublicKeysResponse, error)
+	// SyncEncryptedCredentials pulls active and revoked upstream credentials encrypted with Gateway's public key.
 	SyncEncryptedCredentials(context.Context, *SyncEncryptedCredentialsRequest) (*SyncEncryptedCredentialsResponse, error)
-	// ReportOfferingMetrics pushes aggregated 1-5m window Uptime, p50/p95 latency, error counts, and payable totals from Gateway to Provider Backend.
+	// ReportOfferingMetrics pushes 1-5m aggregated Uptime, latency histograms, error classes, metering completeness, and payable totals.
 	ReportOfferingMetrics(context.Context, *ReportOfferingMetricsRequest) (*ReportOfferingMetricsResponse, error)
+	// SyncProviderStatements pushes billing-period payable statements, invoice corrections, and dispute records from Gateway Finance to Provider Backend.
+	SyncProviderStatements(context.Context, *SyncProviderStatementsRequest) (*SyncProviderStatementsResponse, error)
 	mustEmbedUnimplementedProviderSyncServiceServer()
 }
 
@@ -124,17 +195,29 @@ type ProviderSyncServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedProviderSyncServiceServer struct{}
 
-func (UnimplementedProviderSyncServiceServer) WatchCatalogSnapshot(*WatchCatalogSnapshotRequest, grpc.ServerStreamingServer[WatchCatalogSnapshotResponse]) error {
-	return status.Error(codes.Unimplemented, "method WatchCatalogSnapshot not implemented")
+func (UnimplementedProviderSyncServiceServer) WatchSyncEvents(*WatchSyncEventsRequest, grpc.ServerStreamingServer[WatchSyncEventsResponse]) error {
+	return status.Error(codes.Unimplemented, "method WatchSyncEvents not implemented")
+}
+func (UnimplementedProviderSyncServiceServer) ReportNodeSyncState(context.Context, *ReportNodeSyncStateRequest) (*ReportNodeSyncStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReportNodeSyncState not implemented")
 }
 func (UnimplementedProviderSyncServiceServer) GetCatalogSnapshot(context.Context, *GetCatalogSnapshotRequest) (*GetCatalogSnapshotResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCatalogSnapshot not implemented")
+}
+func (UnimplementedProviderSyncServiceServer) StreamCatalogSnapshotChunks(*StreamCatalogSnapshotChunksRequest, grpc.ServerStreamingServer[StreamCatalogSnapshotChunksResponse]) error {
+	return status.Error(codes.Unimplemented, "method StreamCatalogSnapshotChunks not implemented")
+}
+func (UnimplementedProviderSyncServiceServer) SyncGatewayPublicKeys(context.Context, *SyncGatewayPublicKeysRequest) (*SyncGatewayPublicKeysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncGatewayPublicKeys not implemented")
 }
 func (UnimplementedProviderSyncServiceServer) SyncEncryptedCredentials(context.Context, *SyncEncryptedCredentialsRequest) (*SyncEncryptedCredentialsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncEncryptedCredentials not implemented")
 }
 func (UnimplementedProviderSyncServiceServer) ReportOfferingMetrics(context.Context, *ReportOfferingMetricsRequest) (*ReportOfferingMetricsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReportOfferingMetrics not implemented")
+}
+func (UnimplementedProviderSyncServiceServer) SyncProviderStatements(context.Context, *SyncProviderStatementsRequest) (*SyncProviderStatementsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SyncProviderStatements not implemented")
 }
 func (UnimplementedProviderSyncServiceServer) mustEmbedUnimplementedProviderSyncServiceServer() {}
 func (UnimplementedProviderSyncServiceServer) testEmbeddedByValue()                             {}
@@ -157,16 +240,34 @@ func RegisterProviderSyncServiceServer(s grpc.ServiceRegistrar, srv ProviderSync
 	s.RegisterService(&ProviderSyncService_ServiceDesc, srv)
 }
 
-func _ProviderSyncService_WatchCatalogSnapshot_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(WatchCatalogSnapshotRequest)
+func _ProviderSyncService_WatchSyncEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchSyncEventsRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ProviderSyncServiceServer).WatchCatalogSnapshot(m, &grpc.GenericServerStream[WatchCatalogSnapshotRequest, WatchCatalogSnapshotResponse]{ServerStream: stream})
+	return srv.(ProviderSyncServiceServer).WatchSyncEvents(m, &grpc.GenericServerStream[WatchSyncEventsRequest, WatchSyncEventsResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ProviderSyncService_WatchCatalogSnapshotServer = grpc.ServerStreamingServer[WatchCatalogSnapshotResponse]
+type ProviderSyncService_WatchSyncEventsServer = grpc.ServerStreamingServer[WatchSyncEventsResponse]
+
+func _ProviderSyncService_ReportNodeSyncState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReportNodeSyncStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderSyncServiceServer).ReportNodeSyncState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProviderSyncService_ReportNodeSyncState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderSyncServiceServer).ReportNodeSyncState(ctx, req.(*ReportNodeSyncStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _ProviderSyncService_GetCatalogSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetCatalogSnapshotRequest)
@@ -182,6 +283,35 @@ func _ProviderSyncService_GetCatalogSnapshot_Handler(srv interface{}, ctx contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProviderSyncServiceServer).GetCatalogSnapshot(ctx, req.(*GetCatalogSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProviderSyncService_StreamCatalogSnapshotChunks_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamCatalogSnapshotChunksRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ProviderSyncServiceServer).StreamCatalogSnapshotChunks(m, &grpc.GenericServerStream[StreamCatalogSnapshotChunksRequest, StreamCatalogSnapshotChunksResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ProviderSyncService_StreamCatalogSnapshotChunksServer = grpc.ServerStreamingServer[StreamCatalogSnapshotChunksResponse]
+
+func _ProviderSyncService_SyncGatewayPublicKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncGatewayPublicKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderSyncServiceServer).SyncGatewayPublicKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProviderSyncService_SyncGatewayPublicKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderSyncServiceServer).SyncGatewayPublicKeys(ctx, req.(*SyncGatewayPublicKeysRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -222,6 +352,24 @@ func _ProviderSyncService_ReportOfferingMetrics_Handler(srv interface{}, ctx con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProviderSyncService_SyncProviderStatements_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncProviderStatementsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderSyncServiceServer).SyncProviderStatements(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProviderSyncService_SyncProviderStatements_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderSyncServiceServer).SyncProviderStatements(ctx, req.(*SyncProviderStatementsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProviderSyncService_ServiceDesc is the grpc.ServiceDesc for ProviderSyncService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -230,8 +378,16 @@ var ProviderSyncService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ProviderSyncServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "ReportNodeSyncState",
+			Handler:    _ProviderSyncService_ReportNodeSyncState_Handler,
+		},
+		{
 			MethodName: "GetCatalogSnapshot",
 			Handler:    _ProviderSyncService_GetCatalogSnapshot_Handler,
+		},
+		{
+			MethodName: "SyncGatewayPublicKeys",
+			Handler:    _ProviderSyncService_SyncGatewayPublicKeys_Handler,
 		},
 		{
 			MethodName: "SyncEncryptedCredentials",
@@ -241,13 +397,133 @@ var ProviderSyncService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "ReportOfferingMetrics",
 			Handler:    _ProviderSyncService_ReportOfferingMetrics_Handler,
 		},
+		{
+			MethodName: "SyncProviderStatements",
+			Handler:    _ProviderSyncService_SyncProviderStatements_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "WatchCatalogSnapshot",
-			Handler:       _ProviderSyncService_WatchCatalogSnapshot_Handler,
+			StreamName:    "WatchSyncEvents",
+			Handler:       _ProviderSyncService_WatchSyncEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamCatalogSnapshotChunks",
+			Handler:       _ProviderSyncService_StreamCatalogSnapshotChunks_Handler,
 			ServerStreams: true,
 		},
 	},
+	Metadata: "maxshot/provider_sync/v1/provider_sync.proto",
+}
+
+const (
+	GatewayReconciliationService_ListOfferingAttemptRecords_FullMethodName = "/maxshot.provider_sync.v1.GatewayReconciliationService/ListOfferingAttemptRecords"
+)
+
+// GatewayReconciliationServiceClient is the client API for GatewayReconciliationService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
+// during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+type GatewayReconciliationServiceClient interface {
+	// ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID.
+	ListOfferingAttemptRecords(ctx context.Context, in *ListOfferingAttemptRecordsRequest, opts ...grpc.CallOption) (*ListOfferingAttemptRecordsResponse, error)
+}
+
+type gatewayReconciliationServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewGatewayReconciliationServiceClient(cc grpc.ClientConnInterface) GatewayReconciliationServiceClient {
+	return &gatewayReconciliationServiceClient{cc}
+}
+
+func (c *gatewayReconciliationServiceClient) ListOfferingAttemptRecords(ctx context.Context, in *ListOfferingAttemptRecordsRequest, opts ...grpc.CallOption) (*ListOfferingAttemptRecordsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOfferingAttemptRecordsResponse)
+	err := c.cc.Invoke(ctx, GatewayReconciliationService_ListOfferingAttemptRecords_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GatewayReconciliationServiceServer is the server API for GatewayReconciliationService service.
+// All implementations must embed UnimplementedGatewayReconciliationServiceServer
+// for forward compatibility.
+//
+// GatewayReconciliationService is hosted by Gateway Billing and called on demand by Provider Backend
+// during invoice verification or dispute investigation (PRV-R14 / ADM-R17) without duplicating raw attempt streams.
+type GatewayReconciliationServiceServer interface {
+	// ListOfferingAttemptRecords queries content-free, authoritative attempt settlement records by window, offering, or request ID.
+	ListOfferingAttemptRecords(context.Context, *ListOfferingAttemptRecordsRequest) (*ListOfferingAttemptRecordsResponse, error)
+	mustEmbedUnimplementedGatewayReconciliationServiceServer()
+}
+
+// UnimplementedGatewayReconciliationServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedGatewayReconciliationServiceServer struct{}
+
+func (UnimplementedGatewayReconciliationServiceServer) ListOfferingAttemptRecords(context.Context, *ListOfferingAttemptRecordsRequest) (*ListOfferingAttemptRecordsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListOfferingAttemptRecords not implemented")
+}
+func (UnimplementedGatewayReconciliationServiceServer) mustEmbedUnimplementedGatewayReconciliationServiceServer() {
+}
+func (UnimplementedGatewayReconciliationServiceServer) testEmbeddedByValue() {}
+
+// UnsafeGatewayReconciliationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to GatewayReconciliationServiceServer will
+// result in compilation errors.
+type UnsafeGatewayReconciliationServiceServer interface {
+	mustEmbedUnimplementedGatewayReconciliationServiceServer()
+}
+
+func RegisterGatewayReconciliationServiceServer(s grpc.ServiceRegistrar, srv GatewayReconciliationServiceServer) {
+	// If the following call panics, it indicates UnimplementedGatewayReconciliationServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&GatewayReconciliationService_ServiceDesc, srv)
+}
+
+func _GatewayReconciliationService_ListOfferingAttemptRecords_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOfferingAttemptRecordsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GatewayReconciliationServiceServer).ListOfferingAttemptRecords(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GatewayReconciliationService_ListOfferingAttemptRecords_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GatewayReconciliationServiceServer).ListOfferingAttemptRecords(ctx, req.(*ListOfferingAttemptRecordsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// GatewayReconciliationService_ServiceDesc is the grpc.ServiceDesc for GatewayReconciliationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var GatewayReconciliationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "maxshot.provider_sync.v1.GatewayReconciliationService",
+	HandlerType: (*GatewayReconciliationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListOfferingAttemptRecords",
+			Handler:    _GatewayReconciliationService_ListOfferingAttemptRecords_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "maxshot/provider_sync/v1/provider_sync.proto",
 }

@@ -15,6 +15,7 @@ import {
 import {
   ProviderSyncServiceClient,
   ProviderSyncServiceService,
+  SyncEventKind,
   type ProviderSyncServiceServer,
 } from "../../gen/ts/maxshot/provider_sync/v1/provider_sync.js";
 import {
@@ -111,7 +112,7 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
     ],
   });
 
-  const grantImpl: AitCreditGrantServiceServer = {
+  const grantImpl: Partial<AitCreditGrantServiceServer> = {
     issueAitCreditGrants(call, callback) {
       callback(null, {
         results: [
@@ -119,6 +120,9 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
             grantId: call.request.batchId,
             status: GrantItemStatus.GRANT_ITEM_STATUS_CREDITED,
             detail: "ok",
+            creditedAmount: 230136n,
+            issuedAtUnixSec: 1795670000n,
+            expiresAtUnixSec: 1796274800n,
           },
         ],
       });
@@ -126,23 +130,21 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
   };
 
   const providerImpl: Partial<ProviderSyncServiceServer> = {
-    watchCatalogSnapshot(call) {
+    watchSyncEvents(call) {
       call.write({
-        snapshot: {
-          catalogVersion: "cat-ts-v1",
-          generatedAtUnixMs: 1795670000000n,
-          catalogs: [],
-          providers: [],
-          models: [],
-          offerings: [],
-          autoPool: [],
-        },
+        eventKind: SyncEventKind.SYNC_EVENT_KIND_CATALOG_PUBLISHED,
+        latestCatalogVersion: "cat-ts-v1",
+        latestCredentialRevision: "cred-rev-1",
+        publishedAtUnixMs: 1795670000000n,
       });
       call.end();
     },
   };
 
-  server.addService(AitCreditGrantServiceService, grantImpl);
+  server.addService(
+    AitCreditGrantServiceService,
+    grantImpl as AitCreditGrantServiceServer,
+  );
   server.addService(
     ProviderSyncServiceService,
     providerImpl as ProviderSyncServiceServer,
@@ -219,8 +221,13 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
     );
     const versions: string[] = [];
     await new Promise<void>((resolve, reject) => {
-      const stream = providerClient.watchCatalogSnapshot(
-        { gatewayNodeId: "gw-1", lastSeenCatalogVersion: "" },
+      const stream = providerClient.watchSyncEvents(
+        {
+          gatewayNodeId: "gw-1",
+          nodeRole: "dataplane",
+          lastSeenCatalogVersion: "",
+          lastSeenCredentialRevision: "",
+        },
         new grpc.Metadata(),
         {
           interceptors: [
@@ -233,8 +240,8 @@ test("TS loopback gRPC server + client interceptors enforce HMAC, ACL, and strea
           ],
         },
       );
-      stream.on("data", (chunk: { snapshot?: { catalogVersion: string } }) => {
-        if (chunk.snapshot) versions.push(chunk.snapshot.catalogVersion);
+      stream.on("data", (chunk: { latestCatalogVersion: string }) => {
+        if (chunk.latestCatalogVersion) versions.push(chunk.latestCatalogVersion);
       });
       stream.on("error", reject);
       stream.on("end", () => resolve());

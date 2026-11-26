@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Modality enumerates supported inference modalities across Provider and Gateway.
+// Modality enumerates supported inference and generation modalities across Provider, Gateway, and Studio.
 type Modality int32
 
 const (
@@ -30,6 +30,8 @@ const (
 	Modality_MODALITY_IMAGE       Modality = 2
 	Modality_MODALITY_VIDEO       Modality = 3
 	Modality_MODALITY_EMBEDDING   Modality = 4
+	Modality_MODALITY_RERANK      Modality = 5
+	Modality_MODALITY_AUDIO       Modality = 6
 )
 
 // Enum value maps for Modality.
@@ -40,6 +42,8 @@ var (
 		2: "MODALITY_IMAGE",
 		3: "MODALITY_VIDEO",
 		4: "MODALITY_EMBEDDING",
+		5: "MODALITY_RERANK",
+		6: "MODALITY_AUDIO",
 	}
 	Modality_value = map[string]int32{
 		"MODALITY_UNSPECIFIED": 0,
@@ -47,6 +51,8 @@ var (
 		"MODALITY_IMAGE":       2,
 		"MODALITY_VIDEO":       3,
 		"MODALITY_EMBEDDING":   4,
+		"MODALITY_RERANK":      5,
+		"MODALITY_AUDIO":       6,
 	}
 )
 
@@ -77,14 +83,15 @@ func (Modality) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{0}
 }
 
-// ModelTier represents the subscription/funding tier label assigned by Maxshot.
+// ModelTier represents the model classification tier published by Provider Backend
+// for subscription tier-group management and free-model quota policy.
 type ModelTier int32
 
 const (
 	ModelTier_MODEL_TIER_UNSPECIFIED ModelTier = 0
 	ModelTier_MODEL_TIER_BASIC       ModelTier = 1
 	ModelTier_MODEL_TIER_PREMIUM     ModelTier = 2
-	ModelTier_MODEL_TIER_FREE        ModelTier = 3
+	ModelTier_MODEL_TIER_FREE        ModelTier = 3 // Web Chat F-labeled model: $0 within free quota, then falls back to 6-bucket charging
 )
 
 // Enum value maps for ModelTier.
@@ -130,28 +137,208 @@ func (ModelTier) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{1}
 }
 
-// RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05).
+// FundingBucket enumerates customer funding sources in deterministic consumption order (BIL-R08).
+type FundingBucket int32
+
+const (
+	FundingBucket_FUNDING_BUCKET_UNSPECIFIED       FundingBucket = 0
+	FundingBucket_FUNDING_BUCKET_FREE_MODEL_QUOTA  FundingBucket = 1 // $0 quota slot for F-labeled models before regular 6-bucket fallback
+	FundingBucket_FUNDING_BUCKET_AIT_EARNED        FundingBucket = 2 // 1st paid/earned bucket: 7-day expiring staking grants (earliest expiry first)
+	FundingBucket_FUNDING_BUCKET_BASIC_ALLOWANCE   FundingBucket = 3 // 2nd bucket: subscription Basic pool
+	FundingBucket_FUNDING_BUCKET_PREMIUM_ALLOWANCE FundingBucket = 4 // 3rd bucket: subscription shared Premium pool (including allow_basic_to_premium)
+	FundingBucket_FUNDING_BUCKET_FREE_CREDIT       FundingBucket = 5 // 4th bucket: promotional Free Credits
+	FundingBucket_FUNDING_BUCKET_REFERRAL_CREDIT   FundingBucket = 6 // 5th bucket: Maxshot Referral Credits
+	FundingBucket_FUNDING_BUCKET_DOLLAR_BALANCE    FundingBucket = 7 // 6th bucket: user-funded USD balance
+)
+
+// Enum value maps for FundingBucket.
+var (
+	FundingBucket_name = map[int32]string{
+		0: "FUNDING_BUCKET_UNSPECIFIED",
+		1: "FUNDING_BUCKET_FREE_MODEL_QUOTA",
+		2: "FUNDING_BUCKET_AIT_EARNED",
+		3: "FUNDING_BUCKET_BASIC_ALLOWANCE",
+		4: "FUNDING_BUCKET_PREMIUM_ALLOWANCE",
+		5: "FUNDING_BUCKET_FREE_CREDIT",
+		6: "FUNDING_BUCKET_REFERRAL_CREDIT",
+		7: "FUNDING_BUCKET_DOLLAR_BALANCE",
+	}
+	FundingBucket_value = map[string]int32{
+		"FUNDING_BUCKET_UNSPECIFIED":       0,
+		"FUNDING_BUCKET_FREE_MODEL_QUOTA":  1,
+		"FUNDING_BUCKET_AIT_EARNED":        2,
+		"FUNDING_BUCKET_BASIC_ALLOWANCE":   3,
+		"FUNDING_BUCKET_PREMIUM_ALLOWANCE": 4,
+		"FUNDING_BUCKET_FREE_CREDIT":       5,
+		"FUNDING_BUCKET_REFERRAL_CREDIT":   6,
+		"FUNDING_BUCKET_DOLLAR_BALANCE":    7,
+	}
+)
+
+func (x FundingBucket) Enum() *FundingBucket {
+	p := new(FundingBucket)
+	*p = x
+	return p
+}
+
+func (x FundingBucket) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FundingBucket) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_common_v1_types_proto_enumTypes[2].Descriptor()
+}
+
+func (FundingBucket) Type() protoreflect.EnumType {
+	return &file_maxshot_common_v1_types_proto_enumTypes[2]
+}
+
+func (x FundingBucket) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FundingBucket.Descriptor instead.
+func (FundingBucket) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{2}
+}
+
+// KeyFundingStrategy defines how a scoped API key selects funding buckets.
+//   - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
+//     when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+//   - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
+type KeyFundingStrategy int32
+
+const (
+	KeyFundingStrategy_KEY_FUNDING_STRATEGY_UNSPECIFIED        KeyFundingStrategy = 0
+	KeyFundingStrategy_KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST KeyFundingStrategy = 1
+	KeyFundingStrategy_KEY_FUNDING_STRATEGY_PAYG               KeyFundingStrategy = 2
+)
+
+// Enum value maps for KeyFundingStrategy.
+var (
+	KeyFundingStrategy_name = map[int32]string{
+		0: "KEY_FUNDING_STRATEGY_UNSPECIFIED",
+		1: "KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST",
+		2: "KEY_FUNDING_STRATEGY_PAYG",
+	}
+	KeyFundingStrategy_value = map[string]int32{
+		"KEY_FUNDING_STRATEGY_UNSPECIFIED":        0,
+		"KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST": 1,
+		"KEY_FUNDING_STRATEGY_PAYG":               2,
+	}
+)
+
+func (x KeyFundingStrategy) Enum() *KeyFundingStrategy {
+	p := new(KeyFundingStrategy)
+	*p = x
+	return p
+}
+
+func (x KeyFundingStrategy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (KeyFundingStrategy) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_common_v1_types_proto_enumTypes[3].Descriptor()
+}
+
+func (KeyFundingStrategy) Type() protoreflect.EnumType {
+	return &file_maxshot_common_v1_types_proto_enumTypes[3]
+}
+
+func (x KeyFundingStrategy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use KeyFundingStrategy.Descriptor instead.
+func (KeyFundingStrategy) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{3}
+}
+
+// BudgetPeriodKind enumerates spend-cap window types (matching scoped-configuration.ts).
+type BudgetPeriodKind int32
+
+const (
+	BudgetPeriodKind_BUDGET_PERIOD_KIND_UNSPECIFIED BudgetPeriodKind = 0
+	BudgetPeriodKind_BUDGET_PERIOD_KIND_DAY         BudgetPeriodKind = 1
+	BudgetPeriodKind_BUDGET_PERIOD_KIND_MONTH       BudgetPeriodKind = 2
+	BudgetPeriodKind_BUDGET_PERIOD_KIND_FIXED       BudgetPeriodKind = 3
+)
+
+// Enum value maps for BudgetPeriodKind.
+var (
+	BudgetPeriodKind_name = map[int32]string{
+		0: "BUDGET_PERIOD_KIND_UNSPECIFIED",
+		1: "BUDGET_PERIOD_KIND_DAY",
+		2: "BUDGET_PERIOD_KIND_MONTH",
+		3: "BUDGET_PERIOD_KIND_FIXED",
+	}
+	BudgetPeriodKind_value = map[string]int32{
+		"BUDGET_PERIOD_KIND_UNSPECIFIED": 0,
+		"BUDGET_PERIOD_KIND_DAY":         1,
+		"BUDGET_PERIOD_KIND_MONTH":       2,
+		"BUDGET_PERIOD_KIND_FIXED":       3,
+	}
+)
+
+func (x BudgetPeriodKind) Enum() *BudgetPeriodKind {
+	p := new(BudgetPeriodKind)
+	*p = x
+	return p
+}
+
+func (x BudgetPeriodKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BudgetPeriodKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_common_v1_types_proto_enumTypes[4].Descriptor()
+}
+
+func (BudgetPeriodKind) Type() protoreflect.EnumType {
+	return &file_maxshot_common_v1_types_proto_enumTypes[4]
+}
+
+func (x BudgetPeriodKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BudgetPeriodKind.Descriptor instead.
+func (BudgetPeriodKind) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{4}
+}
+
+// RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05 / server-core).
 type RejectCode int32
 
 const (
-	RejectCode_REJECT_CODE_UNSPECIFIED                RejectCode = 0
-	RejectCode_REJECT_CODE_KEY_INVALID                RejectCode = 1
-	RejectCode_REJECT_CODE_KEY_REVOKED                RejectCode = 2
-	RejectCode_REJECT_CODE_KEY_EXPIRED                RejectCode = 3
-	RejectCode_REJECT_CODE_CATALOG_NOT_ALLOWED        RejectCode = 4
-	RejectCode_REJECT_CODE_MODEL_NOT_ALLOWED          RejectCode = 5
-	RejectCode_REJECT_CODE_MODEL_UNAVAILABLE          RejectCode = 6
-	RejectCode_REJECT_CODE_PINNED_OFFERING_INELIGIBLE RejectCode = 7
-	RejectCode_REJECT_CODE_OVER_REQUEST_CEILING       RejectCode = 8
-	RejectCode_REJECT_CODE_OVER_DAILY_BUDGET          RejectCode = 9
-	RejectCode_REJECT_CODE_OVER_MONTHLY_BUDGET        RejectCode = 10
-	RejectCode_REJECT_CODE_OVER_SUPPLIER_BUDGET       RejectCode = 11
-	RejectCode_REJECT_CODE_OVER_PLATFORM_BUDGET       RejectCode = 12
-	RejectCode_REJECT_CODE_OVER_BUSINESS_BUDGET       RejectCode = 13
-	RejectCode_REJECT_CODE_INSUFFICIENT_FUNDING       RejectCode = 14
-	RejectCode_REJECT_CODE_DOLLAR_NOT_AUTHORIZED      RejectCode = 15
-	RejectCode_REJECT_CODE_JOB_LIMIT_EXCEEDED         RejectCode = 16
-	RejectCode_REJECT_CODE_IDEMPOTENCY_MISMATCH       RejectCode = 17
+	RejectCode_REJECT_CODE_UNSPECIFIED                  RejectCode = 0
+	RejectCode_REJECT_CODE_KEY_INVALID                  RejectCode = 1
+	RejectCode_REJECT_CODE_KEY_REVOKED                  RejectCode = 2
+	RejectCode_REJECT_CODE_KEY_EXPIRED                  RejectCode = 3
+	RejectCode_REJECT_CODE_CATALOG_NOT_ALLOWED          RejectCode = 4
+	RejectCode_REJECT_CODE_MODEL_NOT_ALLOWED            RejectCode = 5
+	RejectCode_REJECT_CODE_MODEL_UNAVAILABLE            RejectCode = 6
+	RejectCode_REJECT_CODE_PINNED_OFFERING_INELIGIBLE   RejectCode = 7
+	RejectCode_REJECT_CODE_OVER_REQUEST_CEILING         RejectCode = 8
+	RejectCode_REJECT_CODE_OVER_DAILY_BUDGET            RejectCode = 9
+	RejectCode_REJECT_CODE_OVER_MONTHLY_BUDGET          RejectCode = 10
+	RejectCode_REJECT_CODE_OVER_SUPPLIER_BUDGET         RejectCode = 11
+	RejectCode_REJECT_CODE_OVER_PLATFORM_BUDGET         RejectCode = 12
+	RejectCode_REJECT_CODE_OVER_BUSINESS_BUDGET         RejectCode = 13
+	RejectCode_REJECT_CODE_INSUFFICIENT_FUNDING         RejectCode = 14
+	RejectCode_REJECT_CODE_DOLLAR_NOT_AUTHORIZED        RejectCode = 15
+	RejectCode_REJECT_CODE_JOB_LIMIT_EXCEEDED           RejectCode = 16
+	RejectCode_REJECT_CODE_IDEMPOTENCY_MISMATCH         RejectCode = 17
+	RejectCode_REJECT_CODE_ACCOUNT_INACTIVE             RejectCode = 18
+	RejectCode_REJECT_CODE_SPENDING_LOCKED              RejectCode = 19
+	RejectCode_REJECT_CODE_POLICY_INELIGIBLE            RejectCode = 20
+	RejectCode_REJECT_CODE_UNSUPPORTED_CAPABILITY       RejectCode = 21
+	RejectCode_REJECT_CODE_CONTEXT_LIMIT_EXCEEDED       RejectCode = 22
+	RejectCode_REJECT_CODE_OUTPUT_LIMIT_EXCEEDED        RejectCode = 23
+	RejectCode_REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET    RejectCode = 24
+	RejectCode_REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET  RejectCode = 25
+	RejectCode_REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED RejectCode = 26
 )
 
 // Enum value maps for RejectCode.
@@ -175,26 +362,44 @@ var (
 		15: "REJECT_CODE_DOLLAR_NOT_AUTHORIZED",
 		16: "REJECT_CODE_JOB_LIMIT_EXCEEDED",
 		17: "REJECT_CODE_IDEMPOTENCY_MISMATCH",
+		18: "REJECT_CODE_ACCOUNT_INACTIVE",
+		19: "REJECT_CODE_SPENDING_LOCKED",
+		20: "REJECT_CODE_POLICY_INELIGIBLE",
+		21: "REJECT_CODE_UNSUPPORTED_CAPABILITY",
+		22: "REJECT_CODE_CONTEXT_LIMIT_EXCEEDED",
+		23: "REJECT_CODE_OUTPUT_LIMIT_EXCEEDED",
+		24: "REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET",
+		25: "REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET",
+		26: "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED",
 	}
 	RejectCode_value = map[string]int32{
-		"REJECT_CODE_UNSPECIFIED":                0,
-		"REJECT_CODE_KEY_INVALID":                1,
-		"REJECT_CODE_KEY_REVOKED":                2,
-		"REJECT_CODE_KEY_EXPIRED":                3,
-		"REJECT_CODE_CATALOG_NOT_ALLOWED":        4,
-		"REJECT_CODE_MODEL_NOT_ALLOWED":          5,
-		"REJECT_CODE_MODEL_UNAVAILABLE":          6,
-		"REJECT_CODE_PINNED_OFFERING_INELIGIBLE": 7,
-		"REJECT_CODE_OVER_REQUEST_CEILING":       8,
-		"REJECT_CODE_OVER_DAILY_BUDGET":          9,
-		"REJECT_CODE_OVER_MONTHLY_BUDGET":        10,
-		"REJECT_CODE_OVER_SUPPLIER_BUDGET":       11,
-		"REJECT_CODE_OVER_PLATFORM_BUDGET":       12,
-		"REJECT_CODE_OVER_BUSINESS_BUDGET":       13,
-		"REJECT_CODE_INSUFFICIENT_FUNDING":       14,
-		"REJECT_CODE_DOLLAR_NOT_AUTHORIZED":      15,
-		"REJECT_CODE_JOB_LIMIT_EXCEEDED":         16,
-		"REJECT_CODE_IDEMPOTENCY_MISMATCH":       17,
+		"REJECT_CODE_UNSPECIFIED":                  0,
+		"REJECT_CODE_KEY_INVALID":                  1,
+		"REJECT_CODE_KEY_REVOKED":                  2,
+		"REJECT_CODE_KEY_EXPIRED":                  3,
+		"REJECT_CODE_CATALOG_NOT_ALLOWED":          4,
+		"REJECT_CODE_MODEL_NOT_ALLOWED":            5,
+		"REJECT_CODE_MODEL_UNAVAILABLE":            6,
+		"REJECT_CODE_PINNED_OFFERING_INELIGIBLE":   7,
+		"REJECT_CODE_OVER_REQUEST_CEILING":         8,
+		"REJECT_CODE_OVER_DAILY_BUDGET":            9,
+		"REJECT_CODE_OVER_MONTHLY_BUDGET":          10,
+		"REJECT_CODE_OVER_SUPPLIER_BUDGET":         11,
+		"REJECT_CODE_OVER_PLATFORM_BUDGET":         12,
+		"REJECT_CODE_OVER_BUSINESS_BUDGET":         13,
+		"REJECT_CODE_INSUFFICIENT_FUNDING":         14,
+		"REJECT_CODE_DOLLAR_NOT_AUTHORIZED":        15,
+		"REJECT_CODE_JOB_LIMIT_EXCEEDED":           16,
+		"REJECT_CODE_IDEMPOTENCY_MISMATCH":         17,
+		"REJECT_CODE_ACCOUNT_INACTIVE":             18,
+		"REJECT_CODE_SPENDING_LOCKED":              19,
+		"REJECT_CODE_POLICY_INELIGIBLE":            20,
+		"REJECT_CODE_UNSUPPORTED_CAPABILITY":       21,
+		"REJECT_CODE_CONTEXT_LIMIT_EXCEEDED":       22,
+		"REJECT_CODE_OUTPUT_LIMIT_EXCEEDED":        23,
+		"REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET":    24,
+		"REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET":  25,
+		"REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED": 26,
 	}
 )
 
@@ -209,11 +414,11 @@ func (x RejectCode) String() string {
 }
 
 func (RejectCode) Descriptor() protoreflect.EnumDescriptor {
-	return file_maxshot_common_v1_types_proto_enumTypes[2].Descriptor()
+	return file_maxshot_common_v1_types_proto_enumTypes[5].Descriptor()
 }
 
 func (RejectCode) Type() protoreflect.EnumType {
-	return &file_maxshot_common_v1_types_proto_enumTypes[2]
+	return &file_maxshot_common_v1_types_proto_enumTypes[5]
 }
 
 func (x RejectCode) Number() protoreflect.EnumNumber {
@@ -222,7 +427,138 @@ func (x RejectCode) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RejectCode.Descriptor instead.
 func (RejectCode) EnumDescriptor() ([]byte, []int) {
-	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{2}
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{5}
+}
+
+// KeyValueAttribute replaces protobuf map<string, string> so Go and TypeScript
+// always produce byte-for-byte identical wire encodings under HMAC verification.
+type KeyValueAttribute struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeyValueAttribute) Reset() {
+	*x = KeyValueAttribute{}
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeyValueAttribute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeyValueAttribute) ProtoMessage() {}
+
+func (x *KeyValueAttribute) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeyValueAttribute.ProtoReflect.Descriptor instead.
+func (*KeyValueAttribute) Descriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *KeyValueAttribute) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *KeyValueAttribute) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// BudgetPeriodRule defines one daily, monthly, or non-overlapping fixed-window spend limit in micro-USD.
+type BudgetPeriodRule struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Kind           BudgetPeriodKind       `protobuf:"varint,1,opt,name=kind,proto3,enum=maxshot.common.v1.BudgetPeriodKind" json:"kind,omitempty"`
+	LimitMicroUsd  int64                  `protobuf:"varint,2,opt,name=limit_micro_usd,json=limitMicroUsd,proto3" json:"limit_micro_usd,omitempty"`
+	PeriodKey      string                 `protobuf:"bytes,3,opt,name=period_key,json=periodKey,proto3" json:"period_key,omitempty"` // required when kind == BUDGET_PERIOD_KIND_FIXED
+	StartsAtUnixMs int64                  `protobuf:"varint,4,opt,name=starts_at_unix_ms,json=startsAtUnixMs,proto3" json:"starts_at_unix_ms,omitempty"`
+	EndsAtUnixMs   int64                  `protobuf:"varint,5,opt,name=ends_at_unix_ms,json=endsAtUnixMs,proto3" json:"ends_at_unix_ms,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *BudgetPeriodRule) Reset() {
+	*x = BudgetPeriodRule{}
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BudgetPeriodRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BudgetPeriodRule) ProtoMessage() {}
+
+func (x *BudgetPeriodRule) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BudgetPeriodRule.ProtoReflect.Descriptor instead.
+func (*BudgetPeriodRule) Descriptor() ([]byte, []int) {
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *BudgetPeriodRule) GetKind() BudgetPeriodKind {
+	if x != nil {
+		return x.Kind
+	}
+	return BudgetPeriodKind_BUDGET_PERIOD_KIND_UNSPECIFIED
+}
+
+func (x *BudgetPeriodRule) GetLimitMicroUsd() int64 {
+	if x != nil {
+		return x.LimitMicroUsd
+	}
+	return 0
+}
+
+func (x *BudgetPeriodRule) GetPeriodKey() string {
+	if x != nil {
+		return x.PeriodKey
+	}
+	return ""
+}
+
+func (x *BudgetPeriodRule) GetStartsAtUnixMs() int64 {
+	if x != nil {
+		return x.StartsAtUnixMs
+	}
+	return 0
+}
+
+func (x *BudgetPeriodRule) GetEndsAtUnixMs() int64 {
+	if x != nil {
+		return x.EndsAtUnixMs
+	}
+	return 0
 }
 
 // CursorPageRequest provides cursor-based pagination for incremental cross-repo sync.
@@ -236,7 +572,7 @@ type CursorPageRequest struct {
 
 func (x *CursorPageRequest) Reset() {
 	*x = CursorPageRequest{}
-	mi := &file_maxshot_common_v1_types_proto_msgTypes[0]
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -248,7 +584,7 @@ func (x *CursorPageRequest) String() string {
 func (*CursorPageRequest) ProtoMessage() {}
 
 func (x *CursorPageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_common_v1_types_proto_msgTypes[0]
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -261,7 +597,7 @@ func (x *CursorPageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CursorPageRequest.ProtoReflect.Descriptor instead.
 func (*CursorPageRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{0}
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CursorPageRequest) GetCursor() string {
@@ -289,7 +625,7 @@ type CursorPageResponse struct {
 
 func (x *CursorPageResponse) Reset() {
 	*x = CursorPageResponse{}
-	mi := &file_maxshot_common_v1_types_proto_msgTypes[1]
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -301,7 +637,7 @@ func (x *CursorPageResponse) String() string {
 func (*CursorPageResponse) ProtoMessage() {}
 
 func (x *CursorPageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_common_v1_types_proto_msgTypes[1]
+	mi := &file_maxshot_common_v1_types_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -314,7 +650,7 @@ func (x *CursorPageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CursorPageResponse.ProtoReflect.Descriptor instead.
 func (*CursorPageResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{1}
+	return file_maxshot_common_v1_types_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CursorPageResponse) GetNextCursor() string {
@@ -335,25 +671,55 @@ var File_maxshot_common_v1_types_proto protoreflect.FileDescriptor
 
 const file_maxshot_common_v1_types_proto_rawDesc = "" +
 	"\n" +
-	"\x1dmaxshot/common/v1/types.proto\x12\x11maxshot.common.v1\"A\n" +
+	"\x1dmaxshot/common/v1/types.proto\x12\x11maxshot.common.v1\";\n" +
+	"\x11KeyValueAttribute\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xe4\x01\n" +
+	"\x10BudgetPeriodRule\x127\n" +
+	"\x04kind\x18\x01 \x01(\x0e2#.maxshot.common.v1.BudgetPeriodKindR\x04kind\x12&\n" +
+	"\x0flimit_micro_usd\x18\x02 \x01(\x03R\rlimitMicroUsd\x12\x1d\n" +
+	"\n" +
+	"period_key\x18\x03 \x01(\tR\tperiodKey\x12)\n" +
+	"\x11starts_at_unix_ms\x18\x04 \x01(\x03R\x0estartsAtUnixMs\x12%\n" +
+	"\x0fends_at_unix_ms\x18\x05 \x01(\x03R\fendsAtUnixMs\"A\n" +
 	"\x11CursorPageRequest\x12\x16\n" +
 	"\x06cursor\x18\x01 \x01(\tR\x06cursor\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\"P\n" +
 	"\x12CursorPageResponse\x12\x1f\n" +
 	"\vnext_cursor\x18\x01 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x02 \x01(\bR\ahasMore*w\n" +
+	"\bhas_more\x18\x02 \x01(\bR\ahasMore*\xa0\x01\n" +
 	"\bModality\x12\x18\n" +
 	"\x14MODALITY_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rMODALITY_TEXT\x10\x01\x12\x12\n" +
 	"\x0eMODALITY_IMAGE\x10\x02\x12\x12\n" +
 	"\x0eMODALITY_VIDEO\x10\x03\x12\x16\n" +
-	"\x12MODALITY_EMBEDDING\x10\x04*j\n" +
+	"\x12MODALITY_EMBEDDING\x10\x04\x12\x13\n" +
+	"\x0fMODALITY_RERANK\x10\x05\x12\x12\n" +
+	"\x0eMODALITY_AUDIO\x10\x06*j\n" +
 	"\tModelTier\x12\x1a\n" +
 	"\x16MODEL_TIER_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10MODEL_TIER_BASIC\x10\x01\x12\x16\n" +
 	"\x12MODEL_TIER_PREMIUM\x10\x02\x12\x13\n" +
-	"\x0fMODEL_TIER_FREE\x10\x03*\x8e\x05\n" +
+	"\x0fMODEL_TIER_FREE\x10\x03*\xa4\x02\n" +
+	"\rFundingBucket\x12\x1e\n" +
+	"\x1aFUNDING_BUCKET_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fFUNDING_BUCKET_FREE_MODEL_QUOTA\x10\x01\x12\x1d\n" +
+	"\x19FUNDING_BUCKET_AIT_EARNED\x10\x02\x12\"\n" +
+	"\x1eFUNDING_BUCKET_BASIC_ALLOWANCE\x10\x03\x12$\n" +
+	" FUNDING_BUCKET_PREMIUM_ALLOWANCE\x10\x04\x12\x1e\n" +
+	"\x1aFUNDING_BUCKET_FREE_CREDIT\x10\x05\x12\"\n" +
+	"\x1eFUNDING_BUCKET_REFERRAL_CREDIT\x10\x06\x12!\n" +
+	"\x1dFUNDING_BUCKET_DOLLAR_BALANCE\x10\a*\x86\x01\n" +
+	"\x12KeyFundingStrategy\x12$\n" +
+	" KEY_FUNDING_STRATEGY_UNSPECIFIED\x10\x00\x12+\n" +
+	"'KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST\x10\x01\x12\x1d\n" +
+	"\x19KEY_FUNDING_STRATEGY_PAYG\x10\x02*\x8e\x01\n" +
+	"\x10BudgetPeriodKind\x12\"\n" +
+	"\x1eBUDGET_PERIOD_KIND_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16BUDGET_PERIOD_KIND_DAY\x10\x01\x12\x1c\n" +
+	"\x18BUDGET_PERIOD_KIND_MONTH\x10\x02\x12\x1c\n" +
+	"\x18BUDGET_PERIOD_KIND_FIXED\x10\x03*\xf1\a\n" +
 	"\n" +
 	"RejectCode\x12\x1b\n" +
 	"\x17REJECT_CODE_UNSPECIFIED\x10\x00\x12\x1b\n" +
@@ -374,7 +740,16 @@ const file_maxshot_common_v1_types_proto_rawDesc = "" +
 	" REJECT_CODE_INSUFFICIENT_FUNDING\x10\x0e\x12%\n" +
 	"!REJECT_CODE_DOLLAR_NOT_AUTHORIZED\x10\x0f\x12\"\n" +
 	"\x1eREJECT_CODE_JOB_LIMIT_EXCEEDED\x10\x10\x12$\n" +
-	" REJECT_CODE_IDEMPOTENCY_MISMATCH\x10\x11BGZEgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1b\x06proto3"
+	" REJECT_CODE_IDEMPOTENCY_MISMATCH\x10\x11\x12 \n" +
+	"\x1cREJECT_CODE_ACCOUNT_INACTIVE\x10\x12\x12\x1f\n" +
+	"\x1bREJECT_CODE_SPENDING_LOCKED\x10\x13\x12!\n" +
+	"\x1dREJECT_CODE_POLICY_INELIGIBLE\x10\x14\x12&\n" +
+	"\"REJECT_CODE_UNSUPPORTED_CAPABILITY\x10\x15\x12&\n" +
+	"\"REJECT_CODE_CONTEXT_LIMIT_EXCEEDED\x10\x16\x12%\n" +
+	"!REJECT_CODE_OUTPUT_LIMIT_EXCEEDED\x10\x17\x12)\n" +
+	"%REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET\x10\x18\x12+\n" +
+	"'REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET\x10\x19\x12,\n" +
+	"(REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED\x10\x1aBGZEgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1b\x06proto3"
 
 var (
 	file_maxshot_common_v1_types_proto_rawDescOnce sync.Once
@@ -388,21 +763,27 @@ func file_maxshot_common_v1_types_proto_rawDescGZIP() []byte {
 	return file_maxshot_common_v1_types_proto_rawDescData
 }
 
-var file_maxshot_common_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_maxshot_common_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_maxshot_common_v1_types_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_maxshot_common_v1_types_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_maxshot_common_v1_types_proto_goTypes = []any{
 	(Modality)(0),              // 0: maxshot.common.v1.Modality
 	(ModelTier)(0),             // 1: maxshot.common.v1.ModelTier
-	(RejectCode)(0),            // 2: maxshot.common.v1.RejectCode
-	(*CursorPageRequest)(nil),  // 3: maxshot.common.v1.CursorPageRequest
-	(*CursorPageResponse)(nil), // 4: maxshot.common.v1.CursorPageResponse
+	(FundingBucket)(0),         // 2: maxshot.common.v1.FundingBucket
+	(KeyFundingStrategy)(0),    // 3: maxshot.common.v1.KeyFundingStrategy
+	(BudgetPeriodKind)(0),      // 4: maxshot.common.v1.BudgetPeriodKind
+	(RejectCode)(0),            // 5: maxshot.common.v1.RejectCode
+	(*KeyValueAttribute)(nil),  // 6: maxshot.common.v1.KeyValueAttribute
+	(*BudgetPeriodRule)(nil),   // 7: maxshot.common.v1.BudgetPeriodRule
+	(*CursorPageRequest)(nil),  // 8: maxshot.common.v1.CursorPageRequest
+	(*CursorPageResponse)(nil), // 9: maxshot.common.v1.CursorPageResponse
 }
 var file_maxshot_common_v1_types_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: maxshot.common.v1.BudgetPeriodRule.kind:type_name -> maxshot.common.v1.BudgetPeriodKind
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_maxshot_common_v1_types_proto_init() }
@@ -415,8 +796,8 @@ func file_maxshot_common_v1_types_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_common_v1_types_proto_rawDesc), len(file_maxshot_common_v1_types_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   2,
+			NumEnums:      6,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

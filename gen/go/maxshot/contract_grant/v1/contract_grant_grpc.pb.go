@@ -19,150 +19,190 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WalletEligibilityService_PushWalletEligibility_FullMethodName        = "/maxshot.contract_grant.v1.WalletEligibilityService/PushWalletEligibility"
-	WalletEligibilityService_PullWalletEligibilityUpdates_FullMethodName = "/maxshot.contract_grant.v1.WalletEligibilityService/PullWalletEligibilityUpdates"
+	ContractBackendService_PushFundedTerms_FullMethodName              = "/maxshot.contract_grant.v1.ContractBackendService/PushFundedTerms"
+	ContractBackendService_PushWalletEligibility_FullMethodName        = "/maxshot.contract_grant.v1.ContractBackendService/PushWalletEligibility"
+	ContractBackendService_GetContractOperationalStatus_FullMethodName = "/maxshot.contract_grant.v1.ContractBackendService/GetContractOperationalStatus"
 )
 
-// WalletEligibilityServiceClient is the client API for WalletEligibilityService service.
+// ContractBackendServiceClient is the client API for ContractBackendService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// WalletEligibilityService synchronizes 1:1 verified SIWE/ERC-1271 wallet bindings and
-// Funded Term acceptance timestamps between Gateway Backend and Contract Backend.
-type WalletEligibilityServiceClient interface {
-	// PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules.
+// ContractBackendService is hosted by Contract Backend and called by Gateway Backend
+// over WireGuard + TLS + HMAC. Services are cleanly split by hosting side for strict method ACLs.
+type ContractBackendServiceClient interface {
+	// PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend.
+	PushFundedTerms(ctx context.Context, in *PushFundedTermsRequest, opts ...grpc.CallOption) (*PushFundedTermsResponse, error)
+	// PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
 	PushWalletEligibility(ctx context.Context, in *PushWalletEligibilityRequest, opts ...grpc.CallOption) (*PushWalletEligibilityResponse, error)
-	// PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor.
-	PullWalletEligibilityUpdates(ctx context.Context, in *PullWalletEligibilityUpdatesRequest, opts ...grpc.CallOption) (*PullWalletEligibilityUpdatesResponse, error)
+	// GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+	GetContractOperationalStatus(ctx context.Context, in *GetContractOperationalStatusRequest, opts ...grpc.CallOption) (*GetContractOperationalStatusResponse, error)
 }
 
-type walletEligibilityServiceClient struct {
+type contractBackendServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewWalletEligibilityServiceClient(cc grpc.ClientConnInterface) WalletEligibilityServiceClient {
-	return &walletEligibilityServiceClient{cc}
+func NewContractBackendServiceClient(cc grpc.ClientConnInterface) ContractBackendServiceClient {
+	return &contractBackendServiceClient{cc}
 }
 
-func (c *walletEligibilityServiceClient) PushWalletEligibility(ctx context.Context, in *PushWalletEligibilityRequest, opts ...grpc.CallOption) (*PushWalletEligibilityResponse, error) {
+func (c *contractBackendServiceClient) PushFundedTerms(ctx context.Context, in *PushFundedTermsRequest, opts ...grpc.CallOption) (*PushFundedTermsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PushFundedTermsResponse)
+	err := c.cc.Invoke(ctx, ContractBackendService_PushFundedTerms_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *contractBackendServiceClient) PushWalletEligibility(ctx context.Context, in *PushWalletEligibilityRequest, opts ...grpc.CallOption) (*PushWalletEligibilityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PushWalletEligibilityResponse)
-	err := c.cc.Invoke(ctx, WalletEligibilityService_PushWalletEligibility_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, ContractBackendService_PushWalletEligibility_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *walletEligibilityServiceClient) PullWalletEligibilityUpdates(ctx context.Context, in *PullWalletEligibilityUpdatesRequest, opts ...grpc.CallOption) (*PullWalletEligibilityUpdatesResponse, error) {
+func (c *contractBackendServiceClient) GetContractOperationalStatus(ctx context.Context, in *GetContractOperationalStatusRequest, opts ...grpc.CallOption) (*GetContractOperationalStatusResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PullWalletEligibilityUpdatesResponse)
-	err := c.cc.Invoke(ctx, WalletEligibilityService_PullWalletEligibilityUpdates_FullMethodName, in, out, cOpts...)
+	out := new(GetContractOperationalStatusResponse)
+	err := c.cc.Invoke(ctx, ContractBackendService_GetContractOperationalStatus_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// WalletEligibilityServiceServer is the server API for WalletEligibilityService service.
-// All implementations must embed UnimplementedWalletEligibilityServiceServer
+// ContractBackendServiceServer is the server API for ContractBackendService service.
+// All implementations must embed UnimplementedContractBackendServiceServer
 // for forward compatibility.
 //
-// WalletEligibilityService synchronizes 1:1 verified SIWE/ERC-1271 wallet bindings and
-// Funded Term acceptance timestamps between Gateway Backend and Contract Backend.
-type WalletEligibilityServiceServer interface {
-	// PushWalletEligibility is called by Gateway Backend whenever a user links a wallet or accepts term rules.
+// ContractBackendService is hosted by Contract Backend and called by Gateway Backend
+// over WireGuard + TLS + HMAC. Services are cleanly split by hosting side for strict method ACLs.
+type ContractBackendServiceServer interface {
+	// PushFundedTerms pushes approved, reserve-backed FundedTerm configurations from Gateway Billing (authoritative owner) to Contract Backend.
+	PushFundedTerms(context.Context, *PushFundedTermsRequest) (*PushFundedTermsResponse, error)
+	// PushWalletEligibility pushes verified 1:1 SIWE/ERC-1271 wallet bindings and Funded Term acceptances from Gateway to Contract Backend.
 	PushWalletEligibility(context.Context, *PushWalletEligibilityRequest) (*PushWalletEligibilityResponse, error)
-	// PullWalletEligibilityUpdates is called by Contract Backend on startup or reconnect to catch up by cursor.
-	PullWalletEligibilityUpdates(context.Context, *PullWalletEligibilityUpdatesRequest) (*PullWalletEligibilityUpdatesResponse, error)
-	mustEmbedUnimplementedWalletEligibilityServiceServer()
+	// GetContractOperationalStatus fetches read-only pause flags and finalized chain sync height for Gateway Admin (ADM-R22).
+	GetContractOperationalStatus(context.Context, *GetContractOperationalStatusRequest) (*GetContractOperationalStatusResponse, error)
+	mustEmbedUnimplementedContractBackendServiceServer()
 }
 
-// UnimplementedWalletEligibilityServiceServer must be embedded to have
+// UnimplementedContractBackendServiceServer must be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedWalletEligibilityServiceServer struct{}
+type UnimplementedContractBackendServiceServer struct{}
 
-func (UnimplementedWalletEligibilityServiceServer) PushWalletEligibility(context.Context, *PushWalletEligibilityRequest) (*PushWalletEligibilityResponse, error) {
+func (UnimplementedContractBackendServiceServer) PushFundedTerms(context.Context, *PushFundedTermsRequest) (*PushFundedTermsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PushFundedTerms not implemented")
+}
+func (UnimplementedContractBackendServiceServer) PushWalletEligibility(context.Context, *PushWalletEligibilityRequest) (*PushWalletEligibilityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PushWalletEligibility not implemented")
 }
-func (UnimplementedWalletEligibilityServiceServer) PullWalletEligibilityUpdates(context.Context, *PullWalletEligibilityUpdatesRequest) (*PullWalletEligibilityUpdatesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method PullWalletEligibilityUpdates not implemented")
+func (UnimplementedContractBackendServiceServer) GetContractOperationalStatus(context.Context, *GetContractOperationalStatusRequest) (*GetContractOperationalStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetContractOperationalStatus not implemented")
 }
-func (UnimplementedWalletEligibilityServiceServer) mustEmbedUnimplementedWalletEligibilityServiceServer() {
+func (UnimplementedContractBackendServiceServer) mustEmbedUnimplementedContractBackendServiceServer() {
 }
-func (UnimplementedWalletEligibilityServiceServer) testEmbeddedByValue() {}
+func (UnimplementedContractBackendServiceServer) testEmbeddedByValue() {}
 
-// UnsafeWalletEligibilityServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to WalletEligibilityServiceServer will
+// UnsafeContractBackendServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ContractBackendServiceServer will
 // result in compilation errors.
-type UnsafeWalletEligibilityServiceServer interface {
-	mustEmbedUnimplementedWalletEligibilityServiceServer()
+type UnsafeContractBackendServiceServer interface {
+	mustEmbedUnimplementedContractBackendServiceServer()
 }
 
-func RegisterWalletEligibilityServiceServer(s grpc.ServiceRegistrar, srv WalletEligibilityServiceServer) {
-	// If the following call panics, it indicates UnimplementedWalletEligibilityServiceServer was
+func RegisterContractBackendServiceServer(s grpc.ServiceRegistrar, srv ContractBackendServiceServer) {
+	// If the following call panics, it indicates UnimplementedContractBackendServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&WalletEligibilityService_ServiceDesc, srv)
+	s.RegisterService(&ContractBackendService_ServiceDesc, srv)
 }
 
-func _WalletEligibilityService_PushWalletEligibility_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ContractBackendService_PushFundedTerms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PushFundedTermsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContractBackendServiceServer).PushFundedTerms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContractBackendService_PushFundedTerms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContractBackendServiceServer).PushFundedTerms(ctx, req.(*PushFundedTermsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ContractBackendService_PushWalletEligibility_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(PushWalletEligibilityRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WalletEligibilityServiceServer).PushWalletEligibility(ctx, in)
+		return srv.(ContractBackendServiceServer).PushWalletEligibility(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: WalletEligibilityService_PushWalletEligibility_FullMethodName,
+		FullMethod: ContractBackendService_PushWalletEligibility_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletEligibilityServiceServer).PushWalletEligibility(ctx, req.(*PushWalletEligibilityRequest))
+		return srv.(ContractBackendServiceServer).PushWalletEligibility(ctx, req.(*PushWalletEligibilityRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _WalletEligibilityService_PullWalletEligibilityUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PullWalletEligibilityUpdatesRequest)
+func _ContractBackendService_GetContractOperationalStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetContractOperationalStatusRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WalletEligibilityServiceServer).PullWalletEligibilityUpdates(ctx, in)
+		return srv.(ContractBackendServiceServer).GetContractOperationalStatus(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: WalletEligibilityService_PullWalletEligibilityUpdates_FullMethodName,
+		FullMethod: ContractBackendService_GetContractOperationalStatus_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WalletEligibilityServiceServer).PullWalletEligibilityUpdates(ctx, req.(*PullWalletEligibilityUpdatesRequest))
+		return srv.(ContractBackendServiceServer).GetContractOperationalStatus(ctx, req.(*GetContractOperationalStatusRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// WalletEligibilityService_ServiceDesc is the grpc.ServiceDesc for WalletEligibilityService service.
+// ContractBackendService_ServiceDesc is the grpc.ServiceDesc for ContractBackendService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var WalletEligibilityService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "maxshot.contract_grant.v1.WalletEligibilityService",
-	HandlerType: (*WalletEligibilityServiceServer)(nil),
+var ContractBackendService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "maxshot.contract_grant.v1.ContractBackendService",
+	HandlerType: (*ContractBackendServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "PushWalletEligibility",
-			Handler:    _WalletEligibilityService_PushWalletEligibility_Handler,
+			MethodName: "PushFundedTerms",
+			Handler:    _ContractBackendService_PushFundedTerms_Handler,
 		},
 		{
-			MethodName: "PullWalletEligibilityUpdates",
-			Handler:    _WalletEligibilityService_PullWalletEligibilityUpdates_Handler,
+			MethodName: "PushWalletEligibility",
+			Handler:    _ContractBackendService_PushWalletEligibility_Handler,
+		},
+		{
+			MethodName: "GetContractOperationalStatus",
+			Handler:    _ContractBackendService_GetContractOperationalStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -170,16 +210,25 @@ var WalletEligibilityService_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	AitCreditGrantService_IssueAitCreditGrants_FullMethodName = "/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants"
+	AitCreditGrantService_ListFundedTerms_FullMethodName              = "/maxshot.contract_grant.v1.AitCreditGrantService/ListFundedTerms"
+	AitCreditGrantService_PullWalletEligibilityUpdates_FullMethodName = "/maxshot.contract_grant.v1.AitCreditGrantService/PullWalletEligibilityUpdates"
+	AitCreditGrantService_IssueAitCreditGrants_FullMethodName         = "/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants"
 )
 
 // AitCreditGrantServiceClient is the client API for AitCreditGrantService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend at each 7-day boundary.
+// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend
+// over WireGuard + TLS + HMAC for startup/reconnect state catch-up and 7-day boundary Credit grants.
 type AitCreditGrantServiceClient interface {
-	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25).
+	// ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect.
+	ListFundedTerms(ctx context.Context, in *ListFundedTermsRequest, opts ...grpc.CallOption) (*ListFundedTermsResponse, error)
+	// PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
+	PullWalletEligibilityUpdates(ctx context.Context, in *PullWalletEligibilityUpdatesRequest, opts ...grpc.CallOption) (*PullWalletEligibilityUpdatesResponse, error)
+	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+	// Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+	// and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
 	IssueAitCreditGrants(ctx context.Context, in *IssueAitCreditGrantsRequest, opts ...grpc.CallOption) (*IssueAitCreditGrantsResponse, error)
 }
 
@@ -189,6 +238,26 @@ type aitCreditGrantServiceClient struct {
 
 func NewAitCreditGrantServiceClient(cc grpc.ClientConnInterface) AitCreditGrantServiceClient {
 	return &aitCreditGrantServiceClient{cc}
+}
+
+func (c *aitCreditGrantServiceClient) ListFundedTerms(ctx context.Context, in *ListFundedTermsRequest, opts ...grpc.CallOption) (*ListFundedTermsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFundedTermsResponse)
+	err := c.cc.Invoke(ctx, AitCreditGrantService_ListFundedTerms_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *aitCreditGrantServiceClient) PullWalletEligibilityUpdates(ctx context.Context, in *PullWalletEligibilityUpdatesRequest, opts ...grpc.CallOption) (*PullWalletEligibilityUpdatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PullWalletEligibilityUpdatesResponse)
+	err := c.cc.Invoke(ctx, AitCreditGrantService_PullWalletEligibilityUpdates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *aitCreditGrantServiceClient) IssueAitCreditGrants(ctx context.Context, in *IssueAitCreditGrantsRequest, opts ...grpc.CallOption) (*IssueAitCreditGrantsResponse, error) {
@@ -205,9 +274,16 @@ func (c *aitCreditGrantServiceClient) IssueAitCreditGrants(ctx context.Context, 
 // All implementations must embed UnimplementedAitCreditGrantServiceServer
 // for forward compatibility.
 //
-// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend at each 7-day boundary.
+// AitCreditGrantService is hosted by Gateway Billing and called by Contract Backend
+// over WireGuard + TLS + HMAC for startup/reconnect state catch-up and 7-day boundary Credit grants.
 type AitCreditGrantServiceServer interface {
-	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit grants (TOK-R24, TOK-R25).
+	// ListFundedTerms lets Contract Backend pull authoritative FundedTerm configurations on startup or reconnect.
+	ListFundedTerms(context.Context, *ListFundedTermsRequest) (*ListFundedTermsResponse, error)
+	// PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
+	PullWalletEligibilityUpdates(context.Context, *PullWalletEligibilityUpdatesRequest) (*PullWalletEligibilityUpdatesResponse, error)
+	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+	// Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
+	// and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
 	IssueAitCreditGrants(context.Context, *IssueAitCreditGrantsRequest) (*IssueAitCreditGrantsResponse, error)
 	mustEmbedUnimplementedAitCreditGrantServiceServer()
 }
@@ -219,6 +295,12 @@ type AitCreditGrantServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAitCreditGrantServiceServer struct{}
 
+func (UnimplementedAitCreditGrantServiceServer) ListFundedTerms(context.Context, *ListFundedTermsRequest) (*ListFundedTermsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFundedTerms not implemented")
+}
+func (UnimplementedAitCreditGrantServiceServer) PullWalletEligibilityUpdates(context.Context, *PullWalletEligibilityUpdatesRequest) (*PullWalletEligibilityUpdatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PullWalletEligibilityUpdates not implemented")
+}
 func (UnimplementedAitCreditGrantServiceServer) IssueAitCreditGrants(context.Context, *IssueAitCreditGrantsRequest) (*IssueAitCreditGrantsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueAitCreditGrants not implemented")
 }
@@ -241,6 +323,42 @@ func RegisterAitCreditGrantServiceServer(s grpc.ServiceRegistrar, srv AitCreditG
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&AitCreditGrantService_ServiceDesc, srv)
+}
+
+func _AitCreditGrantService_ListFundedTerms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFundedTermsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AitCreditGrantServiceServer).ListFundedTerms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AitCreditGrantService_ListFundedTerms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AitCreditGrantServiceServer).ListFundedTerms(ctx, req.(*ListFundedTermsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AitCreditGrantService_PullWalletEligibilityUpdates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullWalletEligibilityUpdatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AitCreditGrantServiceServer).PullWalletEligibilityUpdates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AitCreditGrantService_PullWalletEligibilityUpdates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AitCreditGrantServiceServer).PullWalletEligibilityUpdates(ctx, req.(*PullWalletEligibilityUpdatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _AitCreditGrantService_IssueAitCreditGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -268,6 +386,14 @@ var AitCreditGrantService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "maxshot.contract_grant.v1.AitCreditGrantService",
 	HandlerType: (*AitCreditGrantServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListFundedTerms",
+			Handler:    _AitCreditGrantService_ListFundedTerms_Handler,
+		},
+		{
+			MethodName: "PullWalletEligibilityUpdates",
+			Handler:    _AitCreditGrantService_PullWalletEligibilityUpdates_Handler,
+		},
 		{
 			MethodName: "IssueAitCreditGrants",
 			Handler:    _AitCreditGrantService_IssueAitCreditGrants_Handler,

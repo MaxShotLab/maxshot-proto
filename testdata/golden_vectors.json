@@ -18,8 +18,8 @@
       "expected_signature": "8f642cffbabce96f638d601f8650e92825df7698ce5a729e8dfd44e83804adef"
     },
     {
-      "name": "stream_watch_catalog_snapshot_empty_handshake",
-      "full_method": "/maxshot.provider_sync.v1.ProviderSyncService/WatchCatalogSnapshot",
+      "name": "stream_watch_sync_events_empty_handshake",
+      "full_method": "/maxshot.provider_sync.v1.ProviderSyncService/WatchSyncEvents",
       "service_id": "gateway-dp",
       "key_id": "k2",
       "secret": "ms_hmac_rotate_secret_fedcba9876543210",
@@ -27,8 +27,8 @@
       "nonce": "ffeeddccbbaa99887766554433221100",
       "payload_hex": "",
       "expected_payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "expected_canonical": "v1\n/maxshot.provider_sync.v1.ProviderSyncService/WatchCatalogSnapshot\ngateway-dp\nk2\n1795670500\nffeeddccbbaa99887766554433221100\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "expected_signature": "1e37c8559d08419edc25cc3e76ce95edada64343a0b11f46a1350fa2ff369905"
+      "expected_canonical": "v1\n/maxshot.provider_sync.v1.ProviderSyncService/WatchSyncEvents\ngateway-dp\nk2\n1795670500\nffeeddccbbaa99887766554433221100\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "expected_signature": "6dc41834c0f68892c7d612be98105c366f6ff432b2abb37796884e61711dba13"
     }
   ]
 }

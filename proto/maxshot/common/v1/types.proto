@@ -4,24 +4,57 @@ package maxshot.common.v1;
 
 option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1;commonv1";
 
-// Modality enumerates supported inference modalities across Provider and Gateway.
+// Modality enumerates supported inference and generation modalities across Provider, Gateway, and Studio.
 enum Modality {
   MODALITY_UNSPECIFIED = 0;
   MODALITY_TEXT = 1;
   MODALITY_IMAGE = 2;
   MODALITY_VIDEO = 3;
   MODALITY_EMBEDDING = 4;
+  MODALITY_RERANK = 5;
+  MODALITY_AUDIO = 6;
 }
 
-// ModelTier represents the subscription/funding tier label assigned by Maxshot.
+// ModelTier represents the model classification tier published by Provider Backend
+// for subscription tier-group management and free-model quota policy.
 enum ModelTier {
   MODEL_TIER_UNSPECIFIED = 0;
   MODEL_TIER_BASIC = 1;
   MODEL_TIER_PREMIUM = 2;
-  MODEL_TIER_FREE = 3;
+  MODEL_TIER_FREE = 3; // Web Chat F-labeled model: $0 within free quota, then falls back to 6-bucket charging
 }
 
-// RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05).
+// FundingBucket enumerates customer funding sources in deterministic consumption order (BIL-R08).
+enum FundingBucket {
+  FUNDING_BUCKET_UNSPECIFIED = 0;
+  FUNDING_BUCKET_FREE_MODEL_QUOTA = 1;  // $0 quota slot for F-labeled models before regular 6-bucket fallback
+  FUNDING_BUCKET_AIT_EARNED = 2;        // 1st paid/earned bucket: 7-day expiring staking grants (earliest expiry first)
+  FUNDING_BUCKET_BASIC_ALLOWANCE = 3;   // 2nd bucket: subscription Basic pool
+  FUNDING_BUCKET_PREMIUM_ALLOWANCE = 4; // 3rd bucket: subscription shared Premium pool (including allow_basic_to_premium)
+  FUNDING_BUCKET_FREE_CREDIT = 5;       // 4th bucket: promotional Free Credits
+  FUNDING_BUCKET_REFERRAL_CREDIT = 6;   // 5th bucket: Maxshot Referral Credits
+  FUNDING_BUCKET_DOLLAR_BALANCE = 7;    // 6th bucket: user-funded USD balance
+}
+
+// KeyFundingStrategy defines how a scoped API key selects funding buckets.
+// - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
+//   when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+// - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
+enum KeyFundingStrategy {
+  KEY_FUNDING_STRATEGY_UNSPECIFIED = 0;
+  KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST = 1;
+  KEY_FUNDING_STRATEGY_PAYG = 2;
+}
+
+// BudgetPeriodKind enumerates spend-cap window types (matching scoped-configuration.ts).
+enum BudgetPeriodKind {
+  BUDGET_PERIOD_KIND_UNSPECIFIED = 0;
+  BUDGET_PERIOD_KIND_DAY = 1;
+  BUDGET_PERIOD_KIND_MONTH = 2;
+  BUDGET_PERIOD_KIND_FIXED = 3;
+}
+
+// RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05 / server-core).
 enum RejectCode {
   REJECT_CODE_UNSPECIFIED = 0;
   REJECT_CODE_KEY_INVALID = 1;
@@ -41,6 +74,31 @@ enum RejectCode {
   REJECT_CODE_DOLLAR_NOT_AUTHORIZED = 15;
   REJECT_CODE_JOB_LIMIT_EXCEEDED = 16;
   REJECT_CODE_IDEMPOTENCY_MISMATCH = 17;
+  REJECT_CODE_ACCOUNT_INACTIVE = 18;
+  REJECT_CODE_SPENDING_LOCKED = 19;
+  REJECT_CODE_POLICY_INELIGIBLE = 20;
+  REJECT_CODE_UNSUPPORTED_CAPABILITY = 21;
+  REJECT_CODE_CONTEXT_LIMIT_EXCEEDED = 22;
+  REJECT_CODE_OUTPUT_LIMIT_EXCEEDED = 23;
+  REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET = 24;
+  REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET = 25;
+  REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED = 26;
+}
+
+// KeyValueAttribute replaces protobuf map<string, string> so Go and TypeScript
+// always produce byte-for-byte identical wire encodings under HMAC verification.
+message KeyValueAttribute {
+  string key = 1;
+  string value = 2;
+}
+
+// BudgetPeriodRule defines one daily, monthly, or non-overlapping fixed-window spend limit in micro-USD.
+message BudgetPeriodRule {
+  BudgetPeriodKind kind = 1;
+  int64 limit_micro_usd = 2;
+  string period_key = 3; // required when kind == BUDGET_PERIOD_KIND_FIXED
+  int64 starts_at_unix_ms = 4;
+  int64 ends_at_unix_ms = 5;
 }
 
 // CursorPageRequest provides cursor-based pagination for incremental cross-repo sync.

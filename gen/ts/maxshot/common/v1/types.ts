@@ -11,13 +11,15 @@ export const protobufPackage = "maxshot.common.v1";
 
 export const protobufFileName = "maxshot/common/v1/types.proto";
 
-/** Modality enumerates supported inference modalities across Provider and Gateway. */
+/** Modality enumerates supported inference and generation modalities across Provider, Gateway, and Studio. */
 export enum Modality {
   MODALITY_UNSPECIFIED = 0,
   MODALITY_TEXT = 1,
   MODALITY_IMAGE = 2,
   MODALITY_VIDEO = 3,
   MODALITY_EMBEDDING = 4,
+  MODALITY_RERANK = 5,
+  MODALITY_AUDIO = 6,
   UNRECOGNIZED = -1,
 }
 
@@ -38,6 +40,12 @@ export function modalityFromJSON(object: any): Modality {
     case 4:
     case "MODALITY_EMBEDDING":
       return Modality.MODALITY_EMBEDDING;
+    case 5:
+    case "MODALITY_RERANK":
+      return Modality.MODALITY_RERANK;
+    case 6:
+    case "MODALITY_AUDIO":
+      return Modality.MODALITY_AUDIO;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -57,17 +65,25 @@ export function modalityToJSON(object: Modality): string {
       return "MODALITY_VIDEO";
     case Modality.MODALITY_EMBEDDING:
       return "MODALITY_EMBEDDING";
+    case Modality.MODALITY_RERANK:
+      return "MODALITY_RERANK";
+    case Modality.MODALITY_AUDIO:
+      return "MODALITY_AUDIO";
     case Modality.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
 }
 
-/** ModelTier represents the subscription/funding tier label assigned by Maxshot. */
+/**
+ * ModelTier represents the model classification tier published by Provider Backend
+ * for subscription tier-group management and free-model quota policy.
+ */
 export enum ModelTier {
   MODEL_TIER_UNSPECIFIED = 0,
   MODEL_TIER_BASIC = 1,
   MODEL_TIER_PREMIUM = 2,
+  /** MODEL_TIER_FREE - Web Chat F-labeled model: $0 within free quota, then falls back to 6-bucket charging */
   MODEL_TIER_FREE = 3,
   UNRECOGNIZED = -1,
 }
@@ -109,7 +125,175 @@ export function modelTierToJSON(object: ModelTier): string {
   }
 }
 
-/** RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05). */
+/** FundingBucket enumerates customer funding sources in deterministic consumption order (BIL-R08). */
+export enum FundingBucket {
+  FUNDING_BUCKET_UNSPECIFIED = 0,
+  /** FUNDING_BUCKET_FREE_MODEL_QUOTA - $0 quota slot for F-labeled models before regular 6-bucket fallback */
+  FUNDING_BUCKET_FREE_MODEL_QUOTA = 1,
+  /** FUNDING_BUCKET_AIT_EARNED - 1st paid/earned bucket: 7-day expiring staking grants (earliest expiry first) */
+  FUNDING_BUCKET_AIT_EARNED = 2,
+  /** FUNDING_BUCKET_BASIC_ALLOWANCE - 2nd bucket: subscription Basic pool */
+  FUNDING_BUCKET_BASIC_ALLOWANCE = 3,
+  /** FUNDING_BUCKET_PREMIUM_ALLOWANCE - 3rd bucket: subscription shared Premium pool (including allow_basic_to_premium) */
+  FUNDING_BUCKET_PREMIUM_ALLOWANCE = 4,
+  /** FUNDING_BUCKET_FREE_CREDIT - 4th bucket: promotional Free Credits */
+  FUNDING_BUCKET_FREE_CREDIT = 5,
+  /** FUNDING_BUCKET_REFERRAL_CREDIT - 5th bucket: Maxshot Referral Credits */
+  FUNDING_BUCKET_REFERRAL_CREDIT = 6,
+  /** FUNDING_BUCKET_DOLLAR_BALANCE - 6th bucket: user-funded USD balance */
+  FUNDING_BUCKET_DOLLAR_BALANCE = 7,
+  UNRECOGNIZED = -1,
+}
+
+export function fundingBucketFromJSON(object: any): FundingBucket {
+  switch (object) {
+    case 0:
+    case "FUNDING_BUCKET_UNSPECIFIED":
+      return FundingBucket.FUNDING_BUCKET_UNSPECIFIED;
+    case 1:
+    case "FUNDING_BUCKET_FREE_MODEL_QUOTA":
+      return FundingBucket.FUNDING_BUCKET_FREE_MODEL_QUOTA;
+    case 2:
+    case "FUNDING_BUCKET_AIT_EARNED":
+      return FundingBucket.FUNDING_BUCKET_AIT_EARNED;
+    case 3:
+    case "FUNDING_BUCKET_BASIC_ALLOWANCE":
+      return FundingBucket.FUNDING_BUCKET_BASIC_ALLOWANCE;
+    case 4:
+    case "FUNDING_BUCKET_PREMIUM_ALLOWANCE":
+      return FundingBucket.FUNDING_BUCKET_PREMIUM_ALLOWANCE;
+    case 5:
+    case "FUNDING_BUCKET_FREE_CREDIT":
+      return FundingBucket.FUNDING_BUCKET_FREE_CREDIT;
+    case 6:
+    case "FUNDING_BUCKET_REFERRAL_CREDIT":
+      return FundingBucket.FUNDING_BUCKET_REFERRAL_CREDIT;
+    case 7:
+    case "FUNDING_BUCKET_DOLLAR_BALANCE":
+      return FundingBucket.FUNDING_BUCKET_DOLLAR_BALANCE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FundingBucket.UNRECOGNIZED;
+  }
+}
+
+export function fundingBucketToJSON(object: FundingBucket): string {
+  switch (object) {
+    case FundingBucket.FUNDING_BUCKET_UNSPECIFIED:
+      return "FUNDING_BUCKET_UNSPECIFIED";
+    case FundingBucket.FUNDING_BUCKET_FREE_MODEL_QUOTA:
+      return "FUNDING_BUCKET_FREE_MODEL_QUOTA";
+    case FundingBucket.FUNDING_BUCKET_AIT_EARNED:
+      return "FUNDING_BUCKET_AIT_EARNED";
+    case FundingBucket.FUNDING_BUCKET_BASIC_ALLOWANCE:
+      return "FUNDING_BUCKET_BASIC_ALLOWANCE";
+    case FundingBucket.FUNDING_BUCKET_PREMIUM_ALLOWANCE:
+      return "FUNDING_BUCKET_PREMIUM_ALLOWANCE";
+    case FundingBucket.FUNDING_BUCKET_FREE_CREDIT:
+      return "FUNDING_BUCKET_FREE_CREDIT";
+    case FundingBucket.FUNDING_BUCKET_REFERRAL_CREDIT:
+      return "FUNDING_BUCKET_REFERRAL_CREDIT";
+    case FundingBucket.FUNDING_BUCKET_DOLLAR_BALANCE:
+      return "FUNDING_BUCKET_DOLLAR_BALANCE";
+    case FundingBucket.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * KeyFundingStrategy defines how a scoped API key selects funding buckets.
+ * - SUBSCRIPTION_FIRST: uses AIT Earned (when allow_ait_earned_credit=true), then Basic/Premium allowances;
+ *   when dollar_relay_enabled=false, blocks all non-subscription PAYG buckets (Free, Referral, Dollar).
+ * - PAYG: skips subscription allowances; uses AIT Earned (when allow_ait_earned_credit=true), then Free -> Referral -> Dollar.
+ */
+export enum KeyFundingStrategy {
+  KEY_FUNDING_STRATEGY_UNSPECIFIED = 0,
+  KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST = 1,
+  KEY_FUNDING_STRATEGY_PAYG = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function keyFundingStrategyFromJSON(object: any): KeyFundingStrategy {
+  switch (object) {
+    case 0:
+    case "KEY_FUNDING_STRATEGY_UNSPECIFIED":
+      return KeyFundingStrategy.KEY_FUNDING_STRATEGY_UNSPECIFIED;
+    case 1:
+    case "KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST":
+      return KeyFundingStrategy.KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST;
+    case 2:
+    case "KEY_FUNDING_STRATEGY_PAYG":
+      return KeyFundingStrategy.KEY_FUNDING_STRATEGY_PAYG;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return KeyFundingStrategy.UNRECOGNIZED;
+  }
+}
+
+export function keyFundingStrategyToJSON(object: KeyFundingStrategy): string {
+  switch (object) {
+    case KeyFundingStrategy.KEY_FUNDING_STRATEGY_UNSPECIFIED:
+      return "KEY_FUNDING_STRATEGY_UNSPECIFIED";
+    case KeyFundingStrategy.KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST:
+      return "KEY_FUNDING_STRATEGY_SUBSCRIPTION_FIRST";
+    case KeyFundingStrategy.KEY_FUNDING_STRATEGY_PAYG:
+      return "KEY_FUNDING_STRATEGY_PAYG";
+    case KeyFundingStrategy.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** BudgetPeriodKind enumerates spend-cap window types (matching scoped-configuration.ts). */
+export enum BudgetPeriodKind {
+  BUDGET_PERIOD_KIND_UNSPECIFIED = 0,
+  BUDGET_PERIOD_KIND_DAY = 1,
+  BUDGET_PERIOD_KIND_MONTH = 2,
+  BUDGET_PERIOD_KIND_FIXED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function budgetPeriodKindFromJSON(object: any): BudgetPeriodKind {
+  switch (object) {
+    case 0:
+    case "BUDGET_PERIOD_KIND_UNSPECIFIED":
+      return BudgetPeriodKind.BUDGET_PERIOD_KIND_UNSPECIFIED;
+    case 1:
+    case "BUDGET_PERIOD_KIND_DAY":
+      return BudgetPeriodKind.BUDGET_PERIOD_KIND_DAY;
+    case 2:
+    case "BUDGET_PERIOD_KIND_MONTH":
+      return BudgetPeriodKind.BUDGET_PERIOD_KIND_MONTH;
+    case 3:
+    case "BUDGET_PERIOD_KIND_FIXED":
+      return BudgetPeriodKind.BUDGET_PERIOD_KIND_FIXED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return BudgetPeriodKind.UNRECOGNIZED;
+  }
+}
+
+export function budgetPeriodKindToJSON(object: BudgetPeriodKind): string {
+  switch (object) {
+    case BudgetPeriodKind.BUDGET_PERIOD_KIND_UNSPECIFIED:
+      return "BUDGET_PERIOD_KIND_UNSPECIFIED";
+    case BudgetPeriodKind.BUDGET_PERIOD_KIND_DAY:
+      return "BUDGET_PERIOD_KIND_DAY";
+    case BudgetPeriodKind.BUDGET_PERIOD_KIND_MONTH:
+      return "BUDGET_PERIOD_KIND_MONTH";
+    case BudgetPeriodKind.BUDGET_PERIOD_KIND_FIXED:
+      return "BUDGET_PERIOD_KIND_FIXED";
+    case BudgetPeriodKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** RejectCode enumerates deterministic pre-dispatch rejection reasons (BIL-R24 / AGT-R05 / server-core). */
 export enum RejectCode {
   REJECT_CODE_UNSPECIFIED = 0,
   REJECT_CODE_KEY_INVALID = 1,
@@ -129,6 +313,15 @@ export enum RejectCode {
   REJECT_CODE_DOLLAR_NOT_AUTHORIZED = 15,
   REJECT_CODE_JOB_LIMIT_EXCEEDED = 16,
   REJECT_CODE_IDEMPOTENCY_MISMATCH = 17,
+  REJECT_CODE_ACCOUNT_INACTIVE = 18,
+  REJECT_CODE_SPENDING_LOCKED = 19,
+  REJECT_CODE_POLICY_INELIGIBLE = 20,
+  REJECT_CODE_UNSUPPORTED_CAPABILITY = 21,
+  REJECT_CODE_CONTEXT_LIMIT_EXCEEDED = 22,
+  REJECT_CODE_OUTPUT_LIMIT_EXCEEDED = 23,
+  REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET = 24,
+  REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET = 25,
+  REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED = 26,
   UNRECOGNIZED = -1,
 }
 
@@ -188,6 +381,33 @@ export function rejectCodeFromJSON(object: any): RejectCode {
     case 17:
     case "REJECT_CODE_IDEMPOTENCY_MISMATCH":
       return RejectCode.REJECT_CODE_IDEMPOTENCY_MISMATCH;
+    case 18:
+    case "REJECT_CODE_ACCOUNT_INACTIVE":
+      return RejectCode.REJECT_CODE_ACCOUNT_INACTIVE;
+    case 19:
+    case "REJECT_CODE_SPENDING_LOCKED":
+      return RejectCode.REJECT_CODE_SPENDING_LOCKED;
+    case 20:
+    case "REJECT_CODE_POLICY_INELIGIBLE":
+      return RejectCode.REJECT_CODE_POLICY_INELIGIBLE;
+    case 21:
+    case "REJECT_CODE_UNSUPPORTED_CAPABILITY":
+      return RejectCode.REJECT_CODE_UNSUPPORTED_CAPABILITY;
+    case 22:
+    case "REJECT_CODE_CONTEXT_LIMIT_EXCEEDED":
+      return RejectCode.REJECT_CODE_CONTEXT_LIMIT_EXCEEDED;
+    case 23:
+    case "REJECT_CODE_OUTPUT_LIMIT_EXCEEDED":
+      return RejectCode.REJECT_CODE_OUTPUT_LIMIT_EXCEEDED;
+    case 24:
+    case "REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET":
+      return RejectCode.REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET;
+    case 25:
+    case "REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET":
+      return RejectCode.REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET;
+    case 26:
+    case "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED":
+      return RejectCode.REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -233,10 +453,47 @@ export function rejectCodeToJSON(object: RejectCode): string {
       return "REJECT_CODE_JOB_LIMIT_EXCEEDED";
     case RejectCode.REJECT_CODE_IDEMPOTENCY_MISMATCH:
       return "REJECT_CODE_IDEMPOTENCY_MISMATCH";
+    case RejectCode.REJECT_CODE_ACCOUNT_INACTIVE:
+      return "REJECT_CODE_ACCOUNT_INACTIVE";
+    case RejectCode.REJECT_CODE_SPENDING_LOCKED:
+      return "REJECT_CODE_SPENDING_LOCKED";
+    case RejectCode.REJECT_CODE_POLICY_INELIGIBLE:
+      return "REJECT_CODE_POLICY_INELIGIBLE";
+    case RejectCode.REJECT_CODE_UNSUPPORTED_CAPABILITY:
+      return "REJECT_CODE_UNSUPPORTED_CAPABILITY";
+    case RejectCode.REJECT_CODE_CONTEXT_LIMIT_EXCEEDED:
+      return "REJECT_CODE_CONTEXT_LIMIT_EXCEEDED";
+    case RejectCode.REJECT_CODE_OUTPUT_LIMIT_EXCEEDED:
+      return "REJECT_CODE_OUTPUT_LIMIT_EXCEEDED";
+    case RejectCode.REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET:
+      return "REJECT_CODE_OVER_ACCOUNT_DAILY_BUDGET";
+    case RejectCode.REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET:
+      return "REJECT_CODE_OVER_ACCOUNT_MONTHLY_BUDGET";
+    case RejectCode.REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED:
+      return "REJECT_CODE_DOLLAR_CONFIRMATION_REQUIRED";
     case RejectCode.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+/**
+ * KeyValueAttribute replaces protobuf map<string, string> so Go and TypeScript
+ * always produce byte-for-byte identical wire encodings under HMAC verification.
+ */
+export interface KeyValueAttribute {
+  key: string;
+  value: string;
+}
+
+/** BudgetPeriodRule defines one daily, monthly, or non-overlapping fixed-window spend limit in micro-USD. */
+export interface BudgetPeriodRule {
+  kind: BudgetPeriodKind;
+  limitMicroUsd: bigint;
+  /** required when kind == BUDGET_PERIOD_KIND_FIXED */
+  periodKey: string;
+  startsAtUnixMs: bigint;
+  endsAtUnixMs: bigint;
 }
 
 /** CursorPageRequest provides cursor-based pagination for incremental cross-repo sync. */
@@ -250,6 +507,255 @@ export interface CursorPageResponse {
   nextCursor: string;
   hasMore: boolean;
 }
+
+function createBaseKeyValueAttribute(): KeyValueAttribute {
+  return { key: "", value: "" };
+}
+
+export const KeyValueAttribute: MessageFns<KeyValueAttribute> = {
+  encode(message: KeyValueAttribute, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): KeyValueAttribute {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseKeyValueAttribute();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.value = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): KeyValueAttribute {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: KeyValueAttribute): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<KeyValueAttribute>, I>>(base?: I): KeyValueAttribute {
+    return KeyValueAttribute.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<KeyValueAttribute>, I>>(object: I): KeyValueAttribute {
+    const message = createBaseKeyValueAttribute();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseBudgetPeriodRule(): BudgetPeriodRule {
+  return { kind: 0, limitMicroUsd: 0n, periodKey: "", startsAtUnixMs: 0n, endsAtUnixMs: 0n };
+}
+
+export const BudgetPeriodRule: MessageFns<BudgetPeriodRule> = {
+  encode(message: BudgetPeriodRule, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.kind !== 0) {
+      writer.uint32(8).int32(message.kind);
+    }
+    if (message.limitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.limitMicroUsd) !== message.limitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.limitMicroUsd of type int64 too large");
+      }
+      writer.uint32(16).int64(message.limitMicroUsd);
+    }
+    if (message.periodKey !== "") {
+      writer.uint32(26).string(message.periodKey);
+    }
+    if (message.startsAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.startsAtUnixMs) !== message.startsAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.startsAtUnixMs of type int64 too large");
+      }
+      writer.uint32(32).int64(message.startsAtUnixMs);
+    }
+    if (message.endsAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.endsAtUnixMs) !== message.endsAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.endsAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.endsAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BudgetPeriodRule {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseBudgetPeriodRule();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.kind = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.limitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.periodKey = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.startsAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.endsAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): BudgetPeriodRule {
+    return {
+      kind: isSet(object.kind) ? budgetPeriodKindFromJSON(object.kind) : 0,
+      limitMicroUsd: isSet(object.limitMicroUsd)
+        ? BigInt(object.limitMicroUsd)
+        : isSet(object.limit_micro_usd)
+        ? BigInt(object.limit_micro_usd)
+        : 0n,
+      periodKey: isSet(object.periodKey)
+        ? globalThis.String(object.periodKey)
+        : isSet(object.period_key)
+        ? globalThis.String(object.period_key)
+        : "",
+      startsAtUnixMs: isSet(object.startsAtUnixMs)
+        ? BigInt(object.startsAtUnixMs)
+        : isSet(object.starts_at_unix_ms)
+        ? BigInt(object.starts_at_unix_ms)
+        : 0n,
+      endsAtUnixMs: isSet(object.endsAtUnixMs)
+        ? BigInt(object.endsAtUnixMs)
+        : isSet(object.ends_at_unix_ms)
+        ? BigInt(object.ends_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: BudgetPeriodRule): unknown {
+    const obj: any = {};
+    if (message.kind !== 0) {
+      obj.kind = budgetPeriodKindToJSON(message.kind);
+    }
+    if (message.limitMicroUsd !== 0n) {
+      obj.limitMicroUsd = message.limitMicroUsd.toString();
+    }
+    if (message.periodKey !== "") {
+      obj.periodKey = message.periodKey;
+    }
+    if (message.startsAtUnixMs !== 0n) {
+      obj.startsAtUnixMs = message.startsAtUnixMs.toString();
+    }
+    if (message.endsAtUnixMs !== 0n) {
+      obj.endsAtUnixMs = message.endsAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<BudgetPeriodRule>, I>>(base?: I): BudgetPeriodRule {
+    return BudgetPeriodRule.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<BudgetPeriodRule>, I>>(object: I): BudgetPeriodRule {
+    const message = createBaseBudgetPeriodRule();
+    message.kind = object.kind ?? 0;
+    message.limitMicroUsd = (object.limitMicroUsd !== undefined && object.limitMicroUsd !== null)
+      ? BigInt(object.limitMicroUsd)
+      : 0n;
+    message.periodKey = object.periodKey ?? "";
+    message.startsAtUnixMs = (object.startsAtUnixMs !== undefined && object.startsAtUnixMs !== null)
+      ? BigInt(object.startsAtUnixMs)
+      : 0n;
+    message.endsAtUnixMs = (object.endsAtUnixMs !== undefined && object.endsAtUnixMs !== null)
+      ? BigInt(object.endsAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
 
 function createBaseCursorPageRequest(): CursorPageRequest {
   return { cursor: "", limit: 0 };

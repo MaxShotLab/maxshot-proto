@@ -2,10 +2,13 @@ import crypto from "node:crypto";
 import * as grpc from "@grpc/grpc-js";
 import {
   AitCreditGrantServiceService,
-  WalletEligibilityServiceService,
+  ContractBackendServiceService,
 } from "../../gen/ts/maxshot/contract_grant/v1/contract_grant.js";
 import { BillingExecutionServiceService } from "../../gen/ts/maxshot/gateway_internal/v1/execution.js";
-import { ProviderSyncServiceService } from "../../gen/ts/maxshot/provider_sync/v1/provider_sync.js";
+import {
+  GatewayReconciliationServiceService,
+  ProviderSyncServiceService,
+} from "../../gen/ts/maxshot/provider_sync/v1/provider_sync.js";
 
 export const PROTOCOL_VERSION = "v1";
 export const HEADER_SERVICE_ID = "x-ms-service-id";
@@ -191,7 +194,8 @@ function collectSerializers(
 
 const BUILTIN_SERIALIZERS = collectSerializers([
   ProviderSyncServiceService,
-  WalletEligibilityServiceService,
+  GatewayReconciliationServiceService,
+  ContractBackendServiceService,
   AitCreditGrantServiceService,
   BillingExecutionServiceService,
 ]);

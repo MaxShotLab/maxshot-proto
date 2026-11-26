@@ -6,17 +6,39 @@ import "maxshot/common/v1/types.proto";
 
 option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1;gatewayinternalv1";
 
-// BillingExecutionService is the intra-Gateway synchronous gRPC contract between
-// Go Data Plane (gateway-dataplane) and TypeScript Billing Service (billing-account-service).
+// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
+// hosted by TypeScript billing-account-service and called by:
+// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
+// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
+// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 service BillingExecutionService {
-  // AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold.
+  // ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+  // so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+  rpc ResolvePrincipalScope(ResolvePrincipalScopeRequest) returns (ResolvePrincipalScopeResponse);
+
+  // PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+  // F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+  rpc PreviewQuote(PreviewQuoteRequest) returns (PreviewQuoteResponse);
+
+  // AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+  // and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
   rpc AuthorizeAndHold(AuthorizeAndHoldRequest) returns (AuthorizeAndHoldResponse);
 
   // MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
   rpc MarkSending(MarkSendingRequest) returns (MarkSendingResponse);
 
-  // Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds.
+  // ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs.
+  rpc ExtendExecutionLease(ExtendExecutionLeaseRequest) returns (ExtendExecutionLeaseResponse);
+
+  // Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+  // records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
   rpc Settle(SettleRequest) returns (SettleResponse);
+
+  // MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
+  rpc MarkUncertain(MarkUncertainRequest) returns (MarkUncertainResponse);
+
+  // ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+  rpc ResolveUncertain(ResolveUncertainRequest) returns (ResolveUncertainResponse);
 }
 
 enum ExecutionChannel {
@@ -26,41 +48,231 @@ enum ExecutionChannel {
   EXECUTION_CHANNEL_STUDIO = 3;
 }
 
+enum RouteSelectionMode {
+  ROUTE_SELECTION_MODE_UNSPECIFIED = 0;
+  ROUTE_SELECTION_MODE_MODEL_AUTO_PROVIDER = 1; // customer chose modelId, Gateway picked lowest-cost offering
+  ROUTE_SELECTION_MODE_MODEL_PINNED_OFFERING = 2; // customer pinned offeringId, zero fallback allowed
+  ROUTE_SELECTION_MODE_AUTO_MODEL = 3; // customer chose maxshot/auto, converged to concrete modelId before hold
+}
+
+enum HoldDecisionStatus {
+  HOLD_DECISION_STATUS_UNSPECIFIED = 0;
+  HOLD_DECISION_STATUS_ADMITTED = 1;
+  HOLD_DECISION_STATUS_REJECTED = 2;
+  HOLD_DECISION_STATUS_IDEMPOTENT_IN_PROGRESS = 3;
+  HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED = 4;
+}
+
 enum SettlementOutcome {
   SETTLEMENT_OUTCOME_UNSPECIFIED = 0;
   SETTLEMENT_OUTCOME_DELIVERED = 1;
-  SETTLEMENT_OUTCOME_NOT_ACCEPTED = 2;
-  SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 3;
-  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 4;
+  SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED = 2; // Studio partial outputs / completed preprocessing (BIL-R33)
+  SETTLEMENT_OUTCOME_NOT_ACCEPTED = 3;
+  SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 4;
+  SETTLEMENT_OUTCOME_CANCELLED = 5;           // charges completed outputs/components, releases remainder
+  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 6; // missing final usage; 24h auto-release applies
+}
+
+enum AttemptErrorClass {
+  ATTEMPT_ERROR_CLASS_UNSPECIFIED = 0;
+  ATTEMPT_ERROR_CLASS_NONE = 1;
+  ATTEMPT_ERROR_CLASS_HTTP_429 = 2;
+  ATTEMPT_ERROR_CLASS_HTTP_5XX = 3;
+  ATTEMPT_ERROR_CLASS_TIMEOUT = 4;
+  ATTEMPT_ERROR_CLASS_CONNECTION_ERROR = 5;
+  ATTEMPT_ERROR_CLASS_MID_STREAM_FAILURE = 6;
+  ATTEMPT_ERROR_CLASS_MALFORMED_OUTPUT = 7;
+  ATTEMPT_ERROR_CLASS_USER_INPUT_4XX = 8;
+  ATTEMPT_ERROR_CLASS_CONTENT_POLICY = 9;
+  ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED = 10;
+}
+
+enum UncertainResolutionAction {
+  UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED = 0;
+  UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED = 1;
+  UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST = 2;
+  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3;
+}
+
+// UsageBound unifies multi-dimensional LLM token bounds/meters and Studio/API media generation units.
+message UsageBound {
+  int64 input_tokens = 1;
+  int64 output_tokens = 2;
+  int64 cache_read_tokens = 3;
+  int64 cache_write_tokens = 4;
+  int64 reasoning_tokens = 5;
+  int64 input_images = 6;
+  int64 input_image_tokens = 7;
+  int64 input_audio_tokens = 8;
+  int64 input_audio_cache_read_tokens = 9;
+  bool has_input_audio = 10;
+  int64 web_search_calls = 11;
+  // Media & async generation dimensions
+  int32 media_output_count = 12;
+  int64 media_duration_seconds = 13;
+  int32 media_width = 14;
+  int32 media_height = 15;
+  string media_megapixels_dec = 16;
+  bool media_has_audio = 17;
+  int64 media_character_count = 18;
+  repeated maxshot.common.v1.KeyValueAttribute media_attributes = 19; // e.g. path=i2v, resolution=1080p, edit_tool=inpaint
+}
+
+message QuoteComponentLine {
+  string item = 1;
+  int64 estimated_credits = 2;
+  int64 hard_max_credits = 3;
+}
+
+message BucketAllocationLine {
+  maxshot.common.v1.FundingBucket bucket = 1;
+  string source_id = 2; // grant_id or subscription_period_id
+  int64 credits = 3;
+  int64 dollar_micro_usd = 4;
+  int64 expires_at_unix_ms = 5;
+}
+
+// SpendingLimitDiagnostic mirrors server-core SpendingLimitExceededDescription (never exposes supplier budgets).
+message SpendingLimitDiagnostic {
+  string scope = 1; // "account" | "api_key"
+  maxshot.common.v1.BudgetPeriodKind period = 2;
+  string unit = 3;  // "credits" | "gross"
+  int64 limit = 4;
+  int64 used = 5;
+  int64 pending_reserved = 6;
+  int64 required_reserve = 7;
+  int64 available = 8;
+  int64 resets_at_unix_ms = 9;
+  string reason = 10;
+}
+
+// CreditShortfallDiagnostic mirrors server-core CreditReservationContext.
+message CreditShortfallDiagnostic {
+  int64 required_reservation_credits = 1;
+  int64 available_credits = 2;
+  int64 short_credits = 3;
+  repeated string funding_reasons = 4;
+}
+
+message ThresholdWarning {
+  string warning_kind = 1; // "window_5h_90pct" | "window_weekly_90pct" | "basic_monthly_90pct" | "premium_monthly_90pct"
+  int32 used_percent = 2;
+  int64 resets_at_unix_ms = 3;
+}
+
+message LockedVersionSet {
+  string catalog_version = 1;
+  string primary_rate_card_version = 2;
+  string backup_rate_card_version = 3;
+  string plan_version = 4;
+  string fx_version = 5;
+}
+
+message ResolvePrincipalScopeRequest {
+  string api_key_sha256 = 1;
+  string internal_account_id = 2;
+  string client_region = 3;
+}
+
+message ResolvePrincipalScopeResponse {
+  bool authenticated = 1;
+  maxshot.common.v1.RejectCode reject_code = 2;
+  string reject_message = 3;
+  string account_id = 4;
+  string api_key_id = 5;
+  maxshot.common.v1.KeyFundingStrategy key_funding_strategy = 6;
+  bool allow_ait_earned_credit = 7; // independent key toggle (default true)
+  bool dollar_relay_enabled = 8;    // on SUBSCRIPTION_FIRST keys, false blocks Free + Referral + Dollar
+  bool allow_basic_to_premium = 9;  // account setting "Continue with Premium when Basic is not enough"
+  repeated string allowed_catalog_ids = 10;
+  repeated string model_allowlist = 11;
+  string active_plan_id = 12;
+  repeated string plan_basic_group_ids = 13;
+  repeated string plan_premium_group_ids = 14;
+}
+
+message PreviewQuoteRequest {
+  string api_key_sha256 = 1;
+  string internal_account_id = 2;
+  ExecutionChannel channel = 3;
+  maxshot.common.v1.Modality modality = 4;
+  RouteSelectionMode selection_mode = 5;
+  string model_id = 6;
+  string catalog_version = 7;
+  string primary_offering_id = 8;
+  string backup_offering_id = 9;
+  UsageBound estimate_bound = 10;
+  UsageBound hard_max_bound = 11;
+  int64 caller_ceiling_micro_usd = 12;
+  bool zero_retention = 13;
+  string client_region = 14;
+}
+
+message PreviewQuoteResponse {
+  bool eligible = 1;
+  maxshot.common.v1.RejectCode reject_code = 2;
+  string reject_message = 3;
+  int64 estimated_credits = 4;
+  int64 hard_max_credits = 5;
+  int64 hard_max_micro_usd = 6;
+  bool uses_free_model_quota = 7;
+  bool free_model_quota_exhausted_fallback = 8; // F-model free quota exhausted; quote reflects regular 6-bucket fallback
+  bool requires_dollar_confirmation = 9;        // BIL-R23: Studio UI must prompt user to confirm max Dollar debit
+  int64 max_dollar_debit_micro_usd = 10;
+  bool basic_to_premium_projected = 11;
+  repeated QuoteComponentLine breakdown = 12;
+  repeated BucketAllocationLine projected_hold_buckets = 13;
+  SpendingLimitDiagnostic budget_diagnostic = 14;
+  CreditShortfallDiagnostic credit_diagnostic = 15;
 }
 
 message AuthorizeAndHoldRequest {
   string trace_id = 1;
-  string idempotency_key = 2;
-  string request_body_sha256 = 3;
-  string api_key_sha256 = 4;          // populated when channel == EXECUTION_CHANNEL_API
-  string internal_account_id = 5;     // populated when channel == WEB_CHAT or STUDIO
-  ExecutionChannel channel = 6;
-  maxshot.common.v1.Modality modality = 7;
-  string model_id = 8;
-  string catalog_version = 9;
-  string primary_offering_id = 10;
-  string backup_offering_id = 11;
-  int64 input_tokens_upper = 12;
-  int64 effective_max_output_tokens = 13;
-  int64 caller_ceiling_micro_usd = 14;
-  bool dollar_confirmed = 15;
+  string idempotency_scope = 2;
+  string idempotency_key = 3;
+  string request_body_sha256 = 4;
+  string api_key_sha256 = 5;          // populated when channel == EXECUTION_CHANNEL_API or API Studio
+  string internal_account_id = 6;     // populated when authenticated via Web session JWT
+  ExecutionChannel channel = 7;
+  maxshot.common.v1.Modality modality = 8;
+  RouteSelectionMode selection_mode = 9;
+  string requested_model_id = 10;     // e.g. "maxshot/auto" or concrete model_id
+  string model_id = 11;               // resolved concrete customer model_id
+  string auto_task_label = 12;
+  string catalog_version = 13;
+  string primary_offering_id = 14;
+  string backup_offering_id = 15;
+  UsageBound estimate_bound = 16;
+  UsageBound hard_max_bound = 17;
+  int64 caller_ceiling_micro_usd = 18;
+  bool dollar_confirmed = 19;
+  bool zero_retention = 20;
+  string client_region = 21;
+  string studio_operation_id = 22;    // links Studio async job record (BIL-R41)
+  int64 initial_lease_ttl_ms = 23;
 }
 
 message AuthorizeAndHoldResponse {
-  bool admitted = 1;
-  maxshot.common.v1.RejectCode reject_code = 2;
-  string reject_message = 3;
-  string request_id = 4; // ULID, generated only when admitted == true (BIL-R24)
-  string hold_id = 5;
-  string lease_token = 6;
-  int64 computed_hard_max_micro_usd = 7;
-  bool basic_to_premium_used = 8; // reflects "Continue with Premium when Basic is not enough"
+  HoldDecisionStatus status = 1;
+  bool admitted = 2;
+  maxshot.common.v1.RejectCode reject_code = 3;
+  string reject_message = 4;
+  string request_id = 5; // ULID, generated only when admitted (BIL-R24)
+  string hold_id = 6;
+  string lease_token = 7;
+  int64 lease_expires_at_unix_ms = 8;
+  int64 estimated_credits = 9;
+  int64 hard_max_credits = 10;
+  int64 computed_hard_max_micro_usd = 11;
+  int64 provider_cost_ceiling_micro_usd = 12;
+  bool uses_free_model_quota = 13;
+  bool basic_to_premium_used = 14;
+  LockedVersionSet locked_versions = 15;
+  repeated BucketAllocationLine held_buckets = 16;
+  repeated ThresholdWarning threshold_warnings = 17;
+  SpendingLimitDiagnostic budget_diagnostic = 18;
+  CreditShortfallDiagnostic credit_diagnostic = 19;
+  SettleResponse cached_settlement = 20; // populated when status == HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED
 }
 
 message MarkSendingRequest {
@@ -69,37 +281,108 @@ message MarkSendingRequest {
   string offering_id = 3;
   string dispatch_key = 4;
   string lease_token = 5;
+  int64 lease_ttl_ms = 6;
 }
 
 message MarkSendingResponse {
   bool accepted = 1;
+  int64 lease_expires_at_unix_ms = 2;
+  string reject_reason = 3;
+}
+
+message ExtendExecutionLeaseRequest {
+  string request_id = 1;
+  string lease_token = 2;
+  int64 extend_ttl_ms = 3;
+}
+
+message ExtendExecutionLeaseResponse {
+  bool accepted = 1;
+  int64 lease_expires_at_unix_ms = 2;
+}
+
+message MediaOutputSettlementItem {
+  string output_id = 1;
+  int32 output_index = 2;
+  bool delivered = 3;
+  int64 duration_ms = 4;
+  bool has_audio = 5;
+  int32 width = 6;
+  int32 height = 7;
+  string failure_code = 8;
 }
 
 message AttemptCostRecord {
   string attempt_id = 1;
   string offering_id = 2;
   string native_request_id = 3;
-  bool succeeded = 4;
-  int64 input_tokens = 5;
-  int64 output_tokens = 6;
-  int64 cache_read_tokens = 7;
+  string reported_serving_endpoint = 4; // PRV-R10 upstream router proof
+  bool succeeded = 5;
+  AttemptErrorClass error_class = 6;
+  UsageBound usage = 7;
+  string provider_reported_cost_usd_dec = 8;
+  int64 dispatched_at_unix_ms = 9;
+  int64 first_token_at_unix_ms = 10;
+  int64 completed_at_unix_ms = 11;
 }
 
 message SettleRequest {
   string request_id = 1;
-  string lease_token = 2;
-  SettlementOutcome outcome = 3;
-  string serving_offering_id = 4;
-  string native_request_id = 5;
-  int64 verified_input_tokens = 6;
-  int64 verified_output_tokens = 7;
-  int64 verified_cache_read_tokens = 8;
-  int64 estimated_streamed_output_tokens = 9; // audit evidence only when outcome == PENDING_RECONCILIATION
-  repeated AttemptCostRecord attempts = 10;
+  string settlement_idempotency_key = 2;
+  string lease_token = 3;
+  SettlementOutcome outcome = 4;
+  string serving_offering_id = 5;
+  string native_request_id = 6;
+  string reported_serving_endpoint = 7;
+  bool fallback_used = 8;
+  string fallback_reason = 9;
+  UsageBound verified_usage = 10;
+  int64 estimated_streamed_output_tokens = 11; // audit evidence only when PENDING_RECONCILIATION (never billed as invented usage)
+  repeated MediaOutputSettlementItem media_outputs = 12;
+  repeated AttemptCostRecord attempts = 13;
 }
 
 message SettleResponse {
   bool settled = 1;
-  int64 final_customer_charge_micro_usd = 2;
-  int64 released_hold_micro_usd = 3;
+  int64 final_customer_credits = 2;
+  int64 final_customer_charge_micro_usd = 3;
+  int64 released_hold_credits = 4;
+  int64 released_hold_micro_usd = 5;
+  int64 shortfall_top_up_micro_usd = 6;            // extra unfrozen Dollar charged when double-authorized & not ceiling-capped
+  int64 platform_borne_discrepancy_micro_usd = 7;  // overrun or uncompensated shortfall routed to discrepancy ledger
+  int64 settled_provider_payable_micro_usd = 8;
+  int64 auto_release_at_unix_ms = 9;               // set to dispatched_at + 24h when outcome == PENDING_RECONCILIATION
+  repeated BucketAllocationLine settled_buckets = 10;
+  repeated BucketAllocationLine released_buckets = 11;
+}
+
+message MarkUncertainRequest {
+  string request_id = 1;
+  string studio_operation_id = 2;
+  string lease_token = 3;
+  string provider_task_id = 4;
+  string reason = 5;
+}
+
+message MarkUncertainResponse {
+  bool marked = 1;
+  int64 auto_release_at_unix_ms = 2; // dispatched_at + 24h (BIL-R36)
+}
+
+message ResolveUncertainRequest {
+  string request_id = 1;
+  string resolution_idempotency_key = 2;
+  UncertainResolutionAction action = 3;
+  string actor_id = 4; // operator ID or "system:finance-worker-24h" (ADM-R12)
+  string reason = 5;
+  string serving_offering_id = 6;
+  string native_request_id = 7;
+  UsageBound verified_usage = 8; // populated when action == UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED
+  repeated MediaOutputSettlementItem media_outputs = 9;
+  string late_provider_cost_usd_dec = 10; // recorded into discrepancy ledger if already auto-released (BIL-R36)
+}
+
+message ResolveUncertainResponse {
+  bool resolved = 1;
+  SettleResponse settlement = 2;
 }

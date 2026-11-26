@@ -19,24 +19,46 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	BillingExecutionService_AuthorizeAndHold_FullMethodName = "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold"
-	BillingExecutionService_MarkSending_FullMethodName      = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkSending"
-	BillingExecutionService_Settle_FullMethodName           = "/maxshot.gateway_internal.v1.BillingExecutionService/Settle"
+	BillingExecutionService_ResolvePrincipalScope_FullMethodName = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolvePrincipalScope"
+	BillingExecutionService_PreviewQuote_FullMethodName          = "/maxshot.gateway_internal.v1.BillingExecutionService/PreviewQuote"
+	BillingExecutionService_AuthorizeAndHold_FullMethodName      = "/maxshot.gateway_internal.v1.BillingExecutionService/AuthorizeAndHold"
+	BillingExecutionService_MarkSending_FullMethodName           = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkSending"
+	BillingExecutionService_ExtendExecutionLease_FullMethodName  = "/maxshot.gateway_internal.v1.BillingExecutionService/ExtendExecutionLease"
+	BillingExecutionService_Settle_FullMethodName                = "/maxshot.gateway_internal.v1.BillingExecutionService/Settle"
+	BillingExecutionService_MarkUncertain_FullMethodName         = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkUncertain"
+	BillingExecutionService_ResolveUncertain_FullMethodName      = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain"
 )
 
 // BillingExecutionServiceClient is the client API for BillingExecutionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// BillingExecutionService is the intra-Gateway synchronous gRPC contract between
-// Go Data Plane (gateway-dataplane) and TypeScript Billing Service (billing-account-service).
+// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
+// hosted by TypeScript billing-account-service and called by:
+// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
+// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
+// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 type BillingExecutionServiceClient interface {
-	// AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold.
+	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+	// so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+	ResolvePrincipalScope(ctx context.Context, in *ResolvePrincipalScopeRequest, opts ...grpc.CallOption) (*ResolvePrincipalScopeResponse, error)
+	// PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+	// F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+	PreviewQuote(ctx context.Context, in *PreviewQuoteRequest, opts ...grpc.CallOption) (*PreviewQuoteResponse, error)
+	// AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+	// and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
 	AuthorizeAndHold(ctx context.Context, in *AuthorizeAndHoldRequest, opts ...grpc.CallOption) (*AuthorizeAndHoldResponse, error)
 	// MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
 	MarkSending(ctx context.Context, in *MarkSendingRequest, opts ...grpc.CallOption) (*MarkSendingResponse, error)
-	// Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds.
+	// ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs.
+	ExtendExecutionLease(ctx context.Context, in *ExtendExecutionLeaseRequest, opts ...grpc.CallOption) (*ExtendExecutionLeaseResponse, error)
+	// Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+	// records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
 	Settle(ctx context.Context, in *SettleRequest, opts ...grpc.CallOption) (*SettleResponse, error)
+	// MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
+	MarkUncertain(ctx context.Context, in *MarkUncertainRequest, opts ...grpc.CallOption) (*MarkUncertainResponse, error)
+	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+	ResolveUncertain(ctx context.Context, in *ResolveUncertainRequest, opts ...grpc.CallOption) (*ResolveUncertainResponse, error)
 }
 
 type billingExecutionServiceClient struct {
@@ -45,6 +67,26 @@ type billingExecutionServiceClient struct {
 
 func NewBillingExecutionServiceClient(cc grpc.ClientConnInterface) BillingExecutionServiceClient {
 	return &billingExecutionServiceClient{cc}
+}
+
+func (c *billingExecutionServiceClient) ResolvePrincipalScope(ctx context.Context, in *ResolvePrincipalScopeRequest, opts ...grpc.CallOption) (*ResolvePrincipalScopeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolvePrincipalScopeResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_ResolvePrincipalScope_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingExecutionServiceClient) PreviewQuote(ctx context.Context, in *PreviewQuoteRequest, opts ...grpc.CallOption) (*PreviewQuoteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreviewQuoteResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_PreviewQuote_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *billingExecutionServiceClient) AuthorizeAndHold(ctx context.Context, in *AuthorizeAndHoldRequest, opts ...grpc.CallOption) (*AuthorizeAndHoldResponse, error) {
@@ -67,6 +109,16 @@ func (c *billingExecutionServiceClient) MarkSending(ctx context.Context, in *Mar
 	return out, nil
 }
 
+func (c *billingExecutionServiceClient) ExtendExecutionLease(ctx context.Context, in *ExtendExecutionLeaseRequest, opts ...grpc.CallOption) (*ExtendExecutionLeaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExtendExecutionLeaseResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_ExtendExecutionLease_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *billingExecutionServiceClient) Settle(ctx context.Context, in *SettleRequest, opts ...grpc.CallOption) (*SettleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SettleResponse)
@@ -77,19 +129,56 @@ func (c *billingExecutionServiceClient) Settle(ctx context.Context, in *SettleRe
 	return out, nil
 }
 
+func (c *billingExecutionServiceClient) MarkUncertain(ctx context.Context, in *MarkUncertainRequest, opts ...grpc.CallOption) (*MarkUncertainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkUncertainResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_MarkUncertain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingExecutionServiceClient) ResolveUncertain(ctx context.Context, in *ResolveUncertainRequest, opts ...grpc.CallOption) (*ResolveUncertainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveUncertainResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_ResolveUncertain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BillingExecutionServiceServer is the server API for BillingExecutionService service.
 // All implementations must embed UnimplementedBillingExecutionServiceServer
 // for forward compatibility.
 //
-// BillingExecutionService is the intra-Gateway synchronous gRPC contract between
-// Go Data Plane (gateway-dataplane) and TypeScript Billing Service (billing-account-service).
+// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
+// hosted by TypeScript billing-account-service and called by:
+// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
+// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
+// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
 type BillingExecutionServiceServer interface {
-	// AuthorizeAndHold performs zero-trust rate/tier recomputation, budget checks, and 6-bucket atomic hold.
+	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan scopes
+	// so Go gateway-dataplane can serve viewer-filtered /v1/models (AGT-R03) without connecting to PostgreSQL.
+	ResolvePrincipalScope(context.Context, *ResolvePrincipalScopeRequest) (*ResolvePrincipalScopeResponse, error)
+	// PreviewQuote computes a side-effect-free pre-submit estimate, hard maximum, bucket breakdown,
+	// F-model free-quota fallback status, and Studio Dollar confirmation requirement (BIL-R21..R23).
+	PreviewQuote(context.Context, *PreviewQuoteRequest) (*PreviewQuoteResponse, error)
+	// AuthorizeAndHold performs zero-trust rate/tier recomputation, idempotency check, budget & video-concurrency checks,
+	// and atomic multi-bucket hold before any upstream dispatch (BIL-R24, BIL-R25).
 	AuthorizeAndHold(context.Context, *AuthorizeAndHoldRequest) (*AuthorizeAndHoldResponse, error)
 	// MarkSending durably records an upstream dispatch attempt under the fenced lease before sending bytes.
 	MarkSending(context.Context, *MarkSendingRequest) (*MarkSendingResponse, error)
-	// Settle finalizes verified usage once at the serving offering's rate (<= hard max) and releases unused holds.
+	// ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs.
+	ExtendExecutionLease(context.Context, *ExtendExecutionLeaseRequest) (*ExtendExecutionLeaseResponse, error)
+	// Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
+	// records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
 	Settle(context.Context, *SettleRequest) (*SettleResponse, error)
+	// MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
+	MarkUncertain(context.Context, *MarkUncertainRequest) (*MarkUncertainResponse, error)
+	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+	ResolveUncertain(context.Context, *ResolveUncertainRequest) (*ResolveUncertainResponse, error)
 	mustEmbedUnimplementedBillingExecutionServiceServer()
 }
 
@@ -100,14 +189,29 @@ type BillingExecutionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedBillingExecutionServiceServer struct{}
 
+func (UnimplementedBillingExecutionServiceServer) ResolvePrincipalScope(context.Context, *ResolvePrincipalScopeRequest) (*ResolvePrincipalScopeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolvePrincipalScope not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) PreviewQuote(context.Context, *PreviewQuoteRequest) (*PreviewQuoteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewQuote not implemented")
+}
 func (UnimplementedBillingExecutionServiceServer) AuthorizeAndHold(context.Context, *AuthorizeAndHoldRequest) (*AuthorizeAndHoldResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AuthorizeAndHold not implemented")
 }
 func (UnimplementedBillingExecutionServiceServer) MarkSending(context.Context, *MarkSendingRequest) (*MarkSendingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method MarkSending not implemented")
 }
+func (UnimplementedBillingExecutionServiceServer) ExtendExecutionLease(context.Context, *ExtendExecutionLeaseRequest) (*ExtendExecutionLeaseResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExtendExecutionLease not implemented")
+}
 func (UnimplementedBillingExecutionServiceServer) Settle(context.Context, *SettleRequest) (*SettleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Settle not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) MarkUncertain(context.Context, *MarkUncertainRequest) (*MarkUncertainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkUncertain not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) ResolveUncertain(context.Context, *ResolveUncertainRequest) (*ResolveUncertainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveUncertain not implemented")
 }
 func (UnimplementedBillingExecutionServiceServer) mustEmbedUnimplementedBillingExecutionServiceServer() {
 }
@@ -129,6 +233,42 @@ func RegisterBillingExecutionServiceServer(s grpc.ServiceRegistrar, srv BillingE
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&BillingExecutionService_ServiceDesc, srv)
+}
+
+func _BillingExecutionService_ResolvePrincipalScope_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolvePrincipalScopeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).ResolvePrincipalScope(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_ResolvePrincipalScope_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).ResolvePrincipalScope(ctx, req.(*ResolvePrincipalScopeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingExecutionService_PreviewQuote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewQuoteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).PreviewQuote(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_PreviewQuote_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).PreviewQuote(ctx, req.(*PreviewQuoteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _BillingExecutionService_AuthorizeAndHold_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -167,6 +307,24 @@ func _BillingExecutionService_MarkSending_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BillingExecutionService_ExtendExecutionLease_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExtendExecutionLeaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).ExtendExecutionLease(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_ExtendExecutionLease_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).ExtendExecutionLease(ctx, req.(*ExtendExecutionLeaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _BillingExecutionService_Settle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SettleRequest)
 	if err := dec(in); err != nil {
@@ -185,6 +343,42 @@ func _BillingExecutionService_Settle_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BillingExecutionService_MarkUncertain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkUncertainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).MarkUncertain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_MarkUncertain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).MarkUncertain(ctx, req.(*MarkUncertainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingExecutionService_ResolveUncertain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveUncertainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).ResolveUncertain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_ResolveUncertain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).ResolveUncertain(ctx, req.(*ResolveUncertainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BillingExecutionService_ServiceDesc is the grpc.ServiceDesc for BillingExecutionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -192,6 +386,14 @@ var BillingExecutionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "maxshot.gateway_internal.v1.BillingExecutionService",
 	HandlerType: (*BillingExecutionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ResolvePrincipalScope",
+			Handler:    _BillingExecutionService_ResolvePrincipalScope_Handler,
+		},
+		{
+			MethodName: "PreviewQuote",
+			Handler:    _BillingExecutionService_PreviewQuote_Handler,
+		},
 		{
 			MethodName: "AuthorizeAndHold",
 			Handler:    _BillingExecutionService_AuthorizeAndHold_Handler,
@@ -201,8 +403,20 @@ var BillingExecutionService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BillingExecutionService_MarkSending_Handler,
 		},
 		{
+			MethodName: "ExtendExecutionLease",
+			Handler:    _BillingExecutionService_ExtendExecutionLease_Handler,
+		},
+		{
 			MethodName: "Settle",
 			Handler:    _BillingExecutionService_Settle_Handler,
+		},
+		{
+			MethodName: "MarkUncertain",
+			Handler:    _BillingExecutionService_MarkUncertain_Handler,
+		},
+		{
+			MethodName: "ResolveUncertain",
+			Handler:    _BillingExecutionService_ResolveUncertain_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

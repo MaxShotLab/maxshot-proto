@@ -22,6 +22,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type FundedTermStatus int32
+
+const (
+	FundedTermStatus_FUNDED_TERM_STATUS_UNSPECIFIED            FundedTermStatus = 0
+	FundedTermStatus_FUNDED_TERM_STATUS_UPCOMING               FundedTermStatus = 1
+	FundedTermStatus_FUNDED_TERM_STATUS_ACTIVE                 FundedTermStatus = 2
+	FundedTermStatus_FUNDED_TERM_STATUS_ENDED                  FundedTermStatus = 3
+	FundedTermStatus_FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH FundedTermStatus = 4 // TOK-R30: blocks uncovered future grants
+)
+
+// Enum value maps for FundedTermStatus.
+var (
+	FundedTermStatus_name = map[int32]string{
+		0: "FUNDED_TERM_STATUS_UNSPECIFIED",
+		1: "FUNDED_TERM_STATUS_UPCOMING",
+		2: "FUNDED_TERM_STATUS_ACTIVE",
+		3: "FUNDED_TERM_STATUS_ENDED",
+		4: "FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH",
+	}
+	FundedTermStatus_value = map[string]int32{
+		"FUNDED_TERM_STATUS_UNSPECIFIED":            0,
+		"FUNDED_TERM_STATUS_UPCOMING":               1,
+		"FUNDED_TERM_STATUS_ACTIVE":                 2,
+		"FUNDED_TERM_STATUS_ENDED":                  3,
+		"FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH": 4,
+	}
+)
+
+func (x FundedTermStatus) Enum() *FundedTermStatus {
+	p := new(FundedTermStatus)
+	*p = x
+	return p
+}
+
+func (x FundedTermStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FundedTermStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[0].Descriptor()
+}
+
+func (FundedTermStatus) Type() protoreflect.EnumType {
+	return &file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[0]
+}
+
+func (x FundedTermStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FundedTermStatus.Descriptor instead.
+func (FundedTermStatus) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{0}
+}
+
 type GrantItemStatus int32
 
 const (
@@ -33,6 +88,7 @@ const (
 	GrantItemStatus_GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH   GrantItemStatus = 5
 	GrantItemStatus_GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED   GrantItemStatus = 6
 	GrantItemStatus_GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET    GrantItemStatus = 7
+	GrantItemStatus_GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH    GrantItemStatus = 8
 )
 
 // Enum value maps for GrantItemStatus.
@@ -46,6 +102,7 @@ var (
 		5: "GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH",
 		6: "GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED",
 		7: "GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET",
+		8: "GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH",
 	}
 	GrantItemStatus_value = map[string]int32{
 		"GRANT_ITEM_STATUS_UNSPECIFIED":                 0,
@@ -56,6 +113,7 @@ var (
 		"GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH":   5,
 		"GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED":   6,
 		"GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET":    7,
+		"GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH":    8,
 	}
 )
 
@@ -70,11 +128,11 @@ func (x GrantItemStatus) String() string {
 }
 
 func (GrantItemStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[0].Descriptor()
+	return file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[1].Descriptor()
 }
 
 func (GrantItemStatus) Type() protoreflect.EnumType {
-	return &file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[0]
+	return &file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes[1]
 }
 
 func (x GrantItemStatus) Number() protoreflect.EnumNumber {
@@ -83,7 +141,342 @@ func (x GrantItemStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use GrantItemStatus.Descriptor instead.
 func (GrantItemStatus) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{1}
+}
+
+// FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
+// and replicated to Contract Backend. The rational N/D rate converts USD face value to integer Credits
+// at grant issuance time only; spending uses the unified Gateway ledger Credit unit.
+type FundedTermConfig struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	TermId               string                 `protobuf:"bytes,1,opt,name=term_id,json=termId,proto3" json:"term_id,omitempty"`
+	ProgramId            string                 `protobuf:"bytes,2,opt,name=program_id,json=programId,proto3" json:"program_id,omitempty"`
+	FundingReservationId string                 `protobuf:"bytes,3,opt,name=funding_reservation_id,json=fundingReservationId,proto3" json:"funding_reservation_id,omitempty"`
+	TermsVersion         string                 `protobuf:"bytes,4,opt,name=terms_version,json=termsVersion,proto3" json:"terms_version,omitempty"`
+	StartUnixSec         int64                  `protobuf:"varint,5,opt,name=start_unix_sec,json=startUnixSec,proto3" json:"start_unix_sec,omitempty"`
+	EndUnixSec           int64                  `protobuf:"varint,6,opt,name=end_unix_sec,json=endUnixSec,proto3" json:"end_unix_sec,omitempty"`
+	AnnualBaseUsdNum     int64                  `protobuf:"varint,7,opt,name=annual_base_usd_num,json=annualBaseUsdNum,proto3" json:"annual_base_usd_num,omitempty"`  // decided: 12 (TD-77)
+	AnnualBaseUsdDen     int64                  `protobuf:"varint,8,opt,name=annual_base_usd_den,json=annualBaseUsdDen,proto3" json:"annual_base_usd_den,omitempty"`  // decided: 1
+	CreditsPerUsdNum     int64                  `protobuf:"varint,9,opt,name=credits_per_usd_num,json=creditsPerUsdNum,proto3" json:"credits_per_usd_num,omitempty"`  // decided: 1000000 (TD-53), issuance conversion only
+	CreditsPerUsdDen     int64                  `protobuf:"varint,10,opt,name=credits_per_usd_den,json=creditsPerUsdDen,proto3" json:"credits_per_usd_den,omitempty"` // decided: 1
+	AllowedCatalogIds    []string               `protobuf:"bytes,11,rep,name=allowed_catalog_ids,json=allowedCatalogIds,proto3" json:"allowed_catalog_ids,omitempty"`
+	MaxTotalGrantCredits int64                  `protobuf:"varint,12,opt,name=max_total_grant_credits,json=maxTotalGrantCredits,proto3" json:"max_total_grant_credits,omitempty"`
+	Status               FundedTermStatus       `protobuf:"varint,13,opt,name=status,proto3,enum=maxshot.contract_grant.v1.FundedTermStatus" json:"status,omitempty"`
+	UpdatedAtUnixSec     int64                  `protobuf:"varint,14,opt,name=updated_at_unix_sec,json=updatedAtUnixSec,proto3" json:"updated_at_unix_sec,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *FundedTermConfig) Reset() {
+	*x = FundedTermConfig{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FundedTermConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FundedTermConfig) ProtoMessage() {}
+
+func (x *FundedTermConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FundedTermConfig.ProtoReflect.Descriptor instead.
+func (*FundedTermConfig) Descriptor() ([]byte, []int) {
 	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *FundedTermConfig) GetTermId() string {
+	if x != nil {
+		return x.TermId
+	}
+	return ""
+}
+
+func (x *FundedTermConfig) GetProgramId() string {
+	if x != nil {
+		return x.ProgramId
+	}
+	return ""
+}
+
+func (x *FundedTermConfig) GetFundingReservationId() string {
+	if x != nil {
+		return x.FundingReservationId
+	}
+	return ""
+}
+
+func (x *FundedTermConfig) GetTermsVersion() string {
+	if x != nil {
+		return x.TermsVersion
+	}
+	return ""
+}
+
+func (x *FundedTermConfig) GetStartUnixSec() int64 {
+	if x != nil {
+		return x.StartUnixSec
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetEndUnixSec() int64 {
+	if x != nil {
+		return x.EndUnixSec
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetAnnualBaseUsdNum() int64 {
+	if x != nil {
+		return x.AnnualBaseUsdNum
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetAnnualBaseUsdDen() int64 {
+	if x != nil {
+		return x.AnnualBaseUsdDen
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetCreditsPerUsdNum() int64 {
+	if x != nil {
+		return x.CreditsPerUsdNum
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetCreditsPerUsdDen() int64 {
+	if x != nil {
+		return x.CreditsPerUsdDen
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetAllowedCatalogIds() []string {
+	if x != nil {
+		return x.AllowedCatalogIds
+	}
+	return nil
+}
+
+func (x *FundedTermConfig) GetMaxTotalGrantCredits() int64 {
+	if x != nil {
+		return x.MaxTotalGrantCredits
+	}
+	return 0
+}
+
+func (x *FundedTermConfig) GetStatus() FundedTermStatus {
+	if x != nil {
+		return x.Status
+	}
+	return FundedTermStatus_FUNDED_TERM_STATUS_UNSPECIFIED
+}
+
+func (x *FundedTermConfig) GetUpdatedAtUnixSec() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixSec
+	}
+	return 0
+}
+
+type PushFundedTermsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BatchId       string                 `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
+	Terms         []*FundedTermConfig    `protobuf:"bytes,2,rep,name=terms,proto3" json:"terms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PushFundedTermsRequest) Reset() {
+	*x = PushFundedTermsRequest{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushFundedTermsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushFundedTermsRequest) ProtoMessage() {}
+
+func (x *PushFundedTermsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushFundedTermsRequest.ProtoReflect.Descriptor instead.
+func (*PushFundedTermsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PushFundedTermsRequest) GetBatchId() string {
+	if x != nil {
+		return x.BatchId
+	}
+	return ""
+}
+
+func (x *PushFundedTermsRequest) GetTerms() []*FundedTermConfig {
+	if x != nil {
+		return x.Terms
+	}
+	return nil
+}
+
+type PushFundedTermsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PushFundedTermsResponse) Reset() {
+	*x = PushFundedTermsResponse{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PushFundedTermsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PushFundedTermsResponse) ProtoMessage() {}
+
+func (x *PushFundedTermsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PushFundedTermsResponse.ProtoReflect.Descriptor instead.
+func (*PushFundedTermsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PushFundedTermsResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+type ListFundedTermsRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	ActiveOrUpcomingOnly bool                   `protobuf:"varint,1,opt,name=active_or_upcoming_only,json=activeOrUpcomingOnly,proto3" json:"active_or_upcoming_only,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *ListFundedTermsRequest) Reset() {
+	*x = ListFundedTermsRequest{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFundedTermsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFundedTermsRequest) ProtoMessage() {}
+
+func (x *ListFundedTermsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFundedTermsRequest.ProtoReflect.Descriptor instead.
+func (*ListFundedTermsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListFundedTermsRequest) GetActiveOrUpcomingOnly() bool {
+	if x != nil {
+		return x.ActiveOrUpcomingOnly
+	}
+	return false
+}
+
+type ListFundedTermsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Terms         []*FundedTermConfig    `protobuf:"bytes,1,rep,name=terms,proto3" json:"terms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListFundedTermsResponse) Reset() {
+	*x = ListFundedTermsResponse{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListFundedTermsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListFundedTermsResponse) ProtoMessage() {}
+
+func (x *ListFundedTermsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListFundedTermsResponse.ProtoReflect.Descriptor instead.
+func (*ListFundedTermsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListFundedTermsResponse) GetTerms() []*FundedTermConfig {
+	if x != nil {
+		return x.Terms
+	}
+	return nil
 }
 
 type TermAcceptance struct {
@@ -97,7 +490,7 @@ type TermAcceptance struct {
 
 func (x *TermAcceptance) Reset() {
 	*x = TermAcceptance{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[0]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +502,7 @@ func (x *TermAcceptance) String() string {
 func (*TermAcceptance) ProtoMessage() {}
 
 func (x *TermAcceptance) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[0]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +515,7 @@ func (x *TermAcceptance) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TermAcceptance.ProtoReflect.Descriptor instead.
 func (*TermAcceptance) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{0}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *TermAcceptance) GetTermId() string {
@@ -147,20 +540,23 @@ func (x *TermAcceptance) GetAcceptedAtUnixSec() int64 {
 }
 
 type WalletEligibilityRecord struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	AccountId              string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	WalletAddress          string                 `protobuf:"bytes,2,opt,name=wallet_address,json=walletAddress,proto3" json:"wallet_address,omitempty"` // normalized lowercase 0x-prefixed Ethereum address
-	LinkedAtUnixSec        int64                  `protobuf:"varint,3,opt,name=linked_at_unix_sec,json=linkedAtUnixSec,proto3" json:"linked_at_unix_sec,omitempty"`
-	ExcludedTreasuryOrTeam bool                   `protobuf:"varint,4,opt,name=excluded_treasury_or_team,json=excludedTreasuryOrTeam,proto3" json:"excluded_treasury_or_team,omitempty"`
-	TermAcceptances        []*TermAcceptance      `protobuf:"bytes,5,rep,name=term_acceptances,json=termAcceptances,proto3" json:"term_acceptances,omitempty"`
-	UpdatedSequence        int64                  `protobuf:"varint,6,opt,name=updated_sequence,json=updatedSequence,proto3" json:"updated_sequence,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	AccountId               string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	WalletAddress           string                 `protobuf:"bytes,2,opt,name=wallet_address,json=walletAddress,proto3" json:"wallet_address,omitempty"` // normalized lowercase 0x-prefixed Ethereum address
+	ChainId                 uint64                 `protobuf:"varint,3,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`                  // 1 (Ethereum mainnet)
+	LinkedAtUnixSec         int64                  `protobuf:"varint,4,opt,name=linked_at_unix_sec,json=linkedAtUnixSec,proto3" json:"linked_at_unix_sec,omitempty"`
+	SiweProofRef            string                 `protobuf:"bytes,5,opt,name=siwe_proof_ref,json=siweProofRef,proto3" json:"siwe_proof_ref,omitempty"` // audit proof reference for ADM-R21
+	IsContractWalletErc1271 bool                   `protobuf:"varint,6,opt,name=is_contract_wallet_erc1271,json=isContractWalletErc1271,proto3" json:"is_contract_wallet_erc1271,omitempty"`
+	ExcludedTreasuryOrTeam  bool                   `protobuf:"varint,7,opt,name=excluded_treasury_or_team,json=excludedTreasuryOrTeam,proto3" json:"excluded_treasury_or_team,omitempty"` // TOK-R36
+	TermAcceptances         []*TermAcceptance      `protobuf:"bytes,8,rep,name=term_acceptances,json=termAcceptances,proto3" json:"term_acceptances,omitempty"`
+	UpdatedSequence         int64                  `protobuf:"varint,9,opt,name=updated_sequence,json=updatedSequence,proto3" json:"updated_sequence,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *WalletEligibilityRecord) Reset() {
 	*x = WalletEligibilityRecord{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[1]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -172,7 +568,7 @@ func (x *WalletEligibilityRecord) String() string {
 func (*WalletEligibilityRecord) ProtoMessage() {}
 
 func (x *WalletEligibilityRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[1]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -185,7 +581,7 @@ func (x *WalletEligibilityRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WalletEligibilityRecord.ProtoReflect.Descriptor instead.
 func (*WalletEligibilityRecord) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{1}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *WalletEligibilityRecord) GetAccountId() string {
@@ -202,11 +598,32 @@ func (x *WalletEligibilityRecord) GetWalletAddress() string {
 	return ""
 }
 
+func (x *WalletEligibilityRecord) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
+	}
+	return 0
+}
+
 func (x *WalletEligibilityRecord) GetLinkedAtUnixSec() int64 {
 	if x != nil {
 		return x.LinkedAtUnixSec
 	}
 	return 0
+}
+
+func (x *WalletEligibilityRecord) GetSiweProofRef() string {
+	if x != nil {
+		return x.SiweProofRef
+	}
+	return ""
+}
+
+func (x *WalletEligibilityRecord) GetIsContractWalletErc1271() bool {
+	if x != nil {
+		return x.IsContractWalletErc1271
+	}
+	return false
 }
 
 func (x *WalletEligibilityRecord) GetExcludedTreasuryOrTeam() bool {
@@ -240,7 +657,7 @@ type PushWalletEligibilityRequest struct {
 
 func (x *PushWalletEligibilityRequest) Reset() {
 	*x = PushWalletEligibilityRequest{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[2]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +669,7 @@ func (x *PushWalletEligibilityRequest) String() string {
 func (*PushWalletEligibilityRequest) ProtoMessage() {}
 
 func (x *PushWalletEligibilityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[2]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +682,7 @@ func (x *PushWalletEligibilityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PushWalletEligibilityRequest.ProtoReflect.Descriptor instead.
 func (*PushWalletEligibilityRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{2}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PushWalletEligibilityRequest) GetBatchId() string {
@@ -292,7 +709,7 @@ type PushWalletEligibilityResponse struct {
 
 func (x *PushWalletEligibilityResponse) Reset() {
 	*x = PushWalletEligibilityResponse{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[3]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +721,7 @@ func (x *PushWalletEligibilityResponse) String() string {
 func (*PushWalletEligibilityResponse) ProtoMessage() {}
 
 func (x *PushWalletEligibilityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[3]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +734,7 @@ func (x *PushWalletEligibilityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PushWalletEligibilityResponse.ProtoReflect.Descriptor instead.
 func (*PushWalletEligibilityResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{3}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *PushWalletEligibilityResponse) GetAccepted() bool {
@@ -343,7 +760,7 @@ type PullWalletEligibilityUpdatesRequest struct {
 
 func (x *PullWalletEligibilityUpdatesRequest) Reset() {
 	*x = PullWalletEligibilityUpdatesRequest{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[4]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -355,7 +772,7 @@ func (x *PullWalletEligibilityUpdatesRequest) String() string {
 func (*PullWalletEligibilityUpdatesRequest) ProtoMessage() {}
 
 func (x *PullWalletEligibilityUpdatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[4]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +785,7 @@ func (x *PullWalletEligibilityUpdatesRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use PullWalletEligibilityUpdatesRequest.ProtoReflect.Descriptor instead.
 func (*PullWalletEligibilityUpdatesRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{4}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PullWalletEligibilityUpdatesRequest) GetPage() *v1.CursorPageRequest {
@@ -388,7 +805,7 @@ type PullWalletEligibilityUpdatesResponse struct {
 
 func (x *PullWalletEligibilityUpdatesResponse) Reset() {
 	*x = PullWalletEligibilityUpdatesResponse{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[5]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +817,7 @@ func (x *PullWalletEligibilityUpdatesResponse) String() string {
 func (*PullWalletEligibilityUpdatesResponse) ProtoMessage() {}
 
 func (x *PullWalletEligibilityUpdatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[5]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +830,7 @@ func (x *PullWalletEligibilityUpdatesResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use PullWalletEligibilityUpdatesResponse.ProtoReflect.Descriptor instead.
 func (*PullWalletEligibilityUpdatesResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{5}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PullWalletEligibilityUpdatesResponse) GetRecords() []*WalletEligibilityRecord {
@@ -430,6 +847,227 @@ func (x *PullWalletEligibilityUpdatesResponse) GetPage() *v1.CursorPageResponse 
 	return nil
 }
 
+type DirectedBridgeRoutePause struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SrcChainEid   uint32                 `protobuf:"varint,1,opt,name=src_chain_eid,json=srcChainEid,proto3" json:"src_chain_eid,omitempty"`
+	DstChainEid   uint32                 `protobuf:"varint,2,opt,name=dst_chain_eid,json=dstChainEid,proto3" json:"dst_chain_eid,omitempty"`
+	Paused        bool                   `protobuf:"varint,3,opt,name=paused,proto3" json:"paused,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DirectedBridgeRoutePause) Reset() {
+	*x = DirectedBridgeRoutePause{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DirectedBridgeRoutePause) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DirectedBridgeRoutePause) ProtoMessage() {}
+
+func (x *DirectedBridgeRoutePause) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DirectedBridgeRoutePause.ProtoReflect.Descriptor instead.
+func (*DirectedBridgeRoutePause) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *DirectedBridgeRoutePause) GetSrcChainEid() uint32 {
+	if x != nil {
+		return x.SrcChainEid
+	}
+	return 0
+}
+
+func (x *DirectedBridgeRoutePause) GetDstChainEid() uint32 {
+	if x != nil {
+		return x.DstChainEid
+	}
+	return 0
+}
+
+func (x *DirectedBridgeRoutePause) GetPaused() bool {
+	if x != nil {
+		return x.Paused
+	}
+	return false
+}
+
+type GetContractOperationalStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetContractOperationalStatusRequest) Reset() {
+	*x = GetContractOperationalStatusRequest{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContractOperationalStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContractOperationalStatusRequest) ProtoMessage() {}
+
+func (x *GetContractOperationalStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContractOperationalStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetContractOperationalStatusRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{12}
+}
+
+// GetContractOperationalStatusResponse feeds Gateway Admin read-only pause & finality monitoring (ADM-R22, TOK-R05).
+type GetContractOperationalStatusResponse struct {
+	state                             protoimpl.MessageState      `protogen:"open.v1"`
+	MintPaused                        bool                        `protobuf:"varint,1,opt,name=mint_paused,json=mintPaused,proto3" json:"mint_paused,omitempty"`
+	BurnPaused                        bool                        `protobuf:"varint,2,opt,name=burn_paused,json=burnPaused,proto3" json:"burn_paused,omitempty"`
+	WithdrawPaused                    bool                        `protobuf:"varint,3,opt,name=withdraw_paused,json=withdrawPaused,proto3" json:"withdraw_paused,omitempty"`
+	PositionPauseAll                  bool                        `protobuf:"varint,4,opt,name=position_pause_all,json=positionPauseAll,proto3" json:"position_pause_all,omitempty"`
+	MaxBridgeGlobalPaused             bool                        `protobuf:"varint,5,opt,name=max_bridge_global_paused,json=maxBridgeGlobalPaused,proto3" json:"max_bridge_global_paused,omitempty"`
+	DirectedBridgePauses              []*DirectedBridgeRoutePause `protobuf:"bytes,6,rep,name=directed_bridge_pauses,json=directedBridgePauses,proto3" json:"directed_bridge_pauses,omitempty"`
+	EthereumHeadBlock                 uint64                      `protobuf:"varint,7,opt,name=ethereum_head_block,json=ethereumHeadBlock,proto3" json:"ethereum_head_block,omitempty"`
+	EthereumFinalizedBlock            uint64                      `protobuf:"varint,8,opt,name=ethereum_finalized_block,json=ethereumFinalizedBlock,proto3" json:"ethereum_finalized_block,omitempty"`
+	EthereumFinalizedTimestampUnixSec int64                       `protobuf:"varint,9,opt,name=ethereum_finalized_timestamp_unix_sec,json=ethereumFinalizedTimestampUnixSec,proto3" json:"ethereum_finalized_timestamp_unix_sec,omitempty"`
+	ActiveTermId                      string                      `protobuf:"bytes,10,opt,name=active_term_id,json=activeTermId,proto3" json:"active_term_id,omitempty"`
+	NextGrantBoundaryUnixSec          int64                       `protobuf:"varint,11,opt,name=next_grant_boundary_unix_sec,json=nextGrantBoundaryUnixSec,proto3" json:"next_grant_boundary_unix_sec,omitempty"`
+	unknownFields                     protoimpl.UnknownFields
+	sizeCache                         protoimpl.SizeCache
+}
+
+func (x *GetContractOperationalStatusResponse) Reset() {
+	*x = GetContractOperationalStatusResponse{}
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetContractOperationalStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetContractOperationalStatusResponse) ProtoMessage() {}
+
+func (x *GetContractOperationalStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetContractOperationalStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetContractOperationalStatusResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetContractOperationalStatusResponse) GetMintPaused() bool {
+	if x != nil {
+		return x.MintPaused
+	}
+	return false
+}
+
+func (x *GetContractOperationalStatusResponse) GetBurnPaused() bool {
+	if x != nil {
+		return x.BurnPaused
+	}
+	return false
+}
+
+func (x *GetContractOperationalStatusResponse) GetWithdrawPaused() bool {
+	if x != nil {
+		return x.WithdrawPaused
+	}
+	return false
+}
+
+func (x *GetContractOperationalStatusResponse) GetPositionPauseAll() bool {
+	if x != nil {
+		return x.PositionPauseAll
+	}
+	return false
+}
+
+func (x *GetContractOperationalStatusResponse) GetMaxBridgeGlobalPaused() bool {
+	if x != nil {
+		return x.MaxBridgeGlobalPaused
+	}
+	return false
+}
+
+func (x *GetContractOperationalStatusResponse) GetDirectedBridgePauses() []*DirectedBridgeRoutePause {
+	if x != nil {
+		return x.DirectedBridgePauses
+	}
+	return nil
+}
+
+func (x *GetContractOperationalStatusResponse) GetEthereumHeadBlock() uint64 {
+	if x != nil {
+		return x.EthereumHeadBlock
+	}
+	return 0
+}
+
+func (x *GetContractOperationalStatusResponse) GetEthereumFinalizedBlock() uint64 {
+	if x != nil {
+		return x.EthereumFinalizedBlock
+	}
+	return 0
+}
+
+func (x *GetContractOperationalStatusResponse) GetEthereumFinalizedTimestampUnixSec() int64 {
+	if x != nil {
+		return x.EthereumFinalizedTimestampUnixSec
+	}
+	return 0
+}
+
+func (x *GetContractOperationalStatusResponse) GetActiveTermId() string {
+	if x != nil {
+		return x.ActiveTermId
+	}
+	return ""
+}
+
+func (x *GetContractOperationalStatusResponse) GetNextGrantBoundaryUnixSec() int64 {
+	if x != nil {
+		return x.NextGrantBoundaryUnixSec
+	}
+	return 0
+}
+
 type AitGrantItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	GrantId       string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"` // deterministic: "{term_id}:{boundary_index}:{account_id}"
@@ -437,19 +1075,24 @@ type AitGrantItem struct {
 	BoundaryIndex int32                  `protobuf:"varint,3,opt,name=boundary_index,json=boundaryIndex,proto3" json:"boundary_index,omitempty"`
 	AccountId     string                 `protobuf:"bytes,4,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	WalletAddress string                 `protobuf:"bytes,5,opt,name=wallet_address,json=walletAddress,proto3" json:"wallet_address,omitempty"`
-	// Exact 256-bit integer string: eligible staked AIT wei * eligible seconds from term start to boundary t.
+	// Exact 256-bit integer decimal string: eligible staked AIT wei * eligible seconds from term start to boundary t.
 	CumulativeEligibleAitWeiSecondsDec string `protobuf:"bytes,6,opt,name=cumulative_eligible_ait_wei_seconds_dec,json=cumulativeEligibleAitWeiSecondsDec,proto3" json:"cumulative_eligible_ait_wei_seconds_dec,omitempty"`
 	PreviouslyGrantedCredits           int64  `protobuf:"varint,7,opt,name=previously_granted_credits,json=previouslyGrantedCredits,proto3" json:"previously_granted_credits,omitempty"`
 	GrantCredits                       int64  `protobuf:"varint,8,opt,name=grant_credits,json=grantCredits,proto3" json:"grant_credits,omitempty"`
 	FinalizedBlockNumber               uint64 `protobuf:"varint,9,opt,name=finalized_block_number,json=finalizedBlockNumber,proto3" json:"finalized_block_number,omitempty"`
 	BoundaryTimestampUnixSec           int64  `protobuf:"varint,10,opt,name=boundary_timestamp_unix_sec,json=boundaryTimestampUnixSec,proto3" json:"boundary_timestamp_unix_sec,omitempty"`
+	ProgramId                          string `protobuf:"bytes,11,opt,name=program_id,json=programId,proto3" json:"program_id,omitempty"`
+	FundingReservationId               string `protobuf:"bytes,12,opt,name=funding_reservation_id,json=fundingReservationId,proto3" json:"funding_reservation_id,omitempty"`
+	IsFinalShortBoundary               bool   `protobuf:"varint,13,opt,name=is_final_short_boundary,json=isFinalShortBoundary,proto3" json:"is_final_short_boundary,omitempty"`
+	CumulativeEntitlementCredits       int64  `protobuf:"varint,14,opt,name=cumulative_entitlement_credits,json=cumulativeEntitlementCredits,proto3" json:"cumulative_entitlement_credits,omitempty"`
+	FinalizedBlockHash                 string `protobuf:"bytes,15,opt,name=finalized_block_hash,json=finalizedBlockHash,proto3" json:"finalized_block_hash,omitempty"`
 	unknownFields                      protoimpl.UnknownFields
 	sizeCache                          protoimpl.SizeCache
 }
 
 func (x *AitGrantItem) Reset() {
 	*x = AitGrantItem{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[6]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +1104,7 @@ func (x *AitGrantItem) String() string {
 func (*AitGrantItem) ProtoMessage() {}
 
 func (x *AitGrantItem) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[6]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +1117,7 @@ func (x *AitGrantItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AitGrantItem.ProtoReflect.Descriptor instead.
 func (*AitGrantItem) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{6}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *AitGrantItem) GetGrantId() string {
@@ -547,6 +1190,41 @@ func (x *AitGrantItem) GetBoundaryTimestampUnixSec() int64 {
 	return 0
 }
 
+func (x *AitGrantItem) GetProgramId() string {
+	if x != nil {
+		return x.ProgramId
+	}
+	return ""
+}
+
+func (x *AitGrantItem) GetFundingReservationId() string {
+	if x != nil {
+		return x.FundingReservationId
+	}
+	return ""
+}
+
+func (x *AitGrantItem) GetIsFinalShortBoundary() bool {
+	if x != nil {
+		return x.IsFinalShortBoundary
+	}
+	return false
+}
+
+func (x *AitGrantItem) GetCumulativeEntitlementCredits() int64 {
+	if x != nil {
+		return x.CumulativeEntitlementCredits
+	}
+	return 0
+}
+
+func (x *AitGrantItem) GetFinalizedBlockHash() string {
+	if x != nil {
+		return x.FinalizedBlockHash
+	}
+	return ""
+}
+
 type IssueAitCreditGrantsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BatchId       string                 `protobuf:"bytes,1,opt,name=batch_id,json=batchId,proto3" json:"batch_id,omitempty"`
@@ -559,7 +1237,7 @@ type IssueAitCreditGrantsRequest struct {
 
 func (x *IssueAitCreditGrantsRequest) Reset() {
 	*x = IssueAitCreditGrantsRequest{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[7]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -571,7 +1249,7 @@ func (x *IssueAitCreditGrantsRequest) String() string {
 func (*IssueAitCreditGrantsRequest) ProtoMessage() {}
 
 func (x *IssueAitCreditGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[7]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -584,7 +1262,7 @@ func (x *IssueAitCreditGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueAitCreditGrantsRequest.ProtoReflect.Descriptor instead.
 func (*IssueAitCreditGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{7}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *IssueAitCreditGrantsRequest) GetBatchId() string {
@@ -616,17 +1294,20 @@ func (x *IssueAitCreditGrantsRequest) GetItems() []*AitGrantItem {
 }
 
 type AitGrantItemResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GrantId       string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
-	Status        GrantItemStatus        `protobuf:"varint,2,opt,name=status,proto3,enum=maxshot.contract_grant.v1.GrantItemStatus" json:"status,omitempty"`
-	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	GrantId          string                 `protobuf:"bytes,1,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
+	Status           GrantItemStatus        `protobuf:"varint,2,opt,name=status,proto3,enum=maxshot.contract_grant.v1.GrantItemStatus" json:"status,omitempty"`
+	Detail           string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	CreditedAmount   int64                  `protobuf:"varint,4,opt,name=credited_amount,json=creditedAmount,proto3" json:"credited_amount,omitempty"`
+	IssuedAtUnixSec  int64                  `protobuf:"varint,5,opt,name=issued_at_unix_sec,json=issuedAtUnixSec,proto3" json:"issued_at_unix_sec,omitempty"`
+	ExpiresAtUnixSec int64                  `protobuf:"varint,6,opt,name=expires_at_unix_sec,json=expiresAtUnixSec,proto3" json:"expires_at_unix_sec,omitempty"` // issued_at_unix_sec + 7 days (TOK-R24)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *AitGrantItemResult) Reset() {
 	*x = AitGrantItemResult{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[8]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +1319,7 @@ func (x *AitGrantItemResult) String() string {
 func (*AitGrantItemResult) ProtoMessage() {}
 
 func (x *AitGrantItemResult) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[8]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +1332,7 @@ func (x *AitGrantItemResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AitGrantItemResult.ProtoReflect.Descriptor instead.
 func (*AitGrantItemResult) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{8}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AitGrantItemResult) GetGrantId() string {
@@ -675,6 +1356,27 @@ func (x *AitGrantItemResult) GetDetail() string {
 	return ""
 }
 
+func (x *AitGrantItemResult) GetCreditedAmount() int64 {
+	if x != nil {
+		return x.CreditedAmount
+	}
+	return 0
+}
+
+func (x *AitGrantItemResult) GetIssuedAtUnixSec() int64 {
+	if x != nil {
+		return x.IssuedAtUnixSec
+	}
+	return 0
+}
+
+func (x *AitGrantItemResult) GetExpiresAtUnixSec() int64 {
+	if x != nil {
+		return x.ExpiresAtUnixSec
+	}
+	return 0
+}
+
 type IssueAitCreditGrantsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Results       []*AitGrantItemResult  `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
@@ -684,7 +1386,7 @@ type IssueAitCreditGrantsResponse struct {
 
 func (x *IssueAitCreditGrantsResponse) Reset() {
 	*x = IssueAitCreditGrantsResponse{}
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[9]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -696,7 +1398,7 @@ func (x *IssueAitCreditGrantsResponse) String() string {
 func (*IssueAitCreditGrantsResponse) ProtoMessage() {}
 
 func (x *IssueAitCreditGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[9]
+	mi := &file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -709,7 +1411,7 @@ func (x *IssueAitCreditGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueAitCreditGrantsResponse.ProtoReflect.Descriptor instead.
 func (*IssueAitCreditGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{9}
+	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *IssueAitCreditGrantsResponse) GetResults() []*AitGrantItemResult {
@@ -723,19 +1425,49 @@ var File_maxshot_contract_grant_v1_contract_grant_proto protoreflect.FileDescrip
 
 const file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc = "" +
 	"\n" +
-	".maxshot/contract_grant/v1/contract_grant.proto\x12\x19maxshot.contract_grant.v1\x1a\x1dmaxshot/common/v1/types.proto\"\x7f\n" +
+	".maxshot/contract_grant/v1/contract_grant.proto\x12\x19maxshot.contract_grant.v1\x1a\x1dmaxshot/common/v1/types.proto\"\x84\x05\n" +
+	"\x10FundedTermConfig\x12\x17\n" +
+	"\aterm_id\x18\x01 \x01(\tR\x06termId\x12\x1d\n" +
+	"\n" +
+	"program_id\x18\x02 \x01(\tR\tprogramId\x124\n" +
+	"\x16funding_reservation_id\x18\x03 \x01(\tR\x14fundingReservationId\x12#\n" +
+	"\rterms_version\x18\x04 \x01(\tR\ftermsVersion\x12$\n" +
+	"\x0estart_unix_sec\x18\x05 \x01(\x03R\fstartUnixSec\x12 \n" +
+	"\fend_unix_sec\x18\x06 \x01(\x03R\n" +
+	"endUnixSec\x12-\n" +
+	"\x13annual_base_usd_num\x18\a \x01(\x03R\x10annualBaseUsdNum\x12-\n" +
+	"\x13annual_base_usd_den\x18\b \x01(\x03R\x10annualBaseUsdDen\x12-\n" +
+	"\x13credits_per_usd_num\x18\t \x01(\x03R\x10creditsPerUsdNum\x12-\n" +
+	"\x13credits_per_usd_den\x18\n" +
+	" \x01(\x03R\x10creditsPerUsdDen\x12.\n" +
+	"\x13allowed_catalog_ids\x18\v \x03(\tR\x11allowedCatalogIds\x125\n" +
+	"\x17max_total_grant_credits\x18\f \x01(\x03R\x14maxTotalGrantCredits\x12C\n" +
+	"\x06status\x18\r \x01(\x0e2+.maxshot.contract_grant.v1.FundedTermStatusR\x06status\x12-\n" +
+	"\x13updated_at_unix_sec\x18\x0e \x01(\x03R\x10updatedAtUnixSec\"v\n" +
+	"\x16PushFundedTermsRequest\x12\x19\n" +
+	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12A\n" +
+	"\x05terms\x18\x02 \x03(\v2+.maxshot.contract_grant.v1.FundedTermConfigR\x05terms\"5\n" +
+	"\x17PushFundedTermsResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\"O\n" +
+	"\x16ListFundedTermsRequest\x125\n" +
+	"\x17active_or_upcoming_only\x18\x01 \x01(\bR\x14activeOrUpcomingOnly\"\\\n" +
+	"\x17ListFundedTermsResponse\x12A\n" +
+	"\x05terms\x18\x01 \x03(\v2+.maxshot.contract_grant.v1.FundedTermConfigR\x05terms\"\x7f\n" +
 	"\x0eTermAcceptance\x12\x17\n" +
 	"\aterm_id\x18\x01 \x01(\tR\x06termId\x12#\n" +
 	"\rterms_version\x18\x02 \x01(\tR\ftermsVersion\x12/\n" +
-	"\x14accepted_at_unix_sec\x18\x03 \x01(\x03R\x11acceptedAtUnixSec\"\xc8\x02\n" +
+	"\x14accepted_at_unix_sec\x18\x03 \x01(\x03R\x11acceptedAtUnixSec\"\xc6\x03\n" +
 	"\x17WalletEligibilityRecord\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12%\n" +
-	"\x0ewallet_address\x18\x02 \x01(\tR\rwalletAddress\x12+\n" +
-	"\x12linked_at_unix_sec\x18\x03 \x01(\x03R\x0flinkedAtUnixSec\x129\n" +
-	"\x19excluded_treasury_or_team\x18\x04 \x01(\bR\x16excludedTreasuryOrTeam\x12T\n" +
-	"\x10term_acceptances\x18\x05 \x03(\v2).maxshot.contract_grant.v1.TermAcceptanceR\x0ftermAcceptances\x12)\n" +
-	"\x10updated_sequence\x18\x06 \x01(\x03R\x0fupdatedSequence\"\x87\x01\n" +
+	"\x0ewallet_address\x18\x02 \x01(\tR\rwalletAddress\x12\x19\n" +
+	"\bchain_id\x18\x03 \x01(\x04R\achainId\x12+\n" +
+	"\x12linked_at_unix_sec\x18\x04 \x01(\x03R\x0flinkedAtUnixSec\x12$\n" +
+	"\x0esiwe_proof_ref\x18\x05 \x01(\tR\fsiweProofRef\x12;\n" +
+	"\x1ais_contract_wallet_erc1271\x18\x06 \x01(\bR\x17isContractWalletErc1271\x129\n" +
+	"\x19excluded_treasury_or_team\x18\a \x01(\bR\x16excludedTreasuryOrTeam\x12T\n" +
+	"\x10term_acceptances\x18\b \x03(\v2).maxshot.contract_grant.v1.TermAcceptanceR\x0ftermAcceptances\x12)\n" +
+	"\x10updated_sequence\x18\t \x01(\x03R\x0fupdatedSequence\"\x87\x01\n" +
 	"\x1cPushWalletEligibilityRequest\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12L\n" +
 	"\arecords\x18\x02 \x03(\v22.maxshot.contract_grant.v1.WalletEligibilityRecordR\arecords\"f\n" +
@@ -746,7 +1478,27 @@ const file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc = "" +
 	"\x04page\x18\x01 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\"\xaf\x01\n" +
 	"$PullWalletEligibilityUpdatesResponse\x12L\n" +
 	"\arecords\x18\x01 \x03(\v22.maxshot.contract_grant.v1.WalletEligibilityRecordR\arecords\x129\n" +
-	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"\xdc\x03\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"z\n" +
+	"\x18DirectedBridgeRoutePause\x12\"\n" +
+	"\rsrc_chain_eid\x18\x01 \x01(\rR\vsrcChainEid\x12\"\n" +
+	"\rdst_chain_eid\x18\x02 \x01(\rR\vdstChainEid\x12\x16\n" +
+	"\x06paused\x18\x03 \x01(\bR\x06paused\"%\n" +
+	"#GetContractOperationalStatusRequest\"\x85\x05\n" +
+	"$GetContractOperationalStatusResponse\x12\x1f\n" +
+	"\vmint_paused\x18\x01 \x01(\bR\n" +
+	"mintPaused\x12\x1f\n" +
+	"\vburn_paused\x18\x02 \x01(\bR\n" +
+	"burnPaused\x12'\n" +
+	"\x0fwithdraw_paused\x18\x03 \x01(\bR\x0ewithdrawPaused\x12,\n" +
+	"\x12position_pause_all\x18\x04 \x01(\bR\x10positionPauseAll\x127\n" +
+	"\x18max_bridge_global_paused\x18\x05 \x01(\bR\x15maxBridgeGlobalPaused\x12i\n" +
+	"\x16directed_bridge_pauses\x18\x06 \x03(\v23.maxshot.contract_grant.v1.DirectedBridgeRoutePauseR\x14directedBridgePauses\x12.\n" +
+	"\x13ethereum_head_block\x18\a \x01(\x04R\x11ethereumHeadBlock\x128\n" +
+	"\x18ethereum_finalized_block\x18\b \x01(\x04R\x16ethereumFinalizedBlock\x12P\n" +
+	"%ethereum_finalized_timestamp_unix_sec\x18\t \x01(\x03R!ethereumFinalizedTimestampUnixSec\x12$\n" +
+	"\x0eactive_term_id\x18\n" +
+	" \x01(\tR\factiveTermId\x12>\n" +
+	"\x1cnext_grant_boundary_unix_sec\x18\v \x01(\x03R\x18nextGrantBoundaryUnixSec\"\xe0\x05\n" +
 	"\fAitGrantItem\x12\x19\n" +
 	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12\x17\n" +
 	"\aterm_id\x18\x02 \x01(\tR\x06termId\x12%\n" +
@@ -759,18 +1511,33 @@ const file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc = "" +
 	"\rgrant_credits\x18\b \x01(\x03R\fgrantCredits\x124\n" +
 	"\x16finalized_block_number\x18\t \x01(\x04R\x14finalizedBlockNumber\x12=\n" +
 	"\x1bboundary_timestamp_unix_sec\x18\n" +
-	" \x01(\x03R\x18boundaryTimestampUnixSec\"\xb7\x01\n" +
+	" \x01(\x03R\x18boundaryTimestampUnixSec\x12\x1d\n" +
+	"\n" +
+	"program_id\x18\v \x01(\tR\tprogramId\x124\n" +
+	"\x16funding_reservation_id\x18\f \x01(\tR\x14fundingReservationId\x125\n" +
+	"\x17is_final_short_boundary\x18\r \x01(\bR\x14isFinalShortBoundary\x12D\n" +
+	"\x1ecumulative_entitlement_credits\x18\x0e \x01(\x03R\x1ccumulativeEntitlementCredits\x120\n" +
+	"\x14finalized_block_hash\x18\x0f \x01(\tR\x12finalizedBlockHash\"\xb7\x01\n" +
 	"\x1bIssueAitCreditGrantsRequest\x12\x19\n" +
 	"\bbatch_id\x18\x01 \x01(\tR\abatchId\x12\x17\n" +
 	"\aterm_id\x18\x02 \x01(\tR\x06termId\x12%\n" +
 	"\x0eboundary_index\x18\x03 \x01(\x05R\rboundaryIndex\x12=\n" +
-	"\x05items\x18\x04 \x03(\v2'.maxshot.contract_grant.v1.AitGrantItemR\x05items\"\x8b\x01\n" +
+	"\x05items\x18\x04 \x03(\v2'.maxshot.contract_grant.v1.AitGrantItemR\x05items\"\x90\x02\n" +
 	"\x12AitGrantItemResult\x12\x19\n" +
 	"\bgrant_id\x18\x01 \x01(\tR\agrantId\x12B\n" +
 	"\x06status\x18\x02 \x01(\x0e2*.maxshot.contract_grant.v1.GrantItemStatusR\x06status\x12\x16\n" +
-	"\x06detail\x18\x03 \x01(\tR\x06detail\"g\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x12'\n" +
+	"\x0fcredited_amount\x18\x04 \x01(\x03R\x0ecreditedAmount\x12+\n" +
+	"\x12issued_at_unix_sec\x18\x05 \x01(\x03R\x0fissuedAtUnixSec\x12-\n" +
+	"\x13expires_at_unix_sec\x18\x06 \x01(\x03R\x10expiresAtUnixSec\"g\n" +
 	"\x1cIssueAitCreditGrantsResponse\x12G\n" +
-	"\aresults\x18\x01 \x03(\v2-.maxshot.contract_grant.v1.AitGrantItemResultR\aresults*\xf1\x02\n" +
+	"\aresults\x18\x01 \x03(\v2-.maxshot.contract_grant.v1.AitGrantItemResultR\aresults*\xc3\x01\n" +
+	"\x10FundedTermStatus\x12\"\n" +
+	"\x1eFUNDED_TERM_STATUS_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bFUNDED_TERM_STATUS_UPCOMING\x10\x01\x12\x1d\n" +
+	"\x19FUNDED_TERM_STATUS_ACTIVE\x10\x02\x12\x1c\n" +
+	"\x18FUNDED_TERM_STATUS_ENDED\x10\x03\x12-\n" +
+	")FUNDED_TERM_STATUS_HALTED_COVERAGE_BREACH\x10\x04*\xa1\x03\n" +
 	"\x0fGrantItemStatus\x12!\n" +
 	"\x1dGRANT_ITEM_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aGRANT_ITEM_STATUS_CREDITED\x10\x01\x12&\n" +
@@ -779,11 +1546,15 @@ const file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc = "" +
 	"-GRANT_ITEM_STATUS_REJECTED_TERMS_NOT_ACCEPTED\x10\x04\x12/\n" +
 	"+GRANT_ITEM_STATUS_REJECTED_FORMULA_MISMATCH\x10\x05\x12/\n" +
 	"+GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED\x10\x06\x12.\n" +
-	"*GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET\x10\a2\xc9\x02\n" +
-	"\x18WalletEligibilityService\x12\x8a\x01\n" +
+	"*GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET\x10\a\x12.\n" +
+	"*GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH\x10\b2\xc1\x03\n" +
+	"\x16ContractBackendService\x12x\n" +
+	"\x0fPushFundedTerms\x121.maxshot.contract_grant.v1.PushFundedTermsRequest\x1a2.maxshot.contract_grant.v1.PushFundedTermsResponse\x12\x8a\x01\n" +
 	"\x15PushWalletEligibility\x127.maxshot.contract_grant.v1.PushWalletEligibilityRequest\x1a8.maxshot.contract_grant.v1.PushWalletEligibilityResponse\x12\x9f\x01\n" +
-	"\x1cPullWalletEligibilityUpdates\x12>.maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest\x1a?.maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse2\xa1\x01\n" +
-	"\x15AitCreditGrantService\x12\x87\x01\n" +
+	"\x1cGetContractOperationalStatus\x12>.maxshot.contract_grant.v1.GetContractOperationalStatusRequest\x1a?.maxshot.contract_grant.v1.GetContractOperationalStatusResponse2\xbd\x03\n" +
+	"\x15AitCreditGrantService\x12x\n" +
+	"\x0fListFundedTerms\x121.maxshot.contract_grant.v1.ListFundedTermsRequest\x1a2.maxshot.contract_grant.v1.ListFundedTermsResponse\x12\x9f\x01\n" +
+	"\x1cPullWalletEligibilityUpdates\x12>.maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest\x1a?.maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse\x12\x87\x01\n" +
 	"\x14IssueAitCreditGrants\x126.maxshot.contract_grant.v1.IssueAitCreditGrantsRequest\x1a7.maxshot.contract_grant.v1.IssueAitCreditGrantsResponseBVZTgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/contract_grant/v1;contractgrantv1b\x06proto3"
 
 var (
@@ -798,43 +1569,62 @@ func file_maxshot_contract_grant_v1_contract_grant_proto_rawDescGZIP() []byte {
 	return file_maxshot_contract_grant_v1_contract_grant_proto_rawDescData
 }
 
-var file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_maxshot_contract_grant_v1_contract_grant_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_maxshot_contract_grant_v1_contract_grant_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_maxshot_contract_grant_v1_contract_grant_proto_goTypes = []any{
-	(GrantItemStatus)(0),                         // 0: maxshot.contract_grant.v1.GrantItemStatus
-	(*TermAcceptance)(nil),                       // 1: maxshot.contract_grant.v1.TermAcceptance
-	(*WalletEligibilityRecord)(nil),              // 2: maxshot.contract_grant.v1.WalletEligibilityRecord
-	(*PushWalletEligibilityRequest)(nil),         // 3: maxshot.contract_grant.v1.PushWalletEligibilityRequest
-	(*PushWalletEligibilityResponse)(nil),        // 4: maxshot.contract_grant.v1.PushWalletEligibilityResponse
-	(*PullWalletEligibilityUpdatesRequest)(nil),  // 5: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest
-	(*PullWalletEligibilityUpdatesResponse)(nil), // 6: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse
-	(*AitGrantItem)(nil),                         // 7: maxshot.contract_grant.v1.AitGrantItem
-	(*IssueAitCreditGrantsRequest)(nil),          // 8: maxshot.contract_grant.v1.IssueAitCreditGrantsRequest
-	(*AitGrantItemResult)(nil),                   // 9: maxshot.contract_grant.v1.AitGrantItemResult
-	(*IssueAitCreditGrantsResponse)(nil),         // 10: maxshot.contract_grant.v1.IssueAitCreditGrantsResponse
-	(*v1.CursorPageRequest)(nil),                 // 11: maxshot.common.v1.CursorPageRequest
-	(*v1.CursorPageResponse)(nil),                // 12: maxshot.common.v1.CursorPageResponse
+	(FundedTermStatus)(0),                        // 0: maxshot.contract_grant.v1.FundedTermStatus
+	(GrantItemStatus)(0),                         // 1: maxshot.contract_grant.v1.GrantItemStatus
+	(*FundedTermConfig)(nil),                     // 2: maxshot.contract_grant.v1.FundedTermConfig
+	(*PushFundedTermsRequest)(nil),               // 3: maxshot.contract_grant.v1.PushFundedTermsRequest
+	(*PushFundedTermsResponse)(nil),              // 4: maxshot.contract_grant.v1.PushFundedTermsResponse
+	(*ListFundedTermsRequest)(nil),               // 5: maxshot.contract_grant.v1.ListFundedTermsRequest
+	(*ListFundedTermsResponse)(nil),              // 6: maxshot.contract_grant.v1.ListFundedTermsResponse
+	(*TermAcceptance)(nil),                       // 7: maxshot.contract_grant.v1.TermAcceptance
+	(*WalletEligibilityRecord)(nil),              // 8: maxshot.contract_grant.v1.WalletEligibilityRecord
+	(*PushWalletEligibilityRequest)(nil),         // 9: maxshot.contract_grant.v1.PushWalletEligibilityRequest
+	(*PushWalletEligibilityResponse)(nil),        // 10: maxshot.contract_grant.v1.PushWalletEligibilityResponse
+	(*PullWalletEligibilityUpdatesRequest)(nil),  // 11: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest
+	(*PullWalletEligibilityUpdatesResponse)(nil), // 12: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse
+	(*DirectedBridgeRoutePause)(nil),             // 13: maxshot.contract_grant.v1.DirectedBridgeRoutePause
+	(*GetContractOperationalStatusRequest)(nil),  // 14: maxshot.contract_grant.v1.GetContractOperationalStatusRequest
+	(*GetContractOperationalStatusResponse)(nil), // 15: maxshot.contract_grant.v1.GetContractOperationalStatusResponse
+	(*AitGrantItem)(nil),                         // 16: maxshot.contract_grant.v1.AitGrantItem
+	(*IssueAitCreditGrantsRequest)(nil),          // 17: maxshot.contract_grant.v1.IssueAitCreditGrantsRequest
+	(*AitGrantItemResult)(nil),                   // 18: maxshot.contract_grant.v1.AitGrantItemResult
+	(*IssueAitCreditGrantsResponse)(nil),         // 19: maxshot.contract_grant.v1.IssueAitCreditGrantsResponse
+	(*v1.CursorPageRequest)(nil),                 // 20: maxshot.common.v1.CursorPageRequest
+	(*v1.CursorPageResponse)(nil),                // 21: maxshot.common.v1.CursorPageResponse
 }
 var file_maxshot_contract_grant_v1_contract_grant_proto_depIdxs = []int32{
-	1,  // 0: maxshot.contract_grant.v1.WalletEligibilityRecord.term_acceptances:type_name -> maxshot.contract_grant.v1.TermAcceptance
-	2,  // 1: maxshot.contract_grant.v1.PushWalletEligibilityRequest.records:type_name -> maxshot.contract_grant.v1.WalletEligibilityRecord
-	11, // 2: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
-	2,  // 3: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse.records:type_name -> maxshot.contract_grant.v1.WalletEligibilityRecord
-	12, // 4: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
-	7,  // 5: maxshot.contract_grant.v1.IssueAitCreditGrantsRequest.items:type_name -> maxshot.contract_grant.v1.AitGrantItem
-	0,  // 6: maxshot.contract_grant.v1.AitGrantItemResult.status:type_name -> maxshot.contract_grant.v1.GrantItemStatus
-	9,  // 7: maxshot.contract_grant.v1.IssueAitCreditGrantsResponse.results:type_name -> maxshot.contract_grant.v1.AitGrantItemResult
-	3,  // 8: maxshot.contract_grant.v1.WalletEligibilityService.PushWalletEligibility:input_type -> maxshot.contract_grant.v1.PushWalletEligibilityRequest
-	5,  // 9: maxshot.contract_grant.v1.WalletEligibilityService.PullWalletEligibilityUpdates:input_type -> maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest
-	8,  // 10: maxshot.contract_grant.v1.AitCreditGrantService.IssueAitCreditGrants:input_type -> maxshot.contract_grant.v1.IssueAitCreditGrantsRequest
-	4,  // 11: maxshot.contract_grant.v1.WalletEligibilityService.PushWalletEligibility:output_type -> maxshot.contract_grant.v1.PushWalletEligibilityResponse
-	6,  // 12: maxshot.contract_grant.v1.WalletEligibilityService.PullWalletEligibilityUpdates:output_type -> maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse
-	10, // 13: maxshot.contract_grant.v1.AitCreditGrantService.IssueAitCreditGrants:output_type -> maxshot.contract_grant.v1.IssueAitCreditGrantsResponse
-	11, // [11:14] is the sub-list for method output_type
-	8,  // [8:11] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	0,  // 0: maxshot.contract_grant.v1.FundedTermConfig.status:type_name -> maxshot.contract_grant.v1.FundedTermStatus
+	2,  // 1: maxshot.contract_grant.v1.PushFundedTermsRequest.terms:type_name -> maxshot.contract_grant.v1.FundedTermConfig
+	2,  // 2: maxshot.contract_grant.v1.ListFundedTermsResponse.terms:type_name -> maxshot.contract_grant.v1.FundedTermConfig
+	7,  // 3: maxshot.contract_grant.v1.WalletEligibilityRecord.term_acceptances:type_name -> maxshot.contract_grant.v1.TermAcceptance
+	8,  // 4: maxshot.contract_grant.v1.PushWalletEligibilityRequest.records:type_name -> maxshot.contract_grant.v1.WalletEligibilityRecord
+	20, // 5: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	8,  // 6: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse.records:type_name -> maxshot.contract_grant.v1.WalletEligibilityRecord
+	21, // 7: maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	13, // 8: maxshot.contract_grant.v1.GetContractOperationalStatusResponse.directed_bridge_pauses:type_name -> maxshot.contract_grant.v1.DirectedBridgeRoutePause
+	16, // 9: maxshot.contract_grant.v1.IssueAitCreditGrantsRequest.items:type_name -> maxshot.contract_grant.v1.AitGrantItem
+	1,  // 10: maxshot.contract_grant.v1.AitGrantItemResult.status:type_name -> maxshot.contract_grant.v1.GrantItemStatus
+	18, // 11: maxshot.contract_grant.v1.IssueAitCreditGrantsResponse.results:type_name -> maxshot.contract_grant.v1.AitGrantItemResult
+	3,  // 12: maxshot.contract_grant.v1.ContractBackendService.PushFundedTerms:input_type -> maxshot.contract_grant.v1.PushFundedTermsRequest
+	9,  // 13: maxshot.contract_grant.v1.ContractBackendService.PushWalletEligibility:input_type -> maxshot.contract_grant.v1.PushWalletEligibilityRequest
+	14, // 14: maxshot.contract_grant.v1.ContractBackendService.GetContractOperationalStatus:input_type -> maxshot.contract_grant.v1.GetContractOperationalStatusRequest
+	5,  // 15: maxshot.contract_grant.v1.AitCreditGrantService.ListFundedTerms:input_type -> maxshot.contract_grant.v1.ListFundedTermsRequest
+	11, // 16: maxshot.contract_grant.v1.AitCreditGrantService.PullWalletEligibilityUpdates:input_type -> maxshot.contract_grant.v1.PullWalletEligibilityUpdatesRequest
+	17, // 17: maxshot.contract_grant.v1.AitCreditGrantService.IssueAitCreditGrants:input_type -> maxshot.contract_grant.v1.IssueAitCreditGrantsRequest
+	4,  // 18: maxshot.contract_grant.v1.ContractBackendService.PushFundedTerms:output_type -> maxshot.contract_grant.v1.PushFundedTermsResponse
+	10, // 19: maxshot.contract_grant.v1.ContractBackendService.PushWalletEligibility:output_type -> maxshot.contract_grant.v1.PushWalletEligibilityResponse
+	15, // 20: maxshot.contract_grant.v1.ContractBackendService.GetContractOperationalStatus:output_type -> maxshot.contract_grant.v1.GetContractOperationalStatusResponse
+	6,  // 21: maxshot.contract_grant.v1.AitCreditGrantService.ListFundedTerms:output_type -> maxshot.contract_grant.v1.ListFundedTermsResponse
+	12, // 22: maxshot.contract_grant.v1.AitCreditGrantService.PullWalletEligibilityUpdates:output_type -> maxshot.contract_grant.v1.PullWalletEligibilityUpdatesResponse
+	19, // 23: maxshot.contract_grant.v1.AitCreditGrantService.IssueAitCreditGrants:output_type -> maxshot.contract_grant.v1.IssueAitCreditGrantsResponse
+	18, // [18:24] is the sub-list for method output_type
+	12, // [12:18] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_maxshot_contract_grant_v1_contract_grant_proto_init() }
@@ -847,8 +1637,8 @@ func file_maxshot_contract_grant_v1_contract_grant_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc), len(file_maxshot_contract_grant_v1_contract_grant_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   10,
+			NumEnums:      2,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
