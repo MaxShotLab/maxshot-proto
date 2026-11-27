@@ -68,34 +68,34 @@ flowchart TB
     end
 
     U_WEB --> GW_WEB
-    GW_WEB -->|HTTPS| BFF_TS
-    GW_WEB -->|HTTPS| STUDIO_TS
-    GW_WEB -->|公网只读 HTTPS (JWKS本地验签)| CNT_GO
-    GW_WEB -->|用户钱包直签交易 (ABI)| ETH
-    U_API -->|HTTPS + API Key| GW_GO
+    GW_WEB -->|"HTTPS"| BFF_TS
+    GW_WEB -->|"HTTPS"| STUDIO_TS
+    GW_WEB -->|"公网只读 HTTPS (JWKS本地验签)"| CNT_GO
+    GW_WEB -->|"用户钱包直签交易 (ABI)"| ETH
+    U_API -->|"HTTPS + API Key"| GW_GO
     U_VENDOR --> PRV_WEB
-    PRV_WEB -->|HTTPS| PRV_GO
+    PRV_WEB -->|"HTTPS"| PRV_GO
 
-    BFF_TS -->|同机房内网主体透传| GW_GO
+    BFF_TS -->|"同机房内网主体透传"| GW_GO
     BFF_TS --> BILL_TS
     GW_GO --> REDIS_GW
-    GW_GO <-->|同机房三步同步 gRPC:<br/>Hold / MarkSending / Settle| BILL_TS
-    STUDIO_TS <-->|同机房同步 gRPC| BILL_TS
+    GW_GO <-->|"同机房三步同步 gRPC:<br/>Hold / MarkSending / Settle"| BILL_TS
+    STUDIO_TS <-->|"同机房同步 gRPC"| BILL_TS
     BILL_TS --> PG_GW
     FIN_WK --> PG_GW
     STUDIO_TS --> PG_GW
     BFF_TS --> PG_GW
 
-    GW_GO -->|HTTPS 直连调用| UPSTREAM
-    CNT_GO -->|只读 JSON-RPC| ETH
-    FIN_WK -.->|7天边界轻量只读对账| ETH
+    GW_GO -->|"HTTPS 直连调用"| UPSTREAM
+    CNT_GO -->|"只读 JSON-RPC"| ETH
+    FIN_WK -.->|"7天边界轻量只读对账"| ETH
 
-    PRV_GO ==>|异地组网 + gRPC + TLS + HMAC:<br/>推送 CatalogSnapshot & 公钥加密凭证| GW_GO
-    PRV_GO ==>|异地组网 + gRPC + TLS + HMAC:<br/>同步只读定价/预算快照副本| BILL_TS
-    GW_GO ==>|异地组网 + gRPC + TLS + HMAC:<br/>分钟级批量回推 Uptime/延迟/调用汇总| PRV_GO
+    PRV_GO ==>|"异地组网 + gRPC + TLS + HMAC:<br/>推送 CatalogSnapshot & 公钥加密凭证"| GW_GO
+    PRV_GO ==>|"异地组网 + gRPC + TLS + HMAC:<br/>同步只读定价/预算快照副本"| BILL_TS
+    GW_GO ==>|"异地组网 + gRPC + TLS + HMAC:<br/>分钟级批量回推 Uptime/延迟/调用汇总"| PRV_GO
 
-    BILL_TS ==>|异地组网 + gRPC + TLS + HMAC:<br/>推送/增量拉取 钱包绑定与条款状态| CNT_GO
-    CNT_GO ==>|异地组网 + gRPC + TLS + HMAC:<br/>推送 7天边界用户 Credits 入账| BILL_TS
+    BILL_TS ==>|"异地组网 + gRPC + TLS + HMAC:<br/>推送/增量拉取 钱包绑定与条款状态"| CNT_GO
+    CNT_GO ==>|"异地组网 + gRPC + TLS + HMAC:<br/>推送 7天边界用户 Credits 入账"| BILL_TS
 
     PRV_GO --> PG_PRV
     CNT_GO --> PG_CNT
@@ -148,9 +148,9 @@ sequenceDiagram
     participant Upstream as 上游大模型供应商
 
     Client->>GW: POST /v1/chat/completions (API Key 或 BFF 内部主体, [Idempotency-Key], modelId, [offeringId], [max_tokens], [max_cost])
-    GW->>GW: 生成 trace_id; 校验可选 Idempotency-Key 24h 加密缓存与请求体指纹
+    GW->>GW: 生成 trace_id；校验可选 Idempotency-Key 24h 加密缓存与请求体指纹
     GW->>Redis: 0. Lua 滑动窗口检查 RPM / TPM / 最大并发 (超限直返 429 + trace_id)
-    GW->>GW: 读内存 CatalogSnapshot(vN) 选 Primary + ≤1 Backup(未Pin)<br/>估算输入 Token 上界; 注入 effective_max_tokens = min(caller, model_default/offering_max)
+    GW->>GW: 读内存 CatalogSnapshot(vN) 选 Primary + ≤1 Backup(未Pin)<br/>估算输入 Token 上界；注入 effective_max_tokens = min(caller, model_default/offering_max)
     GW->>Bill: 1. 同机房同步 gRPC AuthorizeAndHold(catalogVersion, primaryId, backupId, inputUpper, effectiveMaxTokens...)
     Note over Bill: 单一 PG 事务(零信任重算):<br/>1. 查本地 catalogVersion 副本重算档位/目录/客户费率/Hard Max<br/>2. 校验 Key 目录白名单(必填) + 可选模型白名单<br/>3. 校验 Key 预算 + 供应商/平台/业务线日/月预算<br/>4. 6桶原子预留(AIT→Basic→[Continue with Premium when Basic is not enough]→Premium→Free→Ref→Dollar)
     alt 准入拒绝
@@ -163,7 +163,7 @@ sequenceDiagram
         Upstream-->>GW: SSE 流式分片 + native_request_id + Final Usage
         GW-->>Client: 透传响应 (携带 request_id 与 trace_id)
         GW->>Bill: 3. 同步 gRPC Settle(request_id, lease_token, serving_offering_id, native_request_id, usage, outcome)
-        Note over GW,Bill: 若 gRPC 失败则写 Go 本地持久化磁盘队列重试;<br/>缺失 Usage 进入 pending_reconciliation 由 finance-worker 24h Recovery 补拉闭环
+        Note over GW,Bill: 若 gRPC 失败则写 Go 本地持久化磁盘队列重试；<br/>缺失 Usage 进入 pending_reconciliation 由 finance-worker 24h Recovery 补拉闭环
     end
 ```
 
