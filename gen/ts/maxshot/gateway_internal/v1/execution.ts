@@ -22,6 +22,9 @@ import {
   BudgetPeriodKind,
   budgetPeriodKindFromJSON,
   budgetPeriodKindToJSON,
+  BudgetPeriodRule,
+  CursorPageRequest,
+  CursorPageResponse,
   CustomerChargeMode,
   customerChargeModeFromJSON,
   customerChargeModeToJSON,
@@ -42,6 +45,7 @@ import {
   searchPolicyFromJSON,
   searchPolicyToJSON,
 } from "../../common/v1/types.js";
+import { AitCoverageThrottlePolicy, FundedTermConfig, TermAcceptance } from "../../contract_grant/v1/contract_grant.js";
 
 export const protobufPackage = "maxshot.gateway_internal.v1";
 
@@ -200,7 +204,7 @@ export enum SettlementOutcome {
   SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 4,
   /** SETTLEMENT_OUTCOME_CANCELLED - charges completed outputs/components, releases remainder */
   SETTLEMENT_OUTCOME_CANCELLED = 5,
-  /** SETTLEMENT_OUTCOME_PENDING_RECONCILIATION - missing final usage; 24h auto-release applies */
+  /** SETTLEMENT_OUTCOME_PENDING_RECONCILIATION - missing final usage; the persisted release deadline applies */
   SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 6,
   UNRECOGNIZED = -1,
 }
@@ -348,7 +352,9 @@ export enum UncertainResolutionAction {
   UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED = 0,
   UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED = 1,
   UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST = 2,
+  /** @deprecated */
   UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3,
+  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -366,6 +372,9 @@ export function uncertainResolutionActionFromJSON(object: any): UncertainResolut
     case 3:
     case "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H":
       return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H;
+    case 4:
+    case "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD":
+      return UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -383,7 +392,208 @@ export function uncertainResolutionActionToJSON(object: UncertainResolutionActio
       return "UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST";
     case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H:
       return "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H";
+    case UncertainResolutionAction.UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD:
+      return "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD";
     case UncertainResolutionAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Execution-side observations never imply permission to resend an upstream request. */
+export enum AttemptDispatchState {
+  ATTEMPT_DISPATCH_STATE_UNSPECIFIED = 0,
+  ATTEMPT_DISPATCH_STATE_INTENT_RECORDED = 1,
+  ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED = 2,
+  ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL = 3,
+  ATTEMPT_DISPATCH_STATE_ACCEPTED = 4,
+  ATTEMPT_DISPATCH_STATE_UNKNOWN = 5,
+  ATTEMPT_DISPATCH_STATE_COMPLETED = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function attemptDispatchStateFromJSON(object: any): AttemptDispatchState {
+  switch (object) {
+    case 0:
+    case "ATTEMPT_DISPATCH_STATE_UNSPECIFIED":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_UNSPECIFIED;
+    case 1:
+    case "ATTEMPT_DISPATCH_STATE_INTENT_RECORDED":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_INTENT_RECORDED;
+    case 2:
+    case "ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED;
+    case 3:
+    case "ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL;
+    case 4:
+    case "ATTEMPT_DISPATCH_STATE_ACCEPTED":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_ACCEPTED;
+    case 5:
+    case "ATTEMPT_DISPATCH_STATE_UNKNOWN":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_UNKNOWN;
+    case 6:
+    case "ATTEMPT_DISPATCH_STATE_COMPLETED":
+      return AttemptDispatchState.ATTEMPT_DISPATCH_STATE_COMPLETED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AttemptDispatchState.UNRECOGNIZED;
+  }
+}
+
+export function attemptDispatchStateToJSON(object: AttemptDispatchState): string {
+  switch (object) {
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_UNSPECIFIED:
+      return "ATTEMPT_DISPATCH_STATE_UNSPECIFIED";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_INTENT_RECORDED:
+      return "ATTEMPT_DISPATCH_STATE_INTENT_RECORDED";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED:
+      return "ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL:
+      return "ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_ACCEPTED:
+      return "ATTEMPT_DISPATCH_STATE_ACCEPTED";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_UNKNOWN:
+      return "ATTEMPT_DISPATCH_STATE_UNKNOWN";
+    case AttemptDispatchState.ATTEMPT_DISPATCH_STATE_COMPLETED:
+      return "ATTEMPT_DISPATCH_STATE_COMPLETED";
+    case AttemptDispatchState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum SettlementDisposition {
+  SETTLEMENT_DISPOSITION_UNSPECIFIED = 0,
+  SETTLEMENT_DISPOSITION_APPLIED = 1,
+  SETTLEMENT_DISPOSITION_ALREADY_APPLIED = 2,
+  SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION = 3,
+  SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE = 4,
+  SETTLEMENT_DISPOSITION_LEASE_LOST = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function settlementDispositionFromJSON(object: any): SettlementDisposition {
+  switch (object) {
+    case 0:
+    case "SETTLEMENT_DISPOSITION_UNSPECIFIED":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_UNSPECIFIED;
+    case 1:
+    case "SETTLEMENT_DISPOSITION_APPLIED":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_APPLIED;
+    case 2:
+    case "SETTLEMENT_DISPOSITION_ALREADY_APPLIED":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_ALREADY_APPLIED;
+    case 3:
+    case "SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION;
+    case 4:
+    case "SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE;
+    case 5:
+    case "SETTLEMENT_DISPOSITION_LEASE_LOST":
+      return SettlementDisposition.SETTLEMENT_DISPOSITION_LEASE_LOST;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SettlementDisposition.UNRECOGNIZED;
+  }
+}
+
+export function settlementDispositionToJSON(object: SettlementDisposition): string {
+  switch (object) {
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_UNSPECIFIED:
+      return "SETTLEMENT_DISPOSITION_UNSPECIFIED";
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_APPLIED:
+      return "SETTLEMENT_DISPOSITION_APPLIED";
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_ALREADY_APPLIED:
+      return "SETTLEMENT_DISPOSITION_ALREADY_APPLIED";
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION:
+      return "SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION";
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE:
+      return "SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE";
+    case SettlementDisposition.SETTLEMENT_DISPOSITION_LEASE_LOST:
+      return "SETTLEMENT_DISPOSITION_LEASE_LOST";
+    case SettlementDisposition.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum FundingNotice {
+  FUNDING_NOTICE_UNSPECIFIED = 0,
+  FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED = 1,
+  FUNDING_NOTICE_AIT_COVERAGE_THROTTLED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function fundingNoticeFromJSON(object: any): FundingNotice {
+  switch (object) {
+    case 0:
+    case "FUNDING_NOTICE_UNSPECIFIED":
+      return FundingNotice.FUNDING_NOTICE_UNSPECIFIED;
+    case 1:
+    case "FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED":
+      return FundingNotice.FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED;
+    case 2:
+    case "FUNDING_NOTICE_AIT_COVERAGE_THROTTLED":
+      return FundingNotice.FUNDING_NOTICE_AIT_COVERAGE_THROTTLED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return FundingNotice.UNRECOGNIZED;
+  }
+}
+
+export function fundingNoticeToJSON(object: FundingNotice): string {
+  switch (object) {
+    case FundingNotice.FUNDING_NOTICE_UNSPECIFIED:
+      return "FUNDING_NOTICE_UNSPECIFIED";
+    case FundingNotice.FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED:
+      return "FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED";
+    case FundingNotice.FUNDING_NOTICE_AIT_COVERAGE_THROTTLED:
+      return "FUNDING_NOTICE_AIT_COVERAGE_THROTTLED";
+    case FundingNotice.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum OperatorAuthenticationMethod {
+  OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED = 0,
+  OPERATOR_AUTHENTICATION_METHOD_TOTP = 1,
+  OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function operatorAuthenticationMethodFromJSON(object: any): OperatorAuthenticationMethod {
+  switch (object) {
+    case 0:
+    case "OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED":
+      return OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED;
+    case 1:
+    case "OPERATOR_AUTHENTICATION_METHOD_TOTP":
+      return OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_TOTP;
+    case 2:
+    case "OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE":
+      return OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return OperatorAuthenticationMethod.UNRECOGNIZED;
+  }
+}
+
+export function operatorAuthenticationMethodToJSON(object: OperatorAuthenticationMethod): string {
+  switch (object) {
+    case OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED:
+      return "OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED";
+    case OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_TOTP:
+      return "OPERATOR_AUTHENTICATION_METHOD_TOTP";
+    case OperatorAuthenticationMethod.OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE:
+      return "OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE";
+    case OperatorAuthenticationMethod.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -599,6 +809,8 @@ export interface PreviewQuoteRequest {
   /** normalized generation parameter digest bound to quote_id */
   requestHash: string;
   effectiveChannel: string;
+  /** Trusted HTTP principal flows bind the quote to this canonical request fingerprint. */
+  requestBodySha256: string;
 }
 
 export interface PreviewQuoteResponse {
@@ -611,7 +823,7 @@ export interface PreviewQuoteResponse {
   usesFreeModelQuota: boolean;
   /** F-model free quota exhausted; quote reflects regular 6-bucket fallback */
   freeModelQuotaExhaustedFallback: boolean;
-  /** BIL-R23: Studio UI must prompt user to confirm max Dollar debit */
+  /** Studio and applicable Web Chat flows must confirm the maximum Dollar debit */
   requiresDollarConfirmation: boolean;
   maxDollarDebitMicroUsd: bigint;
   basicToPremiumProjected: boolean;
@@ -693,6 +905,16 @@ export interface AuthorizeAndHoldResponse {
     | undefined;
   /** populated when status == HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED */
   cachedSettlement?: SettleResponse | undefined;
+  cachedHttpResponse?: IdempotentHttpResponse | undefined;
+  effectivePrimaryBound?: UsageBound | undefined;
+  effectiveBackupBound?: UsageBound | undefined;
+  customerReleaseAtUnixMs?:
+    | bigint
+    | undefined;
+  /** Present when a confirmed Web request exceeds its locked Dollar maximum or needs a first confirmation. */
+  replacementQuote?: PreviewQuoteResponse | undefined;
+  fundingNotices: FundingNotice[];
+  maxDollarDebitMicroUsd?: bigint | undefined;
 }
 
 export interface MarkSendingRequest {
@@ -708,6 +930,16 @@ export interface MarkSendingResponse {
   accepted: boolean;
   leaseExpiresAtUnixMs: bigint;
   rejectReason: string;
+  /**
+   * True only for the transaction that created the dispatch intent. A retry after an ambiguous
+   * RPC result never grants permission to send again, even when accepted is true.
+   */
+  newlyAuthorized?: boolean | undefined;
+  dispatchedAtUnixMs?:
+    | bigint
+    | undefined;
+  /** Reserved atomically for this attempt, including any backup after a definitive primary failure. */
+  providerCostReservedMicroUsd?: bigint | undefined;
 }
 
 export interface ExtendExecutionLeaseRequest {
@@ -749,6 +981,8 @@ export interface AttemptCostRecord {
   /** OpenRouter gen-... or Ark async task ID */
   providerGenerationId: string;
   httpStatus: number;
+  dispatchState?: AttemptDispatchState | undefined;
+  dispatchKey?: string | undefined;
 }
 
 export interface SettleRequest {
@@ -771,6 +1005,8 @@ export interface SettleRequest {
   customerChargeMode: CustomerChargeMode;
   /** base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies */
   providerReportedCustomerBaseCostUsdDec: string;
+  /** Only bounded, non-streaming responses eligible for retention. Persist with final result or leave absent. */
+  httpResponse?: IdempotentHttpResponse | undefined;
 }
 
 export interface SettleResponse {
@@ -784,10 +1020,11 @@ export interface SettleResponse {
   /** overrun or uncompensated shortfall routed to discrepancy ledger */
   platformBorneDiscrepancyMicroUsd: bigint;
   settledProviderPayableMicroUsd: bigint;
-  /** set to dispatched_at + 24h when outcome == PENDING_RECONCILIATION */
+  /** persisted deadline when customer funds are still held */
   autoReleaseAtUnixMs: bigint;
   settledBuckets: BucketAllocationLine[];
   releasedBuckets: BucketAllocationLine[];
+  disposition?: SettlementDisposition | undefined;
 }
 
 export interface MarkUncertainRequest {
@@ -800,7 +1037,7 @@ export interface MarkUncertainRequest {
 
 export interface MarkUncertainResponse {
   marked: boolean;
-  /** dispatched_at + 24h (BIL-R36) */
+  /** persisted Studio release deadline */
   autoReleaseAtUnixMs: bigint;
 }
 
@@ -808,12 +1045,12 @@ export interface ResolveUncertainRequest {
   requestId: string;
   resolutionIdempotencyKey: string;
   action: UncertainResolutionAction;
-  /** operator ID or "system:finance-worker-24h" (ADM-R12) */
+  /** operator ID or "system:finance-worker" (ADM-R12) */
   actorId: string;
   reason: string;
   servingOfferingId: string;
   nativeRequestId: string;
-  /** populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery */
+  /** populated for Studio SETTLE_DELIVERED or text PENDING_RECONCILIATION recovery */
   verifiedUsage?: UsageBound | undefined;
   mediaOutputs: MediaOutputSettlementItem[];
   /** recorded into discrepancy ledger if already auto-released (BIL-R36) */
@@ -821,11 +1058,745 @@ export interface ResolveUncertainRequest {
   attemptId: string;
   providerGenerationId: string;
   offeringId: string;
+  /** Fenced recovery claim for automatic resolution. Operator paths use an operation-bound audit context. */
+  recoveryLeaseToken: string;
+  operator?: OperatorContext | undefined;
 }
 
 export interface ResolveUncertainResponse {
   resolved: boolean;
   settlement?: SettleResponse | undefined;
+}
+
+export interface IdempotentHttpResponse {
+  statusCode: number;
+  /** Only allowlisted end-to-end headers. Regenerate tracing headers and never persist credentials. */
+  headers: KeyValueAttribute[];
+  /** Maximum 1 MiB. Never store SSE or zero-retention output. */
+  body: Buffer;
+}
+
+export interface RecordAttemptObservationRequest {
+  requestId: string;
+  leaseToken: string;
+  observationIdempotencyKey: string;
+  attempt?: AttemptCostRecord | undefined;
+}
+
+export interface RecordAttemptObservationResponse {
+  recorded: boolean;
+  dispatchState: AttemptDispatchState;
+}
+
+export interface ClaimExecutionRecoveryRequest {
+  limit: number;
+}
+
+export interface ExecutionRecoveryClaim {
+  requestId: string;
+  studioOperationId: string;
+  leaseToken: string;
+  leaseExpiresAtUnixMs: bigint;
+  customerReleaseAtUnixMs: bigint;
+  channel: ExecutionChannel;
+  lockedCatalogVersion: string;
+  attempts: AttemptCostRecord[];
+  customerChargeMode: CustomerChargeMode;
+  customerHoldReleased: boolean;
+}
+
+export interface ClaimExecutionRecoveryResponse {
+  claims: ExecutionRecoveryClaim[];
+}
+
+export interface GetBillingCatalogStateRequest {
+}
+
+export interface GetBillingCatalogStateResponse {
+  activeCatalogVersion: string;
+  frozenRouting: boolean;
+  frozenAllowedOfferingIds: string[];
+}
+
+export interface RegisterAccountRequest {
+  /** Stable BFF-owned identity provisioning reference, never an email or raw OAuth identifier. */
+  registrationId: string;
+}
+
+export interface RegisterAccountResponse {
+  accountId: string;
+}
+
+export interface ApiKeyPolicy {
+  fundingStrategy?: KeyFundingStrategy | undefined;
+  allowAitEarnedCredit?: boolean | undefined;
+  dollarRelayEnabled?: boolean | undefined;
+  allowedCatalogIds: string[];
+  modelAllowlist: string[];
+  perRequestCeilingMicroUsd?: bigint | undefined;
+  spendingLimits: BudgetPeriodRule[];
+  expiresAtUnixMs?: bigint | undefined;
+  rpmLimit?: number | undefined;
+  tpmLimit?: bigint | undefined;
+  maxConcurrentStreams?: number | undefined;
+  searchPolicy?: SearchPolicy | undefined;
+}
+
+export interface ManagedApiKey {
+  apiKeyId: string;
+  label: string;
+  maskedKey: string;
+  policy?: ApiKeyPolicy | undefined;
+  createdAtUnixMs: bigint;
+  revokedAtUnixMs: bigint;
+}
+
+export interface CreateApiKeyRequest {
+  accountId: string;
+  idempotencyKey: string;
+  label: string;
+  policy?: ApiKeyPolicy | undefined;
+}
+
+export interface CreateApiKeyResponse {
+  key?:
+    | ManagedApiKey
+    | undefined;
+  /** Never returned by reads or logged. */
+  oneTimeSecret: string;
+}
+
+export interface UpdateApiKeyRequest {
+  accountId: string;
+  apiKeyId: string;
+  idempotencyKey: string;
+  label?: string | undefined;
+  policy?:
+    | ApiKeyPolicy
+    | undefined;
+  /** Allowlisted policy field names to replace, including explicit clearing of repeated fields. */
+  policyUpdateFields: string[];
+}
+
+export interface UpdateApiKeyResponse {
+  key?: ManagedApiKey | undefined;
+}
+
+export interface RevokeApiKeyRequest {
+  accountId: string;
+  apiKeyId: string;
+  idempotencyKey: string;
+}
+
+export interface RevokeApiKeyResponse {
+  key?: ManagedApiKey | undefined;
+}
+
+export interface ListApiKeysRequest {
+  accountId: string;
+  page?: CursorPageRequest | undefined;
+}
+
+export interface ListApiKeysResponse {
+  keys: ManagedApiKey[];
+  page?: CursorPageResponse | undefined;
+}
+
+export interface AccountFundingSettings {
+  webDollarRelayEnabled?: boolean | undefined;
+  allowBasicToPremium?: boolean | undefined;
+  allowAitEarnedCredit?: boolean | undefined;
+  spendingLimits: BudgetPeriodRule[];
+}
+
+export interface GetAccountFundingRequest {
+  accountId: string;
+}
+
+export interface GetAccountFundingResponse {
+  settings?: AccountFundingSettings | undefined;
+  balances: BucketBalanceView[];
+  windows: FundingWindowStatus[];
+  spendingLocked: boolean;
+  freeRequestsRemaining: bigint;
+  freeEquivalentCreditsRemaining: bigint;
+}
+
+export interface UpdateAccountSettingsRequest {
+  accountId: string;
+  idempotencyKey: string;
+  settings?: AccountFundingSettings | undefined;
+  replaceSpendingLimits: boolean;
+}
+
+export interface UpdateAccountSettingsResponse {
+  settings?: AccountFundingSettings | undefined;
+}
+
+export interface SubscriptionPlanVersion {
+  planId: string;
+  versionId: string;
+  salesStatus: string;
+  isMockCommercial: boolean;
+  priceCents: bigint;
+  currency: string;
+  /** UTF-8 PRD PlanVersionConfig JSON. The owner parses exact integers and rejects unknown fields. */
+  policyJson: Buffer;
+}
+
+export interface AccountSubscription {
+  subscriptionId: string;
+  status: string;
+  currentPlan?: SubscriptionPlanVersion | undefined;
+  periodId: string;
+  periodStartUnixMs: bigint;
+  periodEndUnixMs: bigint;
+  autoRenew: boolean;
+  pendingPlanVersionId: string;
+  anchorDayOfMonth: number;
+  remainingPools: BucketBalanceView[];
+  windows: FundingWindowStatus[];
+}
+
+export interface SubscriptionInvoice {
+  invoiceId: string;
+  planVersionId: string;
+  periodId: string;
+  paymentId: string;
+  dollarDebitMicroUsd: bigint;
+  periodStartUnixMs: bigint;
+  periodEndUnixMs: bigint;
+  paidAtUnixMs: bigint;
+  status: string;
+  currency: string;
+}
+
+export interface ListSubscriptionPlansRequest {
+}
+
+export interface ListSubscriptionPlansResponse {
+  plans: SubscriptionPlanVersion[];
+}
+
+export interface GetSubscriptionRequest {
+  accountId: string;
+}
+
+export interface GetSubscriptionResponse {
+  subscription?: AccountSubscription | undefined;
+}
+
+export interface PurchaseSubscriptionRequest {
+  accountId: string;
+  planVersionId: string;
+  idempotencyKey: string;
+}
+
+export interface PurchaseSubscriptionResponse {
+  subscription?: AccountSubscription | undefined;
+  invoice?: SubscriptionInvoice | undefined;
+}
+
+export interface RenewSubscriptionRequest {
+  accountId: string;
+  /** Optional requested plan for manual recovery. */
+  planVersionId: string;
+  idempotencyKey: string;
+}
+
+export interface RenewSubscriptionResponse {
+  subscription?: AccountSubscription | undefined;
+  invoice?: SubscriptionInvoice | undefined;
+}
+
+export interface CancelSubscriptionRequest {
+  accountId: string;
+  idempotencyKey: string;
+  resumeAutoRenew: boolean;
+}
+
+export interface CancelSubscriptionResponse {
+  subscription?: AccountSubscription | undefined;
+}
+
+export interface SchedulePlanChangeRequest {
+  accountId: string;
+  /** Empty clears a user change where allowed. */
+  planVersionId: string;
+  idempotencyKey: string;
+}
+
+export interface SchedulePlanChangeResponse {
+  subscription?: AccountSubscription | undefined;
+}
+
+export interface ListInvoicesRequest {
+  accountId: string;
+  page?: CursorPageRequest | undefined;
+}
+
+export interface ListInvoicesResponse {
+  invoices: SubscriptionInvoice[];
+  page?: CursorPageResponse | undefined;
+}
+
+export interface GetInvoiceRequest {
+  accountId: string;
+  invoiceId: string;
+}
+
+export interface GetInvoiceResponse {
+  invoice?: SubscriptionInvoice | undefined;
+}
+
+export interface GetDepositAddressRequest {
+  accountId: string;
+  chainId: string;
+}
+
+export interface GetDepositAddressResponse {
+  chainId: string;
+  address: string;
+}
+
+export interface TopupOrder {
+  orderId: string;
+  channel: string;
+  status: string;
+  providerReference: string;
+  destinationChainId: string;
+  destinationAddress: string;
+  netMicroUsd: bigint;
+  createdAtUnixMs: bigint;
+}
+
+export interface CreateTopupOrderRequest {
+  accountId: string;
+  idempotencyKey: string;
+  channel: string;
+  sourceChainId: string;
+  sourceAssetId: string;
+  sourceAmountAtomicDec: string;
+  quoteReference: string;
+  requestedUsdCents: bigint;
+}
+
+export interface CreateTopupOrderResponse {
+  order?: TopupOrder | undefined;
+}
+
+export interface RecordStripePaymentRequest {
+  eventId: string;
+  paymentId: string;
+  checkoutSessionId: string;
+  currency: string;
+  paidMinorUnits: bigint;
+  occurredAtUnixMs: bigint;
+}
+
+export interface RecordStripePaymentResponse {
+  order?: TopupOrder | undefined;
+}
+
+export interface ListTopupsRequest {
+  accountId: string;
+  page?: CursorPageRequest | undefined;
+  orderId: string;
+}
+
+export interface ListTopupsResponse {
+  topups: TopupOrder[];
+  page?: CursorPageResponse | undefined;
+}
+
+export interface LinkedWallet {
+  accountId: string;
+  walletAddress: string;
+  chainId: bigint;
+  linkedAtUnixSec: bigint;
+  siweProofRef: string;
+}
+
+export interface LinkWalletRequest {
+  accountId: string;
+  walletAddress: string;
+  chainId: bigint;
+  siweMessage: string;
+  signature: Buffer;
+  siweProofRef: string;
+  idempotencyKey: string;
+}
+
+export interface LinkWalletResponse {
+  link?: LinkedWallet | undefined;
+}
+
+export interface GetWalletLinkRequest {
+  accountId: string;
+}
+
+export interface GetWalletLinkResponse {
+  link?: LinkedWallet | undefined;
+}
+
+export interface AcceptFundedTermRequest {
+  accountId: string;
+  termId: string;
+  termsVersion: string;
+  idempotencyKey: string;
+}
+
+export interface AcceptFundedTermResponse {
+  acceptance?: TermAcceptance | undefined;
+}
+
+export interface GetCurrentFundedTermRequest {
+  accountId: string;
+}
+
+export interface GetCurrentFundedTermResponse {
+  currentTerm?: FundedTermConfig | undefined;
+  acceptance?: TermAcceptance | undefined;
+}
+
+export interface PrepareAccountMergeRequest {
+  accountId: string;
+  sourceAccountId: string;
+  idempotencyKey: string;
+  verifiedSourceProofRef: string;
+}
+
+export interface PrepareAccountMergeResponse {
+  mergeId: string;
+  blockers: string[];
+  expiresAtUnixMs: bigint;
+}
+
+export interface CommitAccountMergeRequest {
+  accountId: string;
+  mergeId: string;
+  idempotencyKey: string;
+}
+
+export interface CommitAccountMergeResponse {
+  status: string;
+}
+
+export interface AccountUsage {
+  requestId: string;
+  apiKeyId: string;
+  modelId: string;
+  selectedOfferingId: string;
+  servingOfferingId: string;
+  fallbackUsed: boolean;
+  fallbackReason: string;
+  createdAtUnixMs: bigint;
+  status: string;
+  acceptedHardMaxMicroUsd: bigint;
+  settledBuckets: BucketAllocationLine[];
+  usage?: UsageBound | undefined;
+}
+
+export interface ListUsageRequest {
+  accountId: string;
+  page?: CursorPageRequest | undefined;
+  apiKeyId: string;
+  sinceUnixMs: bigint;
+  untilUnixMs: bigint;
+  modelId: string;
+}
+
+export interface ListUsageResponse {
+  records: AccountUsage[];
+  page?: CursorPageResponse | undefined;
+}
+
+export interface GetUsageDetailRequest {
+  accountId: string;
+  requestId: string;
+}
+
+export interface GetUsageDetailResponse {
+  usage?: AccountUsage | undefined;
+}
+
+export interface AccountNotice {
+  noticeId: string;
+  kind: string;
+  issuedAtUnixMs: bigint;
+  readAtUnixMs: bigint;
+  fromPlanVersionId: string;
+  toPlanVersionId: string;
+}
+
+export interface ListAccountNoticesRequest {
+  accountId: string;
+  page?: CursorPageRequest | undefined;
+}
+
+export interface ListAccountNoticesResponse {
+  notices: AccountNotice[];
+  page?: CursorPageResponse | undefined;
+}
+
+export interface AckAccountNoticeRequest {
+  accountId: string;
+  noticeId: string;
+}
+
+export interface AckAccountNoticeResponse {
+  notice?: AccountNotice | undefined;
+}
+
+export interface GetReferralSummaryRequest {
+  accountId: string;
+}
+
+export interface GetReferralSummaryResponse {
+  referralCode: string;
+  rewardedCredits: bigint;
+  availableCredits: bigint;
+  referredAccounts: bigint;
+}
+
+export interface SetReferralAttributionRequest {
+  accountId: string;
+  referralCode: string;
+  idempotencyKey: string;
+}
+
+export interface SetReferralAttributionResponse {
+  attributed: boolean;
+}
+
+export interface OperatorContext {
+  operatorId: string;
+  authenticationMethod: OperatorAuthenticationMethod;
+  reason: string;
+  idempotencyKey: string;
+  sourceIp: string;
+  stepUpVerifiedAtUnixMs: bigint;
+  /** Audit reference to the method- and target-bound step-up, never the TOTP code or wallet signature. */
+  stepUpProofRef: string;
+}
+
+export interface AdminMutationResult {
+  auditId: string;
+  resourceId: string;
+  status: string;
+}
+
+export interface PlanCostValidation {
+  catalogVersion: string;
+  basicWorstCostMicroUsd: bigint;
+  premiumWorstCostMicroUsd: bigint;
+  minimumContributionMicroUsd: bigint;
+  violations: string[];
+}
+
+export interface CreatePlanDraftRequest {
+  operator?: OperatorContext | undefined;
+  plan?: SubscriptionPlanVersion | undefined;
+}
+
+export interface CreatePlanDraftResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ValidatePlanVersionRequest {
+  versionId: string;
+}
+
+export interface ValidatePlanVersionResponse {
+  validation?: PlanCostValidation | undefined;
+}
+
+export interface PreviewPlanImpactRequest {
+  versionId: string;
+}
+
+export interface PreviewPlanImpactResponse {
+  affectedSubscriptions: bigint;
+  adverseChanges: string[];
+  validation?: PlanCostValidation | undefined;
+}
+
+export interface PublishPlanVersionRequest {
+  operator?: OperatorContext | undefined;
+  versionId: string;
+  expectedCatalogVersion: string;
+}
+
+export interface PublishPlanVersionResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface SetPlanSalesStatusRequest {
+  operator?: OperatorContext | undefined;
+  versionId: string;
+  salesStatus: string;
+}
+
+export interface SetPlanSalesStatusResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface SetSpendingLockRequest {
+  operator?: OperatorContext | undefined;
+  accountId: string;
+  locked: boolean;
+}
+
+export interface SetSpendingLockResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ManualLedgerAdjustmentRequest {
+  operator?: OperatorContext | undefined;
+  accountId: string;
+  fundingBucket: FundingBucket;
+  sourceId: string;
+  creditDelta: bigint;
+  dollarDeltaMicroUsd: bigint;
+}
+
+export interface ManualLedgerAdjustmentResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ResolveDepositReorgHoldRequest {
+  operator?: OperatorContext | undefined;
+  holdId: string;
+  decision: string;
+}
+
+export interface ResolveDepositReorgHoldResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ReviewTopupRequest {
+  operator?: OperatorContext | undefined;
+  orderId: string;
+  decision: string;
+  evidenceRef: string;
+}
+
+export interface ReviewTopupResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface RevokeReferralRewardRequest {
+  operator?: OperatorContext | undefined;
+  rewardId: string;
+}
+
+export interface RevokeReferralRewardResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ResolveDiscrepancyRequest {
+  operator?: OperatorContext | undefined;
+  discrepancyId: string;
+  disposition: string;
+}
+
+export interface ResolveDiscrepancyResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface RefundSettledRequestRequest {
+  operator?: OperatorContext | undefined;
+  requestId: string;
+}
+
+export interface RefundSettledRequestResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface UpsertFundedTermRequest {
+  operator?: OperatorContext | undefined;
+  term?: FundedTermConfig | undefined;
+  refundReserveBps?: number | undefined;
+}
+
+export interface UpsertFundedTermResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface LockFundedTermRequest {
+  operator?: OperatorContext | undefined;
+  termId: string;
+  fundingReservationId: string;
+}
+
+export interface LockFundedTermResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface SetCoverageThrottlePolicyRequest {
+  operator?: OperatorContext | undefined;
+  policy?: AitCoverageThrottlePolicy | undefined;
+}
+
+export interface SetCoverageThrottlePolicyResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface UpdateSystemSettingRequest {
+  operator?: OperatorContext | undefined;
+  settingKey: string;
+  /** Schema and eligible keys owned by billing-service. */
+  valueJson: Buffer;
+}
+
+export interface UpdateSystemSettingResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface UpdateFreeModelQuotaPolicyRequest {
+  operator?:
+    | OperatorContext
+    | undefined;
+  /** Empty targets the account-wide policy. */
+  modelId: string;
+  dailyFreeRequestsLimit: bigint;
+  dailyFreeEquivalentCreditsLimit: bigint;
+}
+
+export interface UpdateFreeModelQuotaPolicyResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ResolveUncertainJobRequest {
+  operator?: OperatorContext | undefined;
+  operationId: string;
+  action: UncertainResolutionAction;
+  verifiedOutputs: MediaOutputSettlementItem[];
+  verifiedUsage?: UsageBound | undefined;
+}
+
+export interface ResolveUncertainJobResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ModerateMaterialRequest {
+  operator?: OperatorContext | undefined;
+  materialId: string;
+  decision: string;
+}
+
+export interface ModerateMaterialResponse {
+  result?: AdminMutationResult | undefined;
+}
+
+export interface ResolveAppealRequest {
+  operator?: OperatorContext | undefined;
+  appealId: string;
+  decision: string;
+}
+
+export interface ResolveAppealResponse {
+  result?: AdminMutationResult | undefined;
 }
 
 function createBaseMediaPricingDimensions(): MediaPricingDimensions {
@@ -4431,6 +5402,7 @@ function createBasePreviewQuoteRequest(): PreviewQuoteRequest {
     issueQuoteLock: false,
     requestHash: "",
     effectiveChannel: "",
+    requestBodySha256: "",
   };
 }
 
@@ -4489,6 +5461,9 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
     }
     if (message.effectiveChannel !== "") {
       writer.uint32(138).string(message.effectiveChannel);
+    }
+    if (message.requestBodySha256 !== "") {
+      writer.uint32(146).string(message.requestBodySha256);
     }
     return writer;
   },
@@ -4642,6 +5617,14 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
             message.effectiveChannel = reader.string();
             continue;
           }
+          case 18: {
+            if (tag !== 146) {
+              break;
+            }
+
+            message.requestBodySha256 = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -4733,6 +5716,11 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
         : isSet(object.effective_channel)
         ? globalThis.String(object.effective_channel)
         : "",
+      requestBodySha256: isSet(object.requestBodySha256)
+        ? globalThis.String(object.requestBodySha256)
+        : isSet(object.request_body_sha256)
+        ? globalThis.String(object.request_body_sha256)
+        : "",
     };
   },
 
@@ -4789,6 +5777,9 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
     if (message.effectiveChannel !== "") {
       obj.effectiveChannel = message.effectiveChannel;
     }
+    if (message.requestBodySha256 !== "") {
+      obj.requestBodySha256 = message.requestBodySha256;
+    }
     return obj;
   },
 
@@ -4821,6 +5812,7 @@ export const PreviewQuoteRequest: MessageFns<PreviewQuoteRequest> = {
     message.issueQuoteLock = object.issueQuoteLock ?? false;
     message.requestHash = object.requestHash ?? "";
     message.effectiveChannel = object.effectiveChannel ?? "";
+    message.requestBodySha256 = object.requestBodySha256 ?? "";
     return message;
   },
 };
@@ -6083,6 +7075,13 @@ function createBaseAuthorizeAndHoldResponse(): AuthorizeAndHoldResponse {
     budgetDiagnostic: undefined,
     creditDiagnostic: undefined,
     cachedSettlement: undefined,
+    cachedHttpResponse: undefined,
+    effectivePrimaryBound: undefined,
+    effectiveBackupBound: undefined,
+    customerReleaseAtUnixMs: undefined,
+    replacementQuote: undefined,
+    fundingNotices: [],
+    maxDollarDebitMicroUsd: undefined,
   };
 }
 
@@ -6164,6 +7163,37 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
     }
     if (message.cachedSettlement !== undefined) {
       SettleResponse.encode(message.cachedSettlement, writer.uint32(162).fork()).join();
+    }
+    if (message.cachedHttpResponse !== undefined) {
+      IdempotentHttpResponse.encode(message.cachedHttpResponse, writer.uint32(170).fork()).join();
+    }
+    if (message.effectivePrimaryBound !== undefined) {
+      UsageBound.encode(message.effectivePrimaryBound, writer.uint32(178).fork()).join();
+    }
+    if (message.effectiveBackupBound !== undefined) {
+      UsageBound.encode(message.effectiveBackupBound, writer.uint32(186).fork()).join();
+    }
+    if (message.customerReleaseAtUnixMs !== undefined) {
+      if (BigInt.asIntN(64, message.customerReleaseAtUnixMs) !== message.customerReleaseAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.customerReleaseAtUnixMs of type int64 too large");
+      }
+      writer.uint32(192).int64(message.customerReleaseAtUnixMs);
+    }
+    if (message.replacementQuote !== undefined) {
+      PreviewQuoteResponse.encode(message.replacementQuote, writer.uint32(202).fork()).join();
+    }
+    if (message.fundingNotices.length !== 0) {
+      writer.uint32(210).fork();
+      for (const v of message.fundingNotices) {
+        writer.int32(v);
+      }
+      writer.join();
+    }
+    if (message.maxDollarDebitMicroUsd !== undefined) {
+      if (BigInt.asIntN(64, message.maxDollarDebitMicroUsd) !== message.maxDollarDebitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.maxDollarDebitMicroUsd of type int64 too large");
+      }
+      writer.uint32(216).int64(message.maxDollarDebitMicroUsd);
     }
     return writer;
   },
@@ -6341,6 +7371,72 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
             message.cachedSettlement = SettleResponse.decode(reader, reader.uint32());
             continue;
           }
+          case 21: {
+            if (tag !== 170) {
+              break;
+            }
+
+            message.cachedHttpResponse = IdempotentHttpResponse.decode(reader, reader.uint32());
+            continue;
+          }
+          case 22: {
+            if (tag !== 178) {
+              break;
+            }
+
+            message.effectivePrimaryBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 23: {
+            if (tag !== 186) {
+              break;
+            }
+
+            message.effectiveBackupBound = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+          case 24: {
+            if (tag !== 192) {
+              break;
+            }
+
+            message.customerReleaseAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 25: {
+            if (tag !== 202) {
+              break;
+            }
+
+            message.replacementQuote = PreviewQuoteResponse.decode(reader, reader.uint32());
+            continue;
+          }
+          case 26: {
+            if (tag === 208) {
+              message.fundingNotices.push(reader.int32() as any);
+
+              continue;
+            }
+
+            if (tag === 210) {
+              const end2 = reader.uint32() + reader.pos;
+              while (reader.pos < end2) {
+                message.fundingNotices.push(reader.int32() as any);
+              }
+
+              continue;
+            }
+
+            break;
+          }
+          case 27: {
+            if (tag !== 216) {
+              break;
+            }
+
+            message.maxDollarDebitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -6447,6 +7543,41 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
         : isSet(object.cached_settlement)
         ? SettleResponse.fromJSON(object.cached_settlement)
         : undefined,
+      cachedHttpResponse: isSet(object.cachedHttpResponse)
+        ? IdempotentHttpResponse.fromJSON(object.cachedHttpResponse)
+        : isSet(object.cached_http_response)
+        ? IdempotentHttpResponse.fromJSON(object.cached_http_response)
+        : undefined,
+      effectivePrimaryBound: isSet(object.effectivePrimaryBound)
+        ? UsageBound.fromJSON(object.effectivePrimaryBound)
+        : isSet(object.effective_primary_bound)
+        ? UsageBound.fromJSON(object.effective_primary_bound)
+        : undefined,
+      effectiveBackupBound: isSet(object.effectiveBackupBound)
+        ? UsageBound.fromJSON(object.effectiveBackupBound)
+        : isSet(object.effective_backup_bound)
+        ? UsageBound.fromJSON(object.effective_backup_bound)
+        : undefined,
+      customerReleaseAtUnixMs: isSet(object.customerReleaseAtUnixMs)
+        ? BigInt(object.customerReleaseAtUnixMs)
+        : isSet(object.customer_release_at_unix_ms)
+        ? BigInt(object.customer_release_at_unix_ms)
+        : undefined,
+      replacementQuote: isSet(object.replacementQuote)
+        ? PreviewQuoteResponse.fromJSON(object.replacementQuote)
+        : isSet(object.replacement_quote)
+        ? PreviewQuoteResponse.fromJSON(object.replacement_quote)
+        : undefined,
+      fundingNotices: globalThis.Array.isArray(object?.fundingNotices)
+        ? object.fundingNotices.map((e: any) => fundingNoticeFromJSON(e))
+        : globalThis.Array.isArray(object?.funding_notices)
+        ? object.funding_notices.map((e: any) => fundingNoticeFromJSON(e))
+        : [],
+      maxDollarDebitMicroUsd: isSet(object.maxDollarDebitMicroUsd)
+        ? BigInt(object.maxDollarDebitMicroUsd)
+        : isSet(object.max_dollar_debit_micro_usd)
+        ? BigInt(object.max_dollar_debit_micro_usd)
+        : undefined,
     };
   },
 
@@ -6512,6 +7643,27 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
     if (message.cachedSettlement !== undefined) {
       obj.cachedSettlement = SettleResponse.toJSON(message.cachedSettlement);
     }
+    if (message.cachedHttpResponse !== undefined) {
+      obj.cachedHttpResponse = IdempotentHttpResponse.toJSON(message.cachedHttpResponse);
+    }
+    if (message.effectivePrimaryBound !== undefined) {
+      obj.effectivePrimaryBound = UsageBound.toJSON(message.effectivePrimaryBound);
+    }
+    if (message.effectiveBackupBound !== undefined) {
+      obj.effectiveBackupBound = UsageBound.toJSON(message.effectiveBackupBound);
+    }
+    if (message.customerReleaseAtUnixMs !== undefined) {
+      obj.customerReleaseAtUnixMs = message.customerReleaseAtUnixMs.toString();
+    }
+    if (message.replacementQuote !== undefined) {
+      obj.replacementQuote = PreviewQuoteResponse.toJSON(message.replacementQuote);
+    }
+    if (message.fundingNotices?.length) {
+      obj.fundingNotices = message.fundingNotices.map((e) => fundingNoticeToJSON(e));
+    }
+    if (message.maxDollarDebitMicroUsd !== undefined) {
+      obj.maxDollarDebitMicroUsd = message.maxDollarDebitMicroUsd.toString();
+    }
     return obj;
   },
 
@@ -6560,6 +7712,28 @@ export const AuthorizeAndHoldResponse: MessageFns<AuthorizeAndHoldResponse> = {
     message.cachedSettlement = (object.cachedSettlement !== undefined && object.cachedSettlement !== null)
       ? SettleResponse.fromPartial(object.cachedSettlement)
       : undefined;
+    message.cachedHttpResponse = (object.cachedHttpResponse !== undefined && object.cachedHttpResponse !== null)
+      ? IdempotentHttpResponse.fromPartial(object.cachedHttpResponse)
+      : undefined;
+    message.effectivePrimaryBound =
+      (object.effectivePrimaryBound !== undefined && object.effectivePrimaryBound !== null)
+        ? UsageBound.fromPartial(object.effectivePrimaryBound)
+        : undefined;
+    message.effectiveBackupBound = (object.effectiveBackupBound !== undefined && object.effectiveBackupBound !== null)
+      ? UsageBound.fromPartial(object.effectiveBackupBound)
+      : undefined;
+    message.customerReleaseAtUnixMs =
+      (object.customerReleaseAtUnixMs !== undefined && object.customerReleaseAtUnixMs !== null)
+        ? BigInt(object.customerReleaseAtUnixMs)
+        : undefined;
+    message.replacementQuote = (object.replacementQuote !== undefined && object.replacementQuote !== null)
+      ? PreviewQuoteResponse.fromPartial(object.replacementQuote)
+      : undefined;
+    message.fundingNotices = object.fundingNotices?.map((e) => e) || [];
+    message.maxDollarDebitMicroUsd =
+      (object.maxDollarDebitMicroUsd !== undefined && object.maxDollarDebitMicroUsd !== null)
+        ? BigInt(object.maxDollarDebitMicroUsd)
+        : undefined;
     return message;
   },
 };
@@ -6743,7 +7917,14 @@ export const MarkSendingRequest: MessageFns<MarkSendingRequest> = {
 };
 
 function createBaseMarkSendingResponse(): MarkSendingResponse {
-  return { accepted: false, leaseExpiresAtUnixMs: 0n, rejectReason: "" };
+  return {
+    accepted: false,
+    leaseExpiresAtUnixMs: 0n,
+    rejectReason: "",
+    newlyAuthorized: undefined,
+    dispatchedAtUnixMs: undefined,
+    providerCostReservedMicroUsd: undefined,
+  };
 }
 
 export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
@@ -6759,6 +7940,23 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
     }
     if (message.rejectReason !== "") {
       writer.uint32(26).string(message.rejectReason);
+    }
+    if (message.newlyAuthorized !== undefined) {
+      writer.uint32(32).bool(message.newlyAuthorized);
+    }
+    if (message.dispatchedAtUnixMs !== undefined) {
+      if (BigInt.asIntN(64, message.dispatchedAtUnixMs) !== message.dispatchedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.dispatchedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.dispatchedAtUnixMs);
+    }
+    if (message.providerCostReservedMicroUsd !== undefined) {
+      if (BigInt.asIntN(64, message.providerCostReservedMicroUsd) !== message.providerCostReservedMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.providerCostReservedMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(48).int64(message.providerCostReservedMicroUsd);
     }
     return writer;
   },
@@ -6800,6 +7998,30 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
             message.rejectReason = reader.string();
             continue;
           }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.newlyAuthorized = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.dispatchedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.providerCostReservedMicroUsd = reader.int64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -6825,6 +8047,21 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
         : isSet(object.reject_reason)
         ? globalThis.String(object.reject_reason)
         : "",
+      newlyAuthorized: isSet(object.newlyAuthorized)
+        ? globalThis.Boolean(object.newlyAuthorized)
+        : isSet(object.newly_authorized)
+        ? globalThis.Boolean(object.newly_authorized)
+        : undefined,
+      dispatchedAtUnixMs: isSet(object.dispatchedAtUnixMs)
+        ? BigInt(object.dispatchedAtUnixMs)
+        : isSet(object.dispatched_at_unix_ms)
+        ? BigInt(object.dispatched_at_unix_ms)
+        : undefined,
+      providerCostReservedMicroUsd: isSet(object.providerCostReservedMicroUsd)
+        ? BigInt(object.providerCostReservedMicroUsd)
+        : isSet(object.provider_cost_reserved_micro_usd)
+        ? BigInt(object.provider_cost_reserved_micro_usd)
+        : undefined,
     };
   },
 
@@ -6839,6 +8076,15 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
     if (message.rejectReason !== "") {
       obj.rejectReason = message.rejectReason;
     }
+    if (message.newlyAuthorized !== undefined) {
+      obj.newlyAuthorized = message.newlyAuthorized;
+    }
+    if (message.dispatchedAtUnixMs !== undefined) {
+      obj.dispatchedAtUnixMs = message.dispatchedAtUnixMs.toString();
+    }
+    if (message.providerCostReservedMicroUsd !== undefined) {
+      obj.providerCostReservedMicroUsd = message.providerCostReservedMicroUsd.toString();
+    }
     return obj;
   },
 
@@ -6852,6 +8098,14 @@ export const MarkSendingResponse: MessageFns<MarkSendingResponse> = {
       ? BigInt(object.leaseExpiresAtUnixMs)
       : 0n;
     message.rejectReason = object.rejectReason ?? "";
+    message.newlyAuthorized = object.newlyAuthorized ?? undefined;
+    message.dispatchedAtUnixMs = (object.dispatchedAtUnixMs !== undefined && object.dispatchedAtUnixMs !== null)
+      ? BigInt(object.dispatchedAtUnixMs)
+      : undefined;
+    message.providerCostReservedMicroUsd =
+      (object.providerCostReservedMicroUsd !== undefined && object.providerCostReservedMicroUsd !== null)
+        ? BigInt(object.providerCostReservedMicroUsd)
+        : undefined;
     return message;
   },
 };
@@ -7299,6 +8553,8 @@ function createBaseAttemptCostRecord(): AttemptCostRecord {
     attemptNumber: 0,
     providerGenerationId: "",
     httpStatus: 0,
+    dispatchState: undefined,
+    dispatchKey: undefined,
   };
 }
 
@@ -7354,6 +8610,12 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     }
     if (message.httpStatus !== 0) {
       writer.uint32(112).int32(message.httpStatus);
+    }
+    if (message.dispatchState !== undefined) {
+      writer.uint32(120).int32(message.dispatchState);
+    }
+    if (message.dispatchKey !== undefined) {
+      writer.uint32(130).string(message.dispatchKey);
     }
     return writer;
   },
@@ -7483,6 +8745,22 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
             message.httpStatus = reader.int32();
             continue;
           }
+          case 15: {
+            if (tag !== 120) {
+              break;
+            }
+
+            message.dispatchState = reader.int32() as any;
+            continue;
+          }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.dispatchKey = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -7559,6 +8837,16 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
         : isSet(object.http_status)
         ? globalThis.Number(object.http_status)
         : 0,
+      dispatchState: isSet(object.dispatchState)
+        ? attemptDispatchStateFromJSON(object.dispatchState)
+        : isSet(object.dispatch_state)
+        ? attemptDispatchStateFromJSON(object.dispatch_state)
+        : undefined,
+      dispatchKey: isSet(object.dispatchKey)
+        ? globalThis.String(object.dispatchKey)
+        : isSet(object.dispatch_key)
+        ? globalThis.String(object.dispatch_key)
+        : undefined,
     };
   },
 
@@ -7606,6 +8894,12 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     if (message.httpStatus !== 0) {
       obj.httpStatus = Math.round(message.httpStatus);
     }
+    if (message.dispatchState !== undefined) {
+      obj.dispatchState = attemptDispatchStateToJSON(message.dispatchState);
+    }
+    if (message.dispatchKey !== undefined) {
+      obj.dispatchKey = message.dispatchKey;
+    }
     return obj;
   },
 
@@ -7636,6 +8930,8 @@ export const AttemptCostRecord: MessageFns<AttemptCostRecord> = {
     message.attemptNumber = object.attemptNumber ?? 0;
     message.providerGenerationId = object.providerGenerationId ?? "";
     message.httpStatus = object.httpStatus ?? 0;
+    message.dispatchState = object.dispatchState ?? undefined;
+    message.dispatchKey = object.dispatchKey ?? undefined;
     return message;
   },
 };
@@ -7657,6 +8953,7 @@ function createBaseSettleRequest(): SettleRequest {
     attempts: [],
     customerChargeMode: 0,
     providerReportedCustomerBaseCostUsdDec: "",
+    httpResponse: undefined,
   };
 }
 
@@ -7711,6 +9008,9 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     }
     if (message.providerReportedCustomerBaseCostUsdDec !== "") {
       writer.uint32(122).string(message.providerReportedCustomerBaseCostUsdDec);
+    }
+    if (message.httpResponse !== undefined) {
+      IdempotentHttpResponse.encode(message.httpResponse, writer.uint32(130).fork()).join();
     }
     return writer;
   },
@@ -7848,6 +9148,14 @@ export const SettleRequest: MessageFns<SettleRequest> = {
             message.providerReportedCustomerBaseCostUsdDec = reader.string();
             continue;
           }
+          case 16: {
+            if (tag !== 130) {
+              break;
+            }
+
+            message.httpResponse = IdempotentHttpResponse.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -7931,6 +9239,11 @@ export const SettleRequest: MessageFns<SettleRequest> = {
         : isSet(object.provider_reported_customer_base_cost_usd_dec)
         ? globalThis.String(object.provider_reported_customer_base_cost_usd_dec)
         : "",
+      httpResponse: isSet(object.httpResponse)
+        ? IdempotentHttpResponse.fromJSON(object.httpResponse)
+        : isSet(object.http_response)
+        ? IdempotentHttpResponse.fromJSON(object.http_response)
+        : undefined,
     };
   },
 
@@ -7981,6 +9294,9 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     if (message.providerReportedCustomerBaseCostUsdDec !== "") {
       obj.providerReportedCustomerBaseCostUsdDec = message.providerReportedCustomerBaseCostUsdDec;
     }
+    if (message.httpResponse !== undefined) {
+      obj.httpResponse = IdempotentHttpResponse.toJSON(message.httpResponse);
+    }
     return obj;
   },
 
@@ -8009,6 +9325,9 @@ export const SettleRequest: MessageFns<SettleRequest> = {
     message.attempts = object.attempts?.map((e) => AttemptCostRecord.fromPartial(e)) || [];
     message.customerChargeMode = object.customerChargeMode ?? 0;
     message.providerReportedCustomerBaseCostUsdDec = object.providerReportedCustomerBaseCostUsdDec ?? "";
+    message.httpResponse = (object.httpResponse !== undefined && object.httpResponse !== null)
+      ? IdempotentHttpResponse.fromPartial(object.httpResponse)
+      : undefined;
     return message;
   },
 };
@@ -8026,6 +9345,7 @@ function createBaseSettleResponse(): SettleResponse {
     autoReleaseAtUnixMs: 0n,
     settledBuckets: [],
     releasedBuckets: [],
+    disposition: undefined,
   };
 }
 
@@ -8093,6 +9413,9 @@ export const SettleResponse: MessageFns<SettleResponse> = {
     }
     for (const v of message.releasedBuckets) {
       BucketAllocationLine.encode(v!, writer.uint32(90).fork()).join();
+    }
+    if (message.disposition !== undefined) {
+      writer.uint32(96).int32(message.disposition);
     }
     return writer;
   },
@@ -8198,6 +9521,14 @@ export const SettleResponse: MessageFns<SettleResponse> = {
             message.releasedBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
             continue;
           }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.disposition = reader.int32() as any;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -8263,6 +9594,7 @@ export const SettleResponse: MessageFns<SettleResponse> = {
         : globalThis.Array.isArray(object?.released_buckets)
         ? object.released_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
         : [],
+      disposition: isSet(object.disposition) ? settlementDispositionFromJSON(object.disposition) : undefined,
     };
   },
 
@@ -8300,6 +9632,9 @@ export const SettleResponse: MessageFns<SettleResponse> = {
     }
     if (message.releasedBuckets?.length) {
       obj.releasedBuckets = message.releasedBuckets.map((e) => BucketAllocationLine.toJSON(e));
+    }
+    if (message.disposition !== undefined) {
+      obj.disposition = settlementDispositionToJSON(message.disposition);
     }
     return obj;
   },
@@ -8340,6 +9675,7 @@ export const SettleResponse: MessageFns<SettleResponse> = {
       : 0n;
     message.settledBuckets = object.settledBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
     message.releasedBuckets = object.releasedBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    message.disposition = object.disposition ?? undefined;
     return message;
   },
 };
@@ -8602,6 +9938,8 @@ function createBaseResolveUncertainRequest(): ResolveUncertainRequest {
     attemptId: "",
     providerGenerationId: "",
     offeringId: "",
+    recoveryLeaseToken: "",
+    operator: undefined,
   };
 }
 
@@ -8645,6 +9983,12 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
     }
     if (message.offeringId !== "") {
       writer.uint32(106).string(message.offeringId);
+    }
+    if (message.recoveryLeaseToken !== "") {
+      writer.uint32(114).string(message.recoveryLeaseToken);
+    }
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(122).fork()).join();
     }
     return writer;
   },
@@ -8766,6 +10110,22 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
             message.offeringId = reader.string();
             continue;
           }
+          case 14: {
+            if (tag !== 114) {
+              break;
+            }
+
+            message.recoveryLeaseToken = reader.string();
+            continue;
+          }
+          case 15: {
+            if (tag !== 122) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -8837,6 +10197,12 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
         : isSet(object.offering_id)
         ? globalThis.String(object.offering_id)
         : "",
+      recoveryLeaseToken: isSet(object.recoveryLeaseToken)
+        ? globalThis.String(object.recoveryLeaseToken)
+        : isSet(object.recovery_lease_token)
+        ? globalThis.String(object.recovery_lease_token)
+        : "",
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
     };
   },
 
@@ -8881,6 +10247,12 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
     if (message.offeringId !== "") {
       obj.offeringId = message.offeringId;
     }
+    if (message.recoveryLeaseToken !== "") {
+      obj.recoveryLeaseToken = message.recoveryLeaseToken;
+    }
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
     return obj;
   },
 
@@ -8904,6 +10276,10 @@ export const ResolveUncertainRequest: MessageFns<ResolveUncertainRequest> = {
     message.attemptId = object.attemptId ?? "";
     message.providerGenerationId = object.providerGenerationId ?? "";
     message.offeringId = object.offeringId ?? "";
+    message.recoveryLeaseToken = object.recoveryLeaseToken ?? "";
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
     return message;
   },
 };
@@ -8995,13 +10371,13443 @@ export const ResolveUncertainResponse: MessageFns<ResolveUncertainResponse> = {
   },
 };
 
-/**
- * BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
- * hosted by TypeScript billing-account-service and called by:
- * 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
- * 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
- * 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
- */
+function createBaseIdempotentHttpResponse(): IdempotentHttpResponse {
+  return { statusCode: 0, headers: [], body: Buffer.alloc(0) };
+}
+
+export const IdempotentHttpResponse: MessageFns<IdempotentHttpResponse> = {
+  encode(message: IdempotentHttpResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.statusCode !== 0) {
+      writer.uint32(8).int32(message.statusCode);
+    }
+    for (const v of message.headers) {
+      KeyValueAttribute.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.body.length !== 0) {
+      writer.uint32(26).bytes(message.body);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): IdempotentHttpResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseIdempotentHttpResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.statusCode = reader.int32();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.headers.push(KeyValueAttribute.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.body = Buffer.from(reader.bytes());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): IdempotentHttpResponse {
+    return {
+      statusCode: isSet(object.statusCode)
+        ? globalThis.Number(object.statusCode)
+        : isSet(object.status_code)
+        ? globalThis.Number(object.status_code)
+        : 0,
+      headers: globalThis.Array.isArray(object?.headers)
+        ? object.headers.map((e: any) => KeyValueAttribute.fromJSON(e))
+        : [],
+      body: isSet(object.body) ? Buffer.from(bytesFromBase64(object.body)) : Buffer.alloc(0),
+    };
+  },
+
+  toJSON(message: IdempotentHttpResponse): unknown {
+    const obj: any = {};
+    if (message.statusCode !== 0) {
+      obj.statusCode = Math.round(message.statusCode);
+    }
+    if (message.headers?.length) {
+      obj.headers = message.headers.map((e) => KeyValueAttribute.toJSON(e));
+    }
+    if (message.body.length !== 0) {
+      obj.body = base64FromBytes(message.body);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<IdempotentHttpResponse>, I>>(base?: I): IdempotentHttpResponse {
+    return IdempotentHttpResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<IdempotentHttpResponse>, I>>(object: I): IdempotentHttpResponse {
+    const message = createBaseIdempotentHttpResponse();
+    message.statusCode = object.statusCode ?? 0;
+    message.headers = object.headers?.map((e) => KeyValueAttribute.fromPartial(e)) || [];
+    message.body = object.body ?? Buffer.alloc(0);
+    return message;
+  },
+};
+
+function createBaseRecordAttemptObservationRequest(): RecordAttemptObservationRequest {
+  return { requestId: "", leaseToken: "", observationIdempotencyKey: "", attempt: undefined };
+}
+
+export const RecordAttemptObservationRequest: MessageFns<RecordAttemptObservationRequest> = {
+  encode(message: RecordAttemptObservationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.leaseToken !== "") {
+      writer.uint32(18).string(message.leaseToken);
+    }
+    if (message.observationIdempotencyKey !== "") {
+      writer.uint32(26).string(message.observationIdempotencyKey);
+    }
+    if (message.attempt !== undefined) {
+      AttemptCostRecord.encode(message.attempt, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecordAttemptObservationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRecordAttemptObservationRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.leaseToken = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.observationIdempotencyKey = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.attempt = AttemptCostRecord.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RecordAttemptObservationRequest {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      leaseToken: isSet(object.leaseToken)
+        ? globalThis.String(object.leaseToken)
+        : isSet(object.lease_token)
+        ? globalThis.String(object.lease_token)
+        : "",
+      observationIdempotencyKey: isSet(object.observationIdempotencyKey)
+        ? globalThis.String(object.observationIdempotencyKey)
+        : isSet(object.observation_idempotency_key)
+        ? globalThis.String(object.observation_idempotency_key)
+        : "",
+      attempt: isSet(object.attempt) ? AttemptCostRecord.fromJSON(object.attempt) : undefined,
+    };
+  },
+
+  toJSON(message: RecordAttemptObservationRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.leaseToken !== "") {
+      obj.leaseToken = message.leaseToken;
+    }
+    if (message.observationIdempotencyKey !== "") {
+      obj.observationIdempotencyKey = message.observationIdempotencyKey;
+    }
+    if (message.attempt !== undefined) {
+      obj.attempt = AttemptCostRecord.toJSON(message.attempt);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RecordAttemptObservationRequest>, I>>(base?: I): RecordAttemptObservationRequest {
+    return RecordAttemptObservationRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RecordAttemptObservationRequest>, I>>(
+    object: I,
+  ): RecordAttemptObservationRequest {
+    const message = createBaseRecordAttemptObservationRequest();
+    message.requestId = object.requestId ?? "";
+    message.leaseToken = object.leaseToken ?? "";
+    message.observationIdempotencyKey = object.observationIdempotencyKey ?? "";
+    message.attempt = (object.attempt !== undefined && object.attempt !== null)
+      ? AttemptCostRecord.fromPartial(object.attempt)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRecordAttemptObservationResponse(): RecordAttemptObservationResponse {
+  return { recorded: false, dispatchState: 0 };
+}
+
+export const RecordAttemptObservationResponse: MessageFns<RecordAttemptObservationResponse> = {
+  encode(message: RecordAttemptObservationResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.recorded !== false) {
+      writer.uint32(8).bool(message.recorded);
+    }
+    if (message.dispatchState !== 0) {
+      writer.uint32(16).int32(message.dispatchState);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecordAttemptObservationResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRecordAttemptObservationResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.recorded = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.dispatchState = reader.int32() as any;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RecordAttemptObservationResponse {
+    return {
+      recorded: isSet(object.recorded) ? globalThis.Boolean(object.recorded) : false,
+      dispatchState: isSet(object.dispatchState)
+        ? attemptDispatchStateFromJSON(object.dispatchState)
+        : isSet(object.dispatch_state)
+        ? attemptDispatchStateFromJSON(object.dispatch_state)
+        : 0,
+    };
+  },
+
+  toJSON(message: RecordAttemptObservationResponse): unknown {
+    const obj: any = {};
+    if (message.recorded !== false) {
+      obj.recorded = message.recorded;
+    }
+    if (message.dispatchState !== 0) {
+      obj.dispatchState = attemptDispatchStateToJSON(message.dispatchState);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RecordAttemptObservationResponse>, I>>(
+    base?: I,
+  ): RecordAttemptObservationResponse {
+    return RecordAttemptObservationResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RecordAttemptObservationResponse>, I>>(
+    object: I,
+  ): RecordAttemptObservationResponse {
+    const message = createBaseRecordAttemptObservationResponse();
+    message.recorded = object.recorded ?? false;
+    message.dispatchState = object.dispatchState ?? 0;
+    return message;
+  },
+};
+
+function createBaseClaimExecutionRecoveryRequest(): ClaimExecutionRecoveryRequest {
+  return { limit: 0 };
+}
+
+export const ClaimExecutionRecoveryRequest: MessageFns<ClaimExecutionRecoveryRequest> = {
+  encode(message: ClaimExecutionRecoveryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.limit !== 0) {
+      writer.uint32(8).uint32(message.limit);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimExecutionRecoveryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseClaimExecutionRecoveryRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.limit = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ClaimExecutionRecoveryRequest {
+    return { limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0 };
+  },
+
+  toJSON(message: ClaimExecutionRecoveryRequest): unknown {
+    const obj: any = {};
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ClaimExecutionRecoveryRequest>, I>>(base?: I): ClaimExecutionRecoveryRequest {
+    return ClaimExecutionRecoveryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ClaimExecutionRecoveryRequest>, I>>(
+    object: I,
+  ): ClaimExecutionRecoveryRequest {
+    const message = createBaseClaimExecutionRecoveryRequest();
+    message.limit = object.limit ?? 0;
+    return message;
+  },
+};
+
+function createBaseExecutionRecoveryClaim(): ExecutionRecoveryClaim {
+  return {
+    requestId: "",
+    studioOperationId: "",
+    leaseToken: "",
+    leaseExpiresAtUnixMs: 0n,
+    customerReleaseAtUnixMs: 0n,
+    channel: 0,
+    lockedCatalogVersion: "",
+    attempts: [],
+    customerChargeMode: 0,
+    customerHoldReleased: false,
+  };
+}
+
+export const ExecutionRecoveryClaim: MessageFns<ExecutionRecoveryClaim> = {
+  encode(message: ExecutionRecoveryClaim, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.studioOperationId !== "") {
+      writer.uint32(18).string(message.studioOperationId);
+    }
+    if (message.leaseToken !== "") {
+      writer.uint32(26).string(message.leaseToken);
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.leaseExpiresAtUnixMs) !== message.leaseExpiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.leaseExpiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(32).int64(message.leaseExpiresAtUnixMs);
+    }
+    if (message.customerReleaseAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.customerReleaseAtUnixMs) !== message.customerReleaseAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.customerReleaseAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.customerReleaseAtUnixMs);
+    }
+    if (message.channel !== 0) {
+      writer.uint32(48).int32(message.channel);
+    }
+    if (message.lockedCatalogVersion !== "") {
+      writer.uint32(58).string(message.lockedCatalogVersion);
+    }
+    for (const v of message.attempts) {
+      AttemptCostRecord.encode(v!, writer.uint32(66).fork()).join();
+    }
+    if (message.customerChargeMode !== 0) {
+      writer.uint32(72).int32(message.customerChargeMode);
+    }
+    if (message.customerHoldReleased !== false) {
+      writer.uint32(80).bool(message.customerHoldReleased);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExecutionRecoveryClaim {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseExecutionRecoveryClaim();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.studioOperationId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.leaseToken = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.leaseExpiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.customerReleaseAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.channel = reader.int32() as any;
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.lockedCatalogVersion = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.attempts.push(AttemptCostRecord.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.customerChargeMode = reader.int32() as any;
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.customerHoldReleased = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ExecutionRecoveryClaim {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      studioOperationId: isSet(object.studioOperationId)
+        ? globalThis.String(object.studioOperationId)
+        : isSet(object.studio_operation_id)
+        ? globalThis.String(object.studio_operation_id)
+        : "",
+      leaseToken: isSet(object.leaseToken)
+        ? globalThis.String(object.leaseToken)
+        : isSet(object.lease_token)
+        ? globalThis.String(object.lease_token)
+        : "",
+      leaseExpiresAtUnixMs: isSet(object.leaseExpiresAtUnixMs)
+        ? BigInt(object.leaseExpiresAtUnixMs)
+        : isSet(object.lease_expires_at_unix_ms)
+        ? BigInt(object.lease_expires_at_unix_ms)
+        : 0n,
+      customerReleaseAtUnixMs: isSet(object.customerReleaseAtUnixMs)
+        ? BigInt(object.customerReleaseAtUnixMs)
+        : isSet(object.customer_release_at_unix_ms)
+        ? BigInt(object.customer_release_at_unix_ms)
+        : 0n,
+      channel: isSet(object.channel) ? executionChannelFromJSON(object.channel) : 0,
+      lockedCatalogVersion: isSet(object.lockedCatalogVersion)
+        ? globalThis.String(object.lockedCatalogVersion)
+        : isSet(object.locked_catalog_version)
+        ? globalThis.String(object.locked_catalog_version)
+        : "",
+      attempts: globalThis.Array.isArray(object?.attempts)
+        ? object.attempts.map((e: any) => AttemptCostRecord.fromJSON(e))
+        : [],
+      customerChargeMode: isSet(object.customerChargeMode)
+        ? customerChargeModeFromJSON(object.customerChargeMode)
+        : isSet(object.customer_charge_mode)
+        ? customerChargeModeFromJSON(object.customer_charge_mode)
+        : 0,
+      customerHoldReleased: isSet(object.customerHoldReleased)
+        ? globalThis.Boolean(object.customerHoldReleased)
+        : isSet(object.customer_hold_released)
+        ? globalThis.Boolean(object.customer_hold_released)
+        : false,
+    };
+  },
+
+  toJSON(message: ExecutionRecoveryClaim): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.studioOperationId !== "") {
+      obj.studioOperationId = message.studioOperationId;
+    }
+    if (message.leaseToken !== "") {
+      obj.leaseToken = message.leaseToken;
+    }
+    if (message.leaseExpiresAtUnixMs !== 0n) {
+      obj.leaseExpiresAtUnixMs = message.leaseExpiresAtUnixMs.toString();
+    }
+    if (message.customerReleaseAtUnixMs !== 0n) {
+      obj.customerReleaseAtUnixMs = message.customerReleaseAtUnixMs.toString();
+    }
+    if (message.channel !== 0) {
+      obj.channel = executionChannelToJSON(message.channel);
+    }
+    if (message.lockedCatalogVersion !== "") {
+      obj.lockedCatalogVersion = message.lockedCatalogVersion;
+    }
+    if (message.attempts?.length) {
+      obj.attempts = message.attempts.map((e) => AttemptCostRecord.toJSON(e));
+    }
+    if (message.customerChargeMode !== 0) {
+      obj.customerChargeMode = customerChargeModeToJSON(message.customerChargeMode);
+    }
+    if (message.customerHoldReleased !== false) {
+      obj.customerHoldReleased = message.customerHoldReleased;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ExecutionRecoveryClaim>, I>>(base?: I): ExecutionRecoveryClaim {
+    return ExecutionRecoveryClaim.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ExecutionRecoveryClaim>, I>>(object: I): ExecutionRecoveryClaim {
+    const message = createBaseExecutionRecoveryClaim();
+    message.requestId = object.requestId ?? "";
+    message.studioOperationId = object.studioOperationId ?? "";
+    message.leaseToken = object.leaseToken ?? "";
+    message.leaseExpiresAtUnixMs = (object.leaseExpiresAtUnixMs !== undefined && object.leaseExpiresAtUnixMs !== null)
+      ? BigInt(object.leaseExpiresAtUnixMs)
+      : 0n;
+    message.customerReleaseAtUnixMs =
+      (object.customerReleaseAtUnixMs !== undefined && object.customerReleaseAtUnixMs !== null)
+        ? BigInt(object.customerReleaseAtUnixMs)
+        : 0n;
+    message.channel = object.channel ?? 0;
+    message.lockedCatalogVersion = object.lockedCatalogVersion ?? "";
+    message.attempts = object.attempts?.map((e) => AttemptCostRecord.fromPartial(e)) || [];
+    message.customerChargeMode = object.customerChargeMode ?? 0;
+    message.customerHoldReleased = object.customerHoldReleased ?? false;
+    return message;
+  },
+};
+
+function createBaseClaimExecutionRecoveryResponse(): ClaimExecutionRecoveryResponse {
+  return { claims: [] };
+}
+
+export const ClaimExecutionRecoveryResponse: MessageFns<ClaimExecutionRecoveryResponse> = {
+  encode(message: ClaimExecutionRecoveryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.claims) {
+      ExecutionRecoveryClaim.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClaimExecutionRecoveryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseClaimExecutionRecoveryResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.claims.push(ExecutionRecoveryClaim.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ClaimExecutionRecoveryResponse {
+    return {
+      claims: globalThis.Array.isArray(object?.claims)
+        ? object.claims.map((e: any) => ExecutionRecoveryClaim.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ClaimExecutionRecoveryResponse): unknown {
+    const obj: any = {};
+    if (message.claims?.length) {
+      obj.claims = message.claims.map((e) => ExecutionRecoveryClaim.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ClaimExecutionRecoveryResponse>, I>>(base?: I): ClaimExecutionRecoveryResponse {
+    return ClaimExecutionRecoveryResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ClaimExecutionRecoveryResponse>, I>>(
+    object: I,
+  ): ClaimExecutionRecoveryResponse {
+    const message = createBaseClaimExecutionRecoveryResponse();
+    message.claims = object.claims?.map((e) => ExecutionRecoveryClaim.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseGetBillingCatalogStateRequest(): GetBillingCatalogStateRequest {
+  return {};
+}
+
+export const GetBillingCatalogStateRequest: MessageFns<GetBillingCatalogStateRequest> = {
+  encode(_: GetBillingCatalogStateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBillingCatalogStateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetBillingCatalogStateRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(_: any): GetBillingCatalogStateRequest {
+    return {};
+  },
+
+  toJSON(_: GetBillingCatalogStateRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetBillingCatalogStateRequest>, I>>(base?: I): GetBillingCatalogStateRequest {
+    return GetBillingCatalogStateRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetBillingCatalogStateRequest>, I>>(_: I): GetBillingCatalogStateRequest {
+    const message = createBaseGetBillingCatalogStateRequest();
+    return message;
+  },
+};
+
+function createBaseGetBillingCatalogStateResponse(): GetBillingCatalogStateResponse {
+  return { activeCatalogVersion: "", frozenRouting: false, frozenAllowedOfferingIds: [] };
+}
+
+export const GetBillingCatalogStateResponse: MessageFns<GetBillingCatalogStateResponse> = {
+  encode(message: GetBillingCatalogStateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.activeCatalogVersion !== "") {
+      writer.uint32(10).string(message.activeCatalogVersion);
+    }
+    if (message.frozenRouting !== false) {
+      writer.uint32(16).bool(message.frozenRouting);
+    }
+    for (const v of message.frozenAllowedOfferingIds) {
+      writer.uint32(26).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetBillingCatalogStateResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetBillingCatalogStateResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.activeCatalogVersion = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.frozenRouting = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.frozenAllowedOfferingIds.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetBillingCatalogStateResponse {
+    return {
+      activeCatalogVersion: isSet(object.activeCatalogVersion)
+        ? globalThis.String(object.activeCatalogVersion)
+        : isSet(object.active_catalog_version)
+        ? globalThis.String(object.active_catalog_version)
+        : "",
+      frozenRouting: isSet(object.frozenRouting)
+        ? globalThis.Boolean(object.frozenRouting)
+        : isSet(object.frozen_routing)
+        ? globalThis.Boolean(object.frozen_routing)
+        : false,
+      frozenAllowedOfferingIds: globalThis.Array.isArray(object?.frozenAllowedOfferingIds)
+        ? object.frozenAllowedOfferingIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.frozen_allowed_offering_ids)
+        ? object.frozen_allowed_offering_ids.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: GetBillingCatalogStateResponse): unknown {
+    const obj: any = {};
+    if (message.activeCatalogVersion !== "") {
+      obj.activeCatalogVersion = message.activeCatalogVersion;
+    }
+    if (message.frozenRouting !== false) {
+      obj.frozenRouting = message.frozenRouting;
+    }
+    if (message.frozenAllowedOfferingIds?.length) {
+      obj.frozenAllowedOfferingIds = message.frozenAllowedOfferingIds;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetBillingCatalogStateResponse>, I>>(base?: I): GetBillingCatalogStateResponse {
+    return GetBillingCatalogStateResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetBillingCatalogStateResponse>, I>>(
+    object: I,
+  ): GetBillingCatalogStateResponse {
+    const message = createBaseGetBillingCatalogStateResponse();
+    message.activeCatalogVersion = object.activeCatalogVersion ?? "";
+    message.frozenRouting = object.frozenRouting ?? false;
+    message.frozenAllowedOfferingIds = object.frozenAllowedOfferingIds?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseRegisterAccountRequest(): RegisterAccountRequest {
+  return { registrationId: "" };
+}
+
+export const RegisterAccountRequest: MessageFns<RegisterAccountRequest> = {
+  encode(message: RegisterAccountRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.registrationId !== "") {
+      writer.uint32(10).string(message.registrationId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RegisterAccountRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRegisterAccountRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.registrationId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RegisterAccountRequest {
+    return {
+      registrationId: isSet(object.registrationId)
+        ? globalThis.String(object.registrationId)
+        : isSet(object.registration_id)
+        ? globalThis.String(object.registration_id)
+        : "",
+    };
+  },
+
+  toJSON(message: RegisterAccountRequest): unknown {
+    const obj: any = {};
+    if (message.registrationId !== "") {
+      obj.registrationId = message.registrationId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RegisterAccountRequest>, I>>(base?: I): RegisterAccountRequest {
+    return RegisterAccountRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RegisterAccountRequest>, I>>(object: I): RegisterAccountRequest {
+    const message = createBaseRegisterAccountRequest();
+    message.registrationId = object.registrationId ?? "";
+    return message;
+  },
+};
+
+function createBaseRegisterAccountResponse(): RegisterAccountResponse {
+  return { accountId: "" };
+}
+
+export const RegisterAccountResponse: MessageFns<RegisterAccountResponse> = {
+  encode(message: RegisterAccountResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RegisterAccountResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRegisterAccountResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RegisterAccountResponse {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: RegisterAccountResponse): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RegisterAccountResponse>, I>>(base?: I): RegisterAccountResponse {
+    return RegisterAccountResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RegisterAccountResponse>, I>>(object: I): RegisterAccountResponse {
+    const message = createBaseRegisterAccountResponse();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseApiKeyPolicy(): ApiKeyPolicy {
+  return {
+    fundingStrategy: undefined,
+    allowAitEarnedCredit: undefined,
+    dollarRelayEnabled: undefined,
+    allowedCatalogIds: [],
+    modelAllowlist: [],
+    perRequestCeilingMicroUsd: undefined,
+    spendingLimits: [],
+    expiresAtUnixMs: undefined,
+    rpmLimit: undefined,
+    tpmLimit: undefined,
+    maxConcurrentStreams: undefined,
+    searchPolicy: undefined,
+  };
+}
+
+export const ApiKeyPolicy: MessageFns<ApiKeyPolicy> = {
+  encode(message: ApiKeyPolicy, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.fundingStrategy !== undefined) {
+      writer.uint32(8).int32(message.fundingStrategy);
+    }
+    if (message.allowAitEarnedCredit !== undefined) {
+      writer.uint32(16).bool(message.allowAitEarnedCredit);
+    }
+    if (message.dollarRelayEnabled !== undefined) {
+      writer.uint32(24).bool(message.dollarRelayEnabled);
+    }
+    for (const v of message.allowedCatalogIds) {
+      writer.uint32(34).string(v!);
+    }
+    for (const v of message.modelAllowlist) {
+      writer.uint32(42).string(v!);
+    }
+    if (message.perRequestCeilingMicroUsd !== undefined) {
+      if (BigInt.asIntN(64, message.perRequestCeilingMicroUsd) !== message.perRequestCeilingMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.perRequestCeilingMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(48).int64(message.perRequestCeilingMicroUsd);
+    }
+    for (const v of message.spendingLimits) {
+      BudgetPeriodRule.encode(v!, writer.uint32(58).fork()).join();
+    }
+    if (message.expiresAtUnixMs !== undefined) {
+      if (BigInt.asIntN(64, message.expiresAtUnixMs) !== message.expiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.expiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(64).int64(message.expiresAtUnixMs);
+    }
+    if (message.rpmLimit !== undefined) {
+      writer.uint32(72).int32(message.rpmLimit);
+    }
+    if (message.tpmLimit !== undefined) {
+      if (BigInt.asIntN(64, message.tpmLimit) !== message.tpmLimit) {
+        throw new globalThis.Error("value provided for field message.tpmLimit of type int64 too large");
+      }
+      writer.uint32(80).int64(message.tpmLimit);
+    }
+    if (message.maxConcurrentStreams !== undefined) {
+      writer.uint32(88).int32(message.maxConcurrentStreams);
+    }
+    if (message.searchPolicy !== undefined) {
+      writer.uint32(96).int32(message.searchPolicy);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ApiKeyPolicy {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseApiKeyPolicy();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.fundingStrategy = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.allowAitEarnedCredit = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.dollarRelayEnabled = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.allowedCatalogIds.push(reader.string());
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.modelAllowlist.push(reader.string());
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.perRequestCeilingMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.spendingLimits.push(BudgetPeriodRule.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.expiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.rpmLimit = reader.int32();
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.tpmLimit = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.maxConcurrentStreams = reader.int32();
+            continue;
+          }
+          case 12: {
+            if (tag !== 96) {
+              break;
+            }
+
+            message.searchPolicy = reader.int32() as any;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ApiKeyPolicy {
+    return {
+      fundingStrategy: isSet(object.fundingStrategy)
+        ? keyFundingStrategyFromJSON(object.fundingStrategy)
+        : isSet(object.funding_strategy)
+        ? keyFundingStrategyFromJSON(object.funding_strategy)
+        : undefined,
+      allowAitEarnedCredit: isSet(object.allowAitEarnedCredit)
+        ? globalThis.Boolean(object.allowAitEarnedCredit)
+        : isSet(object.allow_ait_earned_credit)
+        ? globalThis.Boolean(object.allow_ait_earned_credit)
+        : undefined,
+      dollarRelayEnabled: isSet(object.dollarRelayEnabled)
+        ? globalThis.Boolean(object.dollarRelayEnabled)
+        : isSet(object.dollar_relay_enabled)
+        ? globalThis.Boolean(object.dollar_relay_enabled)
+        : undefined,
+      allowedCatalogIds: globalThis.Array.isArray(object?.allowedCatalogIds)
+        ? object.allowedCatalogIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.allowed_catalog_ids)
+        ? object.allowed_catalog_ids.map((e: any) => globalThis.String(e))
+        : [],
+      modelAllowlist: globalThis.Array.isArray(object?.modelAllowlist)
+        ? object.modelAllowlist.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.model_allowlist)
+        ? object.model_allowlist.map((e: any) => globalThis.String(e))
+        : [],
+      perRequestCeilingMicroUsd: isSet(object.perRequestCeilingMicroUsd)
+        ? BigInt(object.perRequestCeilingMicroUsd)
+        : isSet(object.per_request_ceiling_micro_usd)
+        ? BigInt(object.per_request_ceiling_micro_usd)
+        : undefined,
+      spendingLimits: globalThis.Array.isArray(object?.spendingLimits)
+        ? object.spendingLimits.map((e: any) => BudgetPeriodRule.fromJSON(e))
+        : globalThis.Array.isArray(object?.spending_limits)
+        ? object.spending_limits.map((e: any) => BudgetPeriodRule.fromJSON(e))
+        : [],
+      expiresAtUnixMs: isSet(object.expiresAtUnixMs)
+        ? BigInt(object.expiresAtUnixMs)
+        : isSet(object.expires_at_unix_ms)
+        ? BigInt(object.expires_at_unix_ms)
+        : undefined,
+      rpmLimit: isSet(object.rpmLimit)
+        ? globalThis.Number(object.rpmLimit)
+        : isSet(object.rpm_limit)
+        ? globalThis.Number(object.rpm_limit)
+        : undefined,
+      tpmLimit: isSet(object.tpmLimit)
+        ? BigInt(object.tpmLimit)
+        : isSet(object.tpm_limit)
+        ? BigInt(object.tpm_limit)
+        : undefined,
+      maxConcurrentStreams: isSet(object.maxConcurrentStreams)
+        ? globalThis.Number(object.maxConcurrentStreams)
+        : isSet(object.max_concurrent_streams)
+        ? globalThis.Number(object.max_concurrent_streams)
+        : undefined,
+      searchPolicy: isSet(object.searchPolicy)
+        ? searchPolicyFromJSON(object.searchPolicy)
+        : isSet(object.search_policy)
+        ? searchPolicyFromJSON(object.search_policy)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ApiKeyPolicy): unknown {
+    const obj: any = {};
+    if (message.fundingStrategy !== undefined) {
+      obj.fundingStrategy = keyFundingStrategyToJSON(message.fundingStrategy);
+    }
+    if (message.allowAitEarnedCredit !== undefined) {
+      obj.allowAitEarnedCredit = message.allowAitEarnedCredit;
+    }
+    if (message.dollarRelayEnabled !== undefined) {
+      obj.dollarRelayEnabled = message.dollarRelayEnabled;
+    }
+    if (message.allowedCatalogIds?.length) {
+      obj.allowedCatalogIds = message.allowedCatalogIds;
+    }
+    if (message.modelAllowlist?.length) {
+      obj.modelAllowlist = message.modelAllowlist;
+    }
+    if (message.perRequestCeilingMicroUsd !== undefined) {
+      obj.perRequestCeilingMicroUsd = message.perRequestCeilingMicroUsd.toString();
+    }
+    if (message.spendingLimits?.length) {
+      obj.spendingLimits = message.spendingLimits.map((e) => BudgetPeriodRule.toJSON(e));
+    }
+    if (message.expiresAtUnixMs !== undefined) {
+      obj.expiresAtUnixMs = message.expiresAtUnixMs.toString();
+    }
+    if (message.rpmLimit !== undefined) {
+      obj.rpmLimit = Math.round(message.rpmLimit);
+    }
+    if (message.tpmLimit !== undefined) {
+      obj.tpmLimit = message.tpmLimit.toString();
+    }
+    if (message.maxConcurrentStreams !== undefined) {
+      obj.maxConcurrentStreams = Math.round(message.maxConcurrentStreams);
+    }
+    if (message.searchPolicy !== undefined) {
+      obj.searchPolicy = searchPolicyToJSON(message.searchPolicy);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ApiKeyPolicy>, I>>(base?: I): ApiKeyPolicy {
+    return ApiKeyPolicy.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ApiKeyPolicy>, I>>(object: I): ApiKeyPolicy {
+    const message = createBaseApiKeyPolicy();
+    message.fundingStrategy = object.fundingStrategy ?? undefined;
+    message.allowAitEarnedCredit = object.allowAitEarnedCredit ?? undefined;
+    message.dollarRelayEnabled = object.dollarRelayEnabled ?? undefined;
+    message.allowedCatalogIds = object.allowedCatalogIds?.map((e) => e) || [];
+    message.modelAllowlist = object.modelAllowlist?.map((e) => e) || [];
+    message.perRequestCeilingMicroUsd =
+      (object.perRequestCeilingMicroUsd !== undefined && object.perRequestCeilingMicroUsd !== null)
+        ? BigInt(object.perRequestCeilingMicroUsd)
+        : undefined;
+    message.spendingLimits = object.spendingLimits?.map((e) => BudgetPeriodRule.fromPartial(e)) || [];
+    message.expiresAtUnixMs = (object.expiresAtUnixMs !== undefined && object.expiresAtUnixMs !== null)
+      ? BigInt(object.expiresAtUnixMs)
+      : undefined;
+    message.rpmLimit = object.rpmLimit ?? undefined;
+    message.tpmLimit = (object.tpmLimit !== undefined && object.tpmLimit !== null)
+      ? BigInt(object.tpmLimit)
+      : undefined;
+    message.maxConcurrentStreams = object.maxConcurrentStreams ?? undefined;
+    message.searchPolicy = object.searchPolicy ?? undefined;
+    return message;
+  },
+};
+
+function createBaseManagedApiKey(): ManagedApiKey {
+  return { apiKeyId: "", label: "", maskedKey: "", policy: undefined, createdAtUnixMs: 0n, revokedAtUnixMs: 0n };
+}
+
+export const ManagedApiKey: MessageFns<ManagedApiKey> = {
+  encode(message: ManagedApiKey, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.apiKeyId !== "") {
+      writer.uint32(10).string(message.apiKeyId);
+    }
+    if (message.label !== "") {
+      writer.uint32(18).string(message.label);
+    }
+    if (message.maskedKey !== "") {
+      writer.uint32(26).string(message.maskedKey);
+    }
+    if (message.policy !== undefined) {
+      ApiKeyPolicy.encode(message.policy, writer.uint32(34).fork()).join();
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.createdAtUnixMs) !== message.createdAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.createdAtUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.createdAtUnixMs);
+    }
+    if (message.revokedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.revokedAtUnixMs) !== message.revokedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.revokedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.revokedAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ManagedApiKey {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseManagedApiKey();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.label = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.maskedKey = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.policy = ApiKeyPolicy.decode(reader, reader.uint32());
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.createdAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.revokedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ManagedApiKey {
+    return {
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      label: isSet(object.label) ? globalThis.String(object.label) : "",
+      maskedKey: isSet(object.maskedKey)
+        ? globalThis.String(object.maskedKey)
+        : isSet(object.masked_key)
+        ? globalThis.String(object.masked_key)
+        : "",
+      policy: isSet(object.policy) ? ApiKeyPolicy.fromJSON(object.policy) : undefined,
+      createdAtUnixMs: isSet(object.createdAtUnixMs)
+        ? BigInt(object.createdAtUnixMs)
+        : isSet(object.created_at_unix_ms)
+        ? BigInt(object.created_at_unix_ms)
+        : 0n,
+      revokedAtUnixMs: isSet(object.revokedAtUnixMs)
+        ? BigInt(object.revokedAtUnixMs)
+        : isSet(object.revoked_at_unix_ms)
+        ? BigInt(object.revoked_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ManagedApiKey): unknown {
+    const obj: any = {};
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.label !== "") {
+      obj.label = message.label;
+    }
+    if (message.maskedKey !== "") {
+      obj.maskedKey = message.maskedKey;
+    }
+    if (message.policy !== undefined) {
+      obj.policy = ApiKeyPolicy.toJSON(message.policy);
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      obj.createdAtUnixMs = message.createdAtUnixMs.toString();
+    }
+    if (message.revokedAtUnixMs !== 0n) {
+      obj.revokedAtUnixMs = message.revokedAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ManagedApiKey>, I>>(base?: I): ManagedApiKey {
+    return ManagedApiKey.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ManagedApiKey>, I>>(object: I): ManagedApiKey {
+    const message = createBaseManagedApiKey();
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.label = object.label ?? "";
+    message.maskedKey = object.maskedKey ?? "";
+    message.policy = (object.policy !== undefined && object.policy !== null)
+      ? ApiKeyPolicy.fromPartial(object.policy)
+      : undefined;
+    message.createdAtUnixMs = (object.createdAtUnixMs !== undefined && object.createdAtUnixMs !== null)
+      ? BigInt(object.createdAtUnixMs)
+      : 0n;
+    message.revokedAtUnixMs = (object.revokedAtUnixMs !== undefined && object.revokedAtUnixMs !== null)
+      ? BigInt(object.revokedAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseCreateApiKeyRequest(): CreateApiKeyRequest {
+  return { accountId: "", idempotencyKey: "", label: "", policy: undefined };
+}
+
+export const CreateApiKeyRequest: MessageFns<CreateApiKeyRequest> = {
+  encode(message: CreateApiKeyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.label !== "") {
+      writer.uint32(26).string(message.label);
+    }
+    if (message.policy !== undefined) {
+      ApiKeyPolicy.encode(message.policy, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateApiKeyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreateApiKeyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.label = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.policy = ApiKeyPolicy.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreateApiKeyRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      label: isSet(object.label) ? globalThis.String(object.label) : "",
+      policy: isSet(object.policy) ? ApiKeyPolicy.fromJSON(object.policy) : undefined,
+    };
+  },
+
+  toJSON(message: CreateApiKeyRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.label !== "") {
+      obj.label = message.label;
+    }
+    if (message.policy !== undefined) {
+      obj.policy = ApiKeyPolicy.toJSON(message.policy);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreateApiKeyRequest>, I>>(base?: I): CreateApiKeyRequest {
+    return CreateApiKeyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateApiKeyRequest>, I>>(object: I): CreateApiKeyRequest {
+    const message = createBaseCreateApiKeyRequest();
+    message.accountId = object.accountId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.label = object.label ?? "";
+    message.policy = (object.policy !== undefined && object.policy !== null)
+      ? ApiKeyPolicy.fromPartial(object.policy)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreateApiKeyResponse(): CreateApiKeyResponse {
+  return { key: undefined, oneTimeSecret: "" };
+}
+
+export const CreateApiKeyResponse: MessageFns<CreateApiKeyResponse> = {
+  encode(message: CreateApiKeyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== undefined) {
+      ManagedApiKey.encode(message.key, writer.uint32(10).fork()).join();
+    }
+    if (message.oneTimeSecret !== "") {
+      writer.uint32(18).string(message.oneTimeSecret);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateApiKeyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreateApiKeyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = ManagedApiKey.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.oneTimeSecret = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreateApiKeyResponse {
+    return {
+      key: isSet(object.key) ? ManagedApiKey.fromJSON(object.key) : undefined,
+      oneTimeSecret: isSet(object.oneTimeSecret)
+        ? globalThis.String(object.oneTimeSecret)
+        : isSet(object.one_time_secret)
+        ? globalThis.String(object.one_time_secret)
+        : "",
+    };
+  },
+
+  toJSON(message: CreateApiKeyResponse): unknown {
+    const obj: any = {};
+    if (message.key !== undefined) {
+      obj.key = ManagedApiKey.toJSON(message.key);
+    }
+    if (message.oneTimeSecret !== "") {
+      obj.oneTimeSecret = message.oneTimeSecret;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreateApiKeyResponse>, I>>(base?: I): CreateApiKeyResponse {
+    return CreateApiKeyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateApiKeyResponse>, I>>(object: I): CreateApiKeyResponse {
+    const message = createBaseCreateApiKeyResponse();
+    message.key = (object.key !== undefined && object.key !== null) ? ManagedApiKey.fromPartial(object.key) : undefined;
+    message.oneTimeSecret = object.oneTimeSecret ?? "";
+    return message;
+  },
+};
+
+function createBaseUpdateApiKeyRequest(): UpdateApiKeyRequest {
+  return {
+    accountId: "",
+    apiKeyId: "",
+    idempotencyKey: "",
+    label: undefined,
+    policy: undefined,
+    policyUpdateFields: [],
+  };
+}
+
+export const UpdateApiKeyRequest: MessageFns<UpdateApiKeyRequest> = {
+  encode(message: UpdateApiKeyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.apiKeyId !== "") {
+      writer.uint32(18).string(message.apiKeyId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    if (message.label !== undefined) {
+      writer.uint32(34).string(message.label);
+    }
+    if (message.policy !== undefined) {
+      ApiKeyPolicy.encode(message.policy, writer.uint32(42).fork()).join();
+    }
+    for (const v of message.policyUpdateFields) {
+      writer.uint32(50).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateApiKeyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateApiKeyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.label = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.policy = ApiKeyPolicy.decode(reader, reader.uint32());
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.policyUpdateFields.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateApiKeyRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      label: isSet(object.label) ? globalThis.String(object.label) : undefined,
+      policy: isSet(object.policy) ? ApiKeyPolicy.fromJSON(object.policy) : undefined,
+      policyUpdateFields: globalThis.Array.isArray(object?.policyUpdateFields)
+        ? object.policyUpdateFields.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.policy_update_fields)
+        ? object.policy_update_fields.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: UpdateApiKeyRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.label !== undefined) {
+      obj.label = message.label;
+    }
+    if (message.policy !== undefined) {
+      obj.policy = ApiKeyPolicy.toJSON(message.policy);
+    }
+    if (message.policyUpdateFields?.length) {
+      obj.policyUpdateFields = message.policyUpdateFields;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateApiKeyRequest>, I>>(base?: I): UpdateApiKeyRequest {
+    return UpdateApiKeyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateApiKeyRequest>, I>>(object: I): UpdateApiKeyRequest {
+    const message = createBaseUpdateApiKeyRequest();
+    message.accountId = object.accountId ?? "";
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.label = object.label ?? undefined;
+    message.policy = (object.policy !== undefined && object.policy !== null)
+      ? ApiKeyPolicy.fromPartial(object.policy)
+      : undefined;
+    message.policyUpdateFields = object.policyUpdateFields?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseUpdateApiKeyResponse(): UpdateApiKeyResponse {
+  return { key: undefined };
+}
+
+export const UpdateApiKeyResponse: MessageFns<UpdateApiKeyResponse> = {
+  encode(message: UpdateApiKeyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== undefined) {
+      ManagedApiKey.encode(message.key, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateApiKeyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateApiKeyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = ManagedApiKey.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateApiKeyResponse {
+    return { key: isSet(object.key) ? ManagedApiKey.fromJSON(object.key) : undefined };
+  },
+
+  toJSON(message: UpdateApiKeyResponse): unknown {
+    const obj: any = {};
+    if (message.key !== undefined) {
+      obj.key = ManagedApiKey.toJSON(message.key);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateApiKeyResponse>, I>>(base?: I): UpdateApiKeyResponse {
+    return UpdateApiKeyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateApiKeyResponse>, I>>(object: I): UpdateApiKeyResponse {
+    const message = createBaseUpdateApiKeyResponse();
+    message.key = (object.key !== undefined && object.key !== null) ? ManagedApiKey.fromPartial(object.key) : undefined;
+    return message;
+  },
+};
+
+function createBaseRevokeApiKeyRequest(): RevokeApiKeyRequest {
+  return { accountId: "", apiKeyId: "", idempotencyKey: "" };
+}
+
+export const RevokeApiKeyRequest: MessageFns<RevokeApiKeyRequest> = {
+  encode(message: RevokeApiKeyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.apiKeyId !== "") {
+      writer.uint32(18).string(message.apiKeyId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeApiKeyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRevokeApiKeyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RevokeApiKeyRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: RevokeApiKeyRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RevokeApiKeyRequest>, I>>(base?: I): RevokeApiKeyRequest {
+    return RevokeApiKeyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RevokeApiKeyRequest>, I>>(object: I): RevokeApiKeyRequest {
+    const message = createBaseRevokeApiKeyRequest();
+    message.accountId = object.accountId ?? "";
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseRevokeApiKeyResponse(): RevokeApiKeyResponse {
+  return { key: undefined };
+}
+
+export const RevokeApiKeyResponse: MessageFns<RevokeApiKeyResponse> = {
+  encode(message: RevokeApiKeyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== undefined) {
+      ManagedApiKey.encode(message.key, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeApiKeyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRevokeApiKeyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.key = ManagedApiKey.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RevokeApiKeyResponse {
+    return { key: isSet(object.key) ? ManagedApiKey.fromJSON(object.key) : undefined };
+  },
+
+  toJSON(message: RevokeApiKeyResponse): unknown {
+    const obj: any = {};
+    if (message.key !== undefined) {
+      obj.key = ManagedApiKey.toJSON(message.key);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RevokeApiKeyResponse>, I>>(base?: I): RevokeApiKeyResponse {
+    return RevokeApiKeyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RevokeApiKeyResponse>, I>>(object: I): RevokeApiKeyResponse {
+    const message = createBaseRevokeApiKeyResponse();
+    message.key = (object.key !== undefined && object.key !== null) ? ManagedApiKey.fromPartial(object.key) : undefined;
+    return message;
+  },
+};
+
+function createBaseListApiKeysRequest(): ListApiKeysRequest {
+  return { accountId: "", page: undefined };
+}
+
+export const ListApiKeysRequest: MessageFns<ListApiKeysRequest> = {
+  encode(message: ListApiKeysRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.page !== undefined) {
+      CursorPageRequest.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListApiKeysRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListApiKeysRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageRequest.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListApiKeysRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      page: isSet(object.page) ? CursorPageRequest.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListApiKeysRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageRequest.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListApiKeysRequest>, I>>(base?: I): ListApiKeysRequest {
+    return ListApiKeysRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListApiKeysRequest>, I>>(object: I): ListApiKeysRequest {
+    const message = createBaseListApiKeysRequest();
+    message.accountId = object.accountId ?? "";
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageRequest.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListApiKeysResponse(): ListApiKeysResponse {
+  return { keys: [], page: undefined };
+}
+
+export const ListApiKeysResponse: MessageFns<ListApiKeysResponse> = {
+  encode(message: ListApiKeysResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.keys) {
+      ManagedApiKey.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.page !== undefined) {
+      CursorPageResponse.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListApiKeysResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListApiKeysResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.keys.push(ManagedApiKey.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListApiKeysResponse {
+    return {
+      keys: globalThis.Array.isArray(object?.keys) ? object.keys.map((e: any) => ManagedApiKey.fromJSON(e)) : [],
+      page: isSet(object.page) ? CursorPageResponse.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListApiKeysResponse): unknown {
+    const obj: any = {};
+    if (message.keys?.length) {
+      obj.keys = message.keys.map((e) => ManagedApiKey.toJSON(e));
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageResponse.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListApiKeysResponse>, I>>(base?: I): ListApiKeysResponse {
+    return ListApiKeysResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListApiKeysResponse>, I>>(object: I): ListApiKeysResponse {
+    const message = createBaseListApiKeysResponse();
+    message.keys = object.keys?.map((e) => ManagedApiKey.fromPartial(e)) || [];
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageResponse.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseAccountFundingSettings(): AccountFundingSettings {
+  return {
+    webDollarRelayEnabled: undefined,
+    allowBasicToPremium: undefined,
+    allowAitEarnedCredit: undefined,
+    spendingLimits: [],
+  };
+}
+
+export const AccountFundingSettings: MessageFns<AccountFundingSettings> = {
+  encode(message: AccountFundingSettings, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.webDollarRelayEnabled !== undefined) {
+      writer.uint32(8).bool(message.webDollarRelayEnabled);
+    }
+    if (message.allowBasicToPremium !== undefined) {
+      writer.uint32(16).bool(message.allowBasicToPremium);
+    }
+    if (message.allowAitEarnedCredit !== undefined) {
+      writer.uint32(24).bool(message.allowAitEarnedCredit);
+    }
+    for (const v of message.spendingLimits) {
+      BudgetPeriodRule.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AccountFundingSettings {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAccountFundingSettings();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.webDollarRelayEnabled = reader.bool();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.allowBasicToPremium = reader.bool();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.allowAitEarnedCredit = reader.bool();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.spendingLimits.push(BudgetPeriodRule.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AccountFundingSettings {
+    return {
+      webDollarRelayEnabled: isSet(object.webDollarRelayEnabled)
+        ? globalThis.Boolean(object.webDollarRelayEnabled)
+        : isSet(object.web_dollar_relay_enabled)
+        ? globalThis.Boolean(object.web_dollar_relay_enabled)
+        : undefined,
+      allowBasicToPremium: isSet(object.allowBasicToPremium)
+        ? globalThis.Boolean(object.allowBasicToPremium)
+        : isSet(object.allow_basic_to_premium)
+        ? globalThis.Boolean(object.allow_basic_to_premium)
+        : undefined,
+      allowAitEarnedCredit: isSet(object.allowAitEarnedCredit)
+        ? globalThis.Boolean(object.allowAitEarnedCredit)
+        : isSet(object.allow_ait_earned_credit)
+        ? globalThis.Boolean(object.allow_ait_earned_credit)
+        : undefined,
+      spendingLimits: globalThis.Array.isArray(object?.spendingLimits)
+        ? object.spendingLimits.map((e: any) => BudgetPeriodRule.fromJSON(e))
+        : globalThis.Array.isArray(object?.spending_limits)
+        ? object.spending_limits.map((e: any) => BudgetPeriodRule.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: AccountFundingSettings): unknown {
+    const obj: any = {};
+    if (message.webDollarRelayEnabled !== undefined) {
+      obj.webDollarRelayEnabled = message.webDollarRelayEnabled;
+    }
+    if (message.allowBasicToPremium !== undefined) {
+      obj.allowBasicToPremium = message.allowBasicToPremium;
+    }
+    if (message.allowAitEarnedCredit !== undefined) {
+      obj.allowAitEarnedCredit = message.allowAitEarnedCredit;
+    }
+    if (message.spendingLimits?.length) {
+      obj.spendingLimits = message.spendingLimits.map((e) => BudgetPeriodRule.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AccountFundingSettings>, I>>(base?: I): AccountFundingSettings {
+    return AccountFundingSettings.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AccountFundingSettings>, I>>(object: I): AccountFundingSettings {
+    const message = createBaseAccountFundingSettings();
+    message.webDollarRelayEnabled = object.webDollarRelayEnabled ?? undefined;
+    message.allowBasicToPremium = object.allowBasicToPremium ?? undefined;
+    message.allowAitEarnedCredit = object.allowAitEarnedCredit ?? undefined;
+    message.spendingLimits = object.spendingLimits?.map((e) => BudgetPeriodRule.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseGetAccountFundingRequest(): GetAccountFundingRequest {
+  return { accountId: "" };
+}
+
+export const GetAccountFundingRequest: MessageFns<GetAccountFundingRequest> = {
+  encode(message: GetAccountFundingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAccountFundingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetAccountFundingRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetAccountFundingRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetAccountFundingRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetAccountFundingRequest>, I>>(base?: I): GetAccountFundingRequest {
+    return GetAccountFundingRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetAccountFundingRequest>, I>>(object: I): GetAccountFundingRequest {
+    const message = createBaseGetAccountFundingRequest();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetAccountFundingResponse(): GetAccountFundingResponse {
+  return {
+    settings: undefined,
+    balances: [],
+    windows: [],
+    spendingLocked: false,
+    freeRequestsRemaining: 0n,
+    freeEquivalentCreditsRemaining: 0n,
+  };
+}
+
+export const GetAccountFundingResponse: MessageFns<GetAccountFundingResponse> = {
+  encode(message: GetAccountFundingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.settings !== undefined) {
+      AccountFundingSettings.encode(message.settings, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.balances) {
+      BucketBalanceView.encode(v!, writer.uint32(18).fork()).join();
+    }
+    for (const v of message.windows) {
+      FundingWindowStatus.encode(v!, writer.uint32(26).fork()).join();
+    }
+    if (message.spendingLocked !== false) {
+      writer.uint32(32).bool(message.spendingLocked);
+    }
+    if (message.freeRequestsRemaining !== 0n) {
+      if (BigInt.asIntN(64, message.freeRequestsRemaining) !== message.freeRequestsRemaining) {
+        throw new globalThis.Error("value provided for field message.freeRequestsRemaining of type int64 too large");
+      }
+      writer.uint32(40).int64(message.freeRequestsRemaining);
+    }
+    if (message.freeEquivalentCreditsRemaining !== 0n) {
+      if (BigInt.asIntN(64, message.freeEquivalentCreditsRemaining) !== message.freeEquivalentCreditsRemaining) {
+        throw new globalThis.Error(
+          "value provided for field message.freeEquivalentCreditsRemaining of type int64 too large",
+        );
+      }
+      writer.uint32(48).int64(message.freeEquivalentCreditsRemaining);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetAccountFundingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetAccountFundingResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.settings = AccountFundingSettings.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.balances.push(BucketBalanceView.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.windows.push(FundingWindowStatus.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.spendingLocked = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.freeRequestsRemaining = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.freeEquivalentCreditsRemaining = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetAccountFundingResponse {
+    return {
+      settings: isSet(object.settings) ? AccountFundingSettings.fromJSON(object.settings) : undefined,
+      balances: globalThis.Array.isArray(object?.balances)
+        ? object.balances.map((e: any) => BucketBalanceView.fromJSON(e))
+        : [],
+      windows: globalThis.Array.isArray(object?.windows)
+        ? object.windows.map((e: any) => FundingWindowStatus.fromJSON(e))
+        : [],
+      spendingLocked: isSet(object.spendingLocked)
+        ? globalThis.Boolean(object.spendingLocked)
+        : isSet(object.spending_locked)
+        ? globalThis.Boolean(object.spending_locked)
+        : false,
+      freeRequestsRemaining: isSet(object.freeRequestsRemaining)
+        ? BigInt(object.freeRequestsRemaining)
+        : isSet(object.free_requests_remaining)
+        ? BigInt(object.free_requests_remaining)
+        : 0n,
+      freeEquivalentCreditsRemaining: isSet(object.freeEquivalentCreditsRemaining)
+        ? BigInt(object.freeEquivalentCreditsRemaining)
+        : isSet(object.free_equivalent_credits_remaining)
+        ? BigInt(object.free_equivalent_credits_remaining)
+        : 0n,
+    };
+  },
+
+  toJSON(message: GetAccountFundingResponse): unknown {
+    const obj: any = {};
+    if (message.settings !== undefined) {
+      obj.settings = AccountFundingSettings.toJSON(message.settings);
+    }
+    if (message.balances?.length) {
+      obj.balances = message.balances.map((e) => BucketBalanceView.toJSON(e));
+    }
+    if (message.windows?.length) {
+      obj.windows = message.windows.map((e) => FundingWindowStatus.toJSON(e));
+    }
+    if (message.spendingLocked !== false) {
+      obj.spendingLocked = message.spendingLocked;
+    }
+    if (message.freeRequestsRemaining !== 0n) {
+      obj.freeRequestsRemaining = message.freeRequestsRemaining.toString();
+    }
+    if (message.freeEquivalentCreditsRemaining !== 0n) {
+      obj.freeEquivalentCreditsRemaining = message.freeEquivalentCreditsRemaining.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetAccountFundingResponse>, I>>(base?: I): GetAccountFundingResponse {
+    return GetAccountFundingResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetAccountFundingResponse>, I>>(object: I): GetAccountFundingResponse {
+    const message = createBaseGetAccountFundingResponse();
+    message.settings = (object.settings !== undefined && object.settings !== null)
+      ? AccountFundingSettings.fromPartial(object.settings)
+      : undefined;
+    message.balances = object.balances?.map((e) => BucketBalanceView.fromPartial(e)) || [];
+    message.windows = object.windows?.map((e) => FundingWindowStatus.fromPartial(e)) || [];
+    message.spendingLocked = object.spendingLocked ?? false;
+    message.freeRequestsRemaining =
+      (object.freeRequestsRemaining !== undefined && object.freeRequestsRemaining !== null)
+        ? BigInt(object.freeRequestsRemaining)
+        : 0n;
+    message.freeEquivalentCreditsRemaining =
+      (object.freeEquivalentCreditsRemaining !== undefined && object.freeEquivalentCreditsRemaining !== null)
+        ? BigInt(object.freeEquivalentCreditsRemaining)
+        : 0n;
+    return message;
+  },
+};
+
+function createBaseUpdateAccountSettingsRequest(): UpdateAccountSettingsRequest {
+  return { accountId: "", idempotencyKey: "", settings: undefined, replaceSpendingLimits: false };
+}
+
+export const UpdateAccountSettingsRequest: MessageFns<UpdateAccountSettingsRequest> = {
+  encode(message: UpdateAccountSettingsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.settings !== undefined) {
+      AccountFundingSettings.encode(message.settings, writer.uint32(26).fork()).join();
+    }
+    if (message.replaceSpendingLimits !== false) {
+      writer.uint32(32).bool(message.replaceSpendingLimits);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateAccountSettingsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateAccountSettingsRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.settings = AccountFundingSettings.decode(reader, reader.uint32());
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.replaceSpendingLimits = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateAccountSettingsRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      settings: isSet(object.settings) ? AccountFundingSettings.fromJSON(object.settings) : undefined,
+      replaceSpendingLimits: isSet(object.replaceSpendingLimits)
+        ? globalThis.Boolean(object.replaceSpendingLimits)
+        : isSet(object.replace_spending_limits)
+        ? globalThis.Boolean(object.replace_spending_limits)
+        : false,
+    };
+  },
+
+  toJSON(message: UpdateAccountSettingsRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.settings !== undefined) {
+      obj.settings = AccountFundingSettings.toJSON(message.settings);
+    }
+    if (message.replaceSpendingLimits !== false) {
+      obj.replaceSpendingLimits = message.replaceSpendingLimits;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateAccountSettingsRequest>, I>>(base?: I): UpdateAccountSettingsRequest {
+    return UpdateAccountSettingsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateAccountSettingsRequest>, I>>(object: I): UpdateAccountSettingsRequest {
+    const message = createBaseUpdateAccountSettingsRequest();
+    message.accountId = object.accountId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.settings = (object.settings !== undefined && object.settings !== null)
+      ? AccountFundingSettings.fromPartial(object.settings)
+      : undefined;
+    message.replaceSpendingLimits = object.replaceSpendingLimits ?? false;
+    return message;
+  },
+};
+
+function createBaseUpdateAccountSettingsResponse(): UpdateAccountSettingsResponse {
+  return { settings: undefined };
+}
+
+export const UpdateAccountSettingsResponse: MessageFns<UpdateAccountSettingsResponse> = {
+  encode(message: UpdateAccountSettingsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.settings !== undefined) {
+      AccountFundingSettings.encode(message.settings, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateAccountSettingsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateAccountSettingsResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.settings = AccountFundingSettings.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateAccountSettingsResponse {
+    return { settings: isSet(object.settings) ? AccountFundingSettings.fromJSON(object.settings) : undefined };
+  },
+
+  toJSON(message: UpdateAccountSettingsResponse): unknown {
+    const obj: any = {};
+    if (message.settings !== undefined) {
+      obj.settings = AccountFundingSettings.toJSON(message.settings);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateAccountSettingsResponse>, I>>(base?: I): UpdateAccountSettingsResponse {
+    return UpdateAccountSettingsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateAccountSettingsResponse>, I>>(
+    object: I,
+  ): UpdateAccountSettingsResponse {
+    const message = createBaseUpdateAccountSettingsResponse();
+    message.settings = (object.settings !== undefined && object.settings !== null)
+      ? AccountFundingSettings.fromPartial(object.settings)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSubscriptionPlanVersion(): SubscriptionPlanVersion {
+  return {
+    planId: "",
+    versionId: "",
+    salesStatus: "",
+    isMockCommercial: false,
+    priceCents: 0n,
+    currency: "",
+    policyJson: Buffer.alloc(0),
+  };
+}
+
+export const SubscriptionPlanVersion: MessageFns<SubscriptionPlanVersion> = {
+  encode(message: SubscriptionPlanVersion, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.planId !== "") {
+      writer.uint32(10).string(message.planId);
+    }
+    if (message.versionId !== "") {
+      writer.uint32(18).string(message.versionId);
+    }
+    if (message.salesStatus !== "") {
+      writer.uint32(26).string(message.salesStatus);
+    }
+    if (message.isMockCommercial !== false) {
+      writer.uint32(32).bool(message.isMockCommercial);
+    }
+    if (message.priceCents !== 0n) {
+      if (BigInt.asIntN(64, message.priceCents) !== message.priceCents) {
+        throw new globalThis.Error("value provided for field message.priceCents of type int64 too large");
+      }
+      writer.uint32(40).int64(message.priceCents);
+    }
+    if (message.currency !== "") {
+      writer.uint32(50).string(message.currency);
+    }
+    if (message.policyJson.length !== 0) {
+      writer.uint32(58).bytes(message.policyJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubscriptionPlanVersion {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSubscriptionPlanVersion();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.planId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.versionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.salesStatus = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.isMockCommercial = reader.bool();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.priceCents = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.currency = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.policyJson = Buffer.from(reader.bytes());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SubscriptionPlanVersion {
+    return {
+      planId: isSet(object.planId)
+        ? globalThis.String(object.planId)
+        : isSet(object.plan_id)
+        ? globalThis.String(object.plan_id)
+        : "",
+      versionId: isSet(object.versionId)
+        ? globalThis.String(object.versionId)
+        : isSet(object.version_id)
+        ? globalThis.String(object.version_id)
+        : "",
+      salesStatus: isSet(object.salesStatus)
+        ? globalThis.String(object.salesStatus)
+        : isSet(object.sales_status)
+        ? globalThis.String(object.sales_status)
+        : "",
+      isMockCommercial: isSet(object.isMockCommercial)
+        ? globalThis.Boolean(object.isMockCommercial)
+        : isSet(object.is_mock_commercial)
+        ? globalThis.Boolean(object.is_mock_commercial)
+        : false,
+      priceCents: isSet(object.priceCents)
+        ? BigInt(object.priceCents)
+        : isSet(object.price_cents)
+        ? BigInt(object.price_cents)
+        : 0n,
+      currency: isSet(object.currency) ? globalThis.String(object.currency) : "",
+      policyJson: isSet(object.policyJson)
+        ? Buffer.from(bytesFromBase64(object.policyJson))
+        : isSet(object.policy_json)
+        ? Buffer.from(bytesFromBase64(object.policy_json))
+        : Buffer.alloc(0),
+    };
+  },
+
+  toJSON(message: SubscriptionPlanVersion): unknown {
+    const obj: any = {};
+    if (message.planId !== "") {
+      obj.planId = message.planId;
+    }
+    if (message.versionId !== "") {
+      obj.versionId = message.versionId;
+    }
+    if (message.salesStatus !== "") {
+      obj.salesStatus = message.salesStatus;
+    }
+    if (message.isMockCommercial !== false) {
+      obj.isMockCommercial = message.isMockCommercial;
+    }
+    if (message.priceCents !== 0n) {
+      obj.priceCents = message.priceCents.toString();
+    }
+    if (message.currency !== "") {
+      obj.currency = message.currency;
+    }
+    if (message.policyJson.length !== 0) {
+      obj.policyJson = base64FromBytes(message.policyJson);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SubscriptionPlanVersion>, I>>(base?: I): SubscriptionPlanVersion {
+    return SubscriptionPlanVersion.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SubscriptionPlanVersion>, I>>(object: I): SubscriptionPlanVersion {
+    const message = createBaseSubscriptionPlanVersion();
+    message.planId = object.planId ?? "";
+    message.versionId = object.versionId ?? "";
+    message.salesStatus = object.salesStatus ?? "";
+    message.isMockCommercial = object.isMockCommercial ?? false;
+    message.priceCents = (object.priceCents !== undefined && object.priceCents !== null)
+      ? BigInt(object.priceCents)
+      : 0n;
+    message.currency = object.currency ?? "";
+    message.policyJson = object.policyJson ?? Buffer.alloc(0);
+    return message;
+  },
+};
+
+function createBaseAccountSubscription(): AccountSubscription {
+  return {
+    subscriptionId: "",
+    status: "",
+    currentPlan: undefined,
+    periodId: "",
+    periodStartUnixMs: 0n,
+    periodEndUnixMs: 0n,
+    autoRenew: false,
+    pendingPlanVersionId: "",
+    anchorDayOfMonth: 0,
+    remainingPools: [],
+    windows: [],
+  };
+}
+
+export const AccountSubscription: MessageFns<AccountSubscription> = {
+  encode(message: AccountSubscription, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscriptionId !== "") {
+      writer.uint32(10).string(message.subscriptionId);
+    }
+    if (message.status !== "") {
+      writer.uint32(18).string(message.status);
+    }
+    if (message.currentPlan !== undefined) {
+      SubscriptionPlanVersion.encode(message.currentPlan, writer.uint32(26).fork()).join();
+    }
+    if (message.periodId !== "") {
+      writer.uint32(34).string(message.periodId);
+    }
+    if (message.periodStartUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.periodStartUnixMs) !== message.periodStartUnixMs) {
+        throw new globalThis.Error("value provided for field message.periodStartUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.periodStartUnixMs);
+    }
+    if (message.periodEndUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.periodEndUnixMs) !== message.periodEndUnixMs) {
+        throw new globalThis.Error("value provided for field message.periodEndUnixMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.periodEndUnixMs);
+    }
+    if (message.autoRenew !== false) {
+      writer.uint32(56).bool(message.autoRenew);
+    }
+    if (message.pendingPlanVersionId !== "") {
+      writer.uint32(66).string(message.pendingPlanVersionId);
+    }
+    if (message.anchorDayOfMonth !== 0) {
+      writer.uint32(72).int32(message.anchorDayOfMonth);
+    }
+    for (const v of message.remainingPools) {
+      BucketBalanceView.encode(v!, writer.uint32(82).fork()).join();
+    }
+    for (const v of message.windows) {
+      FundingWindowStatus.encode(v!, writer.uint32(90).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AccountSubscription {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAccountSubscription();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscriptionId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.currentPlan = SubscriptionPlanVersion.decode(reader, reader.uint32());
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.periodId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.periodStartUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.periodEndUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.autoRenew = reader.bool();
+            continue;
+          }
+          case 8: {
+            if (tag !== 66) {
+              break;
+            }
+
+            message.pendingPlanVersionId = reader.string();
+            continue;
+          }
+          case 9: {
+            if (tag !== 72) {
+              break;
+            }
+
+            message.anchorDayOfMonth = reader.int32();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.remainingPools.push(BucketBalanceView.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.windows.push(FundingWindowStatus.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AccountSubscription {
+    return {
+      subscriptionId: isSet(object.subscriptionId)
+        ? globalThis.String(object.subscriptionId)
+        : isSet(object.subscription_id)
+        ? globalThis.String(object.subscription_id)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      currentPlan: isSet(object.currentPlan)
+        ? SubscriptionPlanVersion.fromJSON(object.currentPlan)
+        : isSet(object.current_plan)
+        ? SubscriptionPlanVersion.fromJSON(object.current_plan)
+        : undefined,
+      periodId: isSet(object.periodId)
+        ? globalThis.String(object.periodId)
+        : isSet(object.period_id)
+        ? globalThis.String(object.period_id)
+        : "",
+      periodStartUnixMs: isSet(object.periodStartUnixMs)
+        ? BigInt(object.periodStartUnixMs)
+        : isSet(object.period_start_unix_ms)
+        ? BigInt(object.period_start_unix_ms)
+        : 0n,
+      periodEndUnixMs: isSet(object.periodEndUnixMs)
+        ? BigInt(object.periodEndUnixMs)
+        : isSet(object.period_end_unix_ms)
+        ? BigInt(object.period_end_unix_ms)
+        : 0n,
+      autoRenew: isSet(object.autoRenew)
+        ? globalThis.Boolean(object.autoRenew)
+        : isSet(object.auto_renew)
+        ? globalThis.Boolean(object.auto_renew)
+        : false,
+      pendingPlanVersionId: isSet(object.pendingPlanVersionId)
+        ? globalThis.String(object.pendingPlanVersionId)
+        : isSet(object.pending_plan_version_id)
+        ? globalThis.String(object.pending_plan_version_id)
+        : "",
+      anchorDayOfMonth: isSet(object.anchorDayOfMonth)
+        ? globalThis.Number(object.anchorDayOfMonth)
+        : isSet(object.anchor_day_of_month)
+        ? globalThis.Number(object.anchor_day_of_month)
+        : 0,
+      remainingPools: globalThis.Array.isArray(object?.remainingPools)
+        ? object.remainingPools.map((e: any) => BucketBalanceView.fromJSON(e))
+        : globalThis.Array.isArray(object?.remaining_pools)
+        ? object.remaining_pools.map((e: any) => BucketBalanceView.fromJSON(e))
+        : [],
+      windows: globalThis.Array.isArray(object?.windows)
+        ? object.windows.map((e: any) => FundingWindowStatus.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: AccountSubscription): unknown {
+    const obj: any = {};
+    if (message.subscriptionId !== "") {
+      obj.subscriptionId = message.subscriptionId;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.currentPlan !== undefined) {
+      obj.currentPlan = SubscriptionPlanVersion.toJSON(message.currentPlan);
+    }
+    if (message.periodId !== "") {
+      obj.periodId = message.periodId;
+    }
+    if (message.periodStartUnixMs !== 0n) {
+      obj.periodStartUnixMs = message.periodStartUnixMs.toString();
+    }
+    if (message.periodEndUnixMs !== 0n) {
+      obj.periodEndUnixMs = message.periodEndUnixMs.toString();
+    }
+    if (message.autoRenew !== false) {
+      obj.autoRenew = message.autoRenew;
+    }
+    if (message.pendingPlanVersionId !== "") {
+      obj.pendingPlanVersionId = message.pendingPlanVersionId;
+    }
+    if (message.anchorDayOfMonth !== 0) {
+      obj.anchorDayOfMonth = Math.round(message.anchorDayOfMonth);
+    }
+    if (message.remainingPools?.length) {
+      obj.remainingPools = message.remainingPools.map((e) => BucketBalanceView.toJSON(e));
+    }
+    if (message.windows?.length) {
+      obj.windows = message.windows.map((e) => FundingWindowStatus.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AccountSubscription>, I>>(base?: I): AccountSubscription {
+    return AccountSubscription.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AccountSubscription>, I>>(object: I): AccountSubscription {
+    const message = createBaseAccountSubscription();
+    message.subscriptionId = object.subscriptionId ?? "";
+    message.status = object.status ?? "";
+    message.currentPlan = (object.currentPlan !== undefined && object.currentPlan !== null)
+      ? SubscriptionPlanVersion.fromPartial(object.currentPlan)
+      : undefined;
+    message.periodId = object.periodId ?? "";
+    message.periodStartUnixMs = (object.periodStartUnixMs !== undefined && object.periodStartUnixMs !== null)
+      ? BigInt(object.periodStartUnixMs)
+      : 0n;
+    message.periodEndUnixMs = (object.periodEndUnixMs !== undefined && object.periodEndUnixMs !== null)
+      ? BigInt(object.periodEndUnixMs)
+      : 0n;
+    message.autoRenew = object.autoRenew ?? false;
+    message.pendingPlanVersionId = object.pendingPlanVersionId ?? "";
+    message.anchorDayOfMonth = object.anchorDayOfMonth ?? 0;
+    message.remainingPools = object.remainingPools?.map((e) => BucketBalanceView.fromPartial(e)) || [];
+    message.windows = object.windows?.map((e) => FundingWindowStatus.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseSubscriptionInvoice(): SubscriptionInvoice {
+  return {
+    invoiceId: "",
+    planVersionId: "",
+    periodId: "",
+    paymentId: "",
+    dollarDebitMicroUsd: 0n,
+    periodStartUnixMs: 0n,
+    periodEndUnixMs: 0n,
+    paidAtUnixMs: 0n,
+    status: "",
+    currency: "",
+  };
+}
+
+export const SubscriptionInvoice: MessageFns<SubscriptionInvoice> = {
+  encode(message: SubscriptionInvoice, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.invoiceId !== "") {
+      writer.uint32(10).string(message.invoiceId);
+    }
+    if (message.planVersionId !== "") {
+      writer.uint32(18).string(message.planVersionId);
+    }
+    if (message.periodId !== "") {
+      writer.uint32(26).string(message.periodId);
+    }
+    if (message.paymentId !== "") {
+      writer.uint32(34).string(message.paymentId);
+    }
+    if (message.dollarDebitMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.dollarDebitMicroUsd) !== message.dollarDebitMicroUsd) {
+        throw new globalThis.Error("value provided for field message.dollarDebitMicroUsd of type int64 too large");
+      }
+      writer.uint32(40).int64(message.dollarDebitMicroUsd);
+    }
+    if (message.periodStartUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.periodStartUnixMs) !== message.periodStartUnixMs) {
+        throw new globalThis.Error("value provided for field message.periodStartUnixMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.periodStartUnixMs);
+    }
+    if (message.periodEndUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.periodEndUnixMs) !== message.periodEndUnixMs) {
+        throw new globalThis.Error("value provided for field message.periodEndUnixMs of type int64 too large");
+      }
+      writer.uint32(56).int64(message.periodEndUnixMs);
+    }
+    if (message.paidAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.paidAtUnixMs) !== message.paidAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.paidAtUnixMs of type int64 too large");
+      }
+      writer.uint32(64).int64(message.paidAtUnixMs);
+    }
+    if (message.status !== "") {
+      writer.uint32(74).string(message.status);
+    }
+    if (message.currency !== "") {
+      writer.uint32(82).string(message.currency);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SubscriptionInvoice {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSubscriptionInvoice();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.invoiceId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.planVersionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.periodId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.paymentId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.dollarDebitMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.periodStartUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.periodEndUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.paidAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+          case 10: {
+            if (tag !== 82) {
+              break;
+            }
+
+            message.currency = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SubscriptionInvoice {
+    return {
+      invoiceId: isSet(object.invoiceId)
+        ? globalThis.String(object.invoiceId)
+        : isSet(object.invoice_id)
+        ? globalThis.String(object.invoice_id)
+        : "",
+      planVersionId: isSet(object.planVersionId)
+        ? globalThis.String(object.planVersionId)
+        : isSet(object.plan_version_id)
+        ? globalThis.String(object.plan_version_id)
+        : "",
+      periodId: isSet(object.periodId)
+        ? globalThis.String(object.periodId)
+        : isSet(object.period_id)
+        ? globalThis.String(object.period_id)
+        : "",
+      paymentId: isSet(object.paymentId)
+        ? globalThis.String(object.paymentId)
+        : isSet(object.payment_id)
+        ? globalThis.String(object.payment_id)
+        : "",
+      dollarDebitMicroUsd: isSet(object.dollarDebitMicroUsd)
+        ? BigInt(object.dollarDebitMicroUsd)
+        : isSet(object.dollar_debit_micro_usd)
+        ? BigInt(object.dollar_debit_micro_usd)
+        : 0n,
+      periodStartUnixMs: isSet(object.periodStartUnixMs)
+        ? BigInt(object.periodStartUnixMs)
+        : isSet(object.period_start_unix_ms)
+        ? BigInt(object.period_start_unix_ms)
+        : 0n,
+      periodEndUnixMs: isSet(object.periodEndUnixMs)
+        ? BigInt(object.periodEndUnixMs)
+        : isSet(object.period_end_unix_ms)
+        ? BigInt(object.period_end_unix_ms)
+        : 0n,
+      paidAtUnixMs: isSet(object.paidAtUnixMs)
+        ? BigInt(object.paidAtUnixMs)
+        : isSet(object.paid_at_unix_ms)
+        ? BigInt(object.paid_at_unix_ms)
+        : 0n,
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      currency: isSet(object.currency) ? globalThis.String(object.currency) : "",
+    };
+  },
+
+  toJSON(message: SubscriptionInvoice): unknown {
+    const obj: any = {};
+    if (message.invoiceId !== "") {
+      obj.invoiceId = message.invoiceId;
+    }
+    if (message.planVersionId !== "") {
+      obj.planVersionId = message.planVersionId;
+    }
+    if (message.periodId !== "") {
+      obj.periodId = message.periodId;
+    }
+    if (message.paymentId !== "") {
+      obj.paymentId = message.paymentId;
+    }
+    if (message.dollarDebitMicroUsd !== 0n) {
+      obj.dollarDebitMicroUsd = message.dollarDebitMicroUsd.toString();
+    }
+    if (message.periodStartUnixMs !== 0n) {
+      obj.periodStartUnixMs = message.periodStartUnixMs.toString();
+    }
+    if (message.periodEndUnixMs !== 0n) {
+      obj.periodEndUnixMs = message.periodEndUnixMs.toString();
+    }
+    if (message.paidAtUnixMs !== 0n) {
+      obj.paidAtUnixMs = message.paidAtUnixMs.toString();
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.currency !== "") {
+      obj.currency = message.currency;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SubscriptionInvoice>, I>>(base?: I): SubscriptionInvoice {
+    return SubscriptionInvoice.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SubscriptionInvoice>, I>>(object: I): SubscriptionInvoice {
+    const message = createBaseSubscriptionInvoice();
+    message.invoiceId = object.invoiceId ?? "";
+    message.planVersionId = object.planVersionId ?? "";
+    message.periodId = object.periodId ?? "";
+    message.paymentId = object.paymentId ?? "";
+    message.dollarDebitMicroUsd = (object.dollarDebitMicroUsd !== undefined && object.dollarDebitMicroUsd !== null)
+      ? BigInt(object.dollarDebitMicroUsd)
+      : 0n;
+    message.periodStartUnixMs = (object.periodStartUnixMs !== undefined && object.periodStartUnixMs !== null)
+      ? BigInt(object.periodStartUnixMs)
+      : 0n;
+    message.periodEndUnixMs = (object.periodEndUnixMs !== undefined && object.periodEndUnixMs !== null)
+      ? BigInt(object.periodEndUnixMs)
+      : 0n;
+    message.paidAtUnixMs = (object.paidAtUnixMs !== undefined && object.paidAtUnixMs !== null)
+      ? BigInt(object.paidAtUnixMs)
+      : 0n;
+    message.status = object.status ?? "";
+    message.currency = object.currency ?? "";
+    return message;
+  },
+};
+
+function createBaseListSubscriptionPlansRequest(): ListSubscriptionPlansRequest {
+  return {};
+}
+
+export const ListSubscriptionPlansRequest: MessageFns<ListSubscriptionPlansRequest> = {
+  encode(_: ListSubscriptionPlansRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListSubscriptionPlansRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListSubscriptionPlansRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(_: any): ListSubscriptionPlansRequest {
+    return {};
+  },
+
+  toJSON(_: ListSubscriptionPlansRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListSubscriptionPlansRequest>, I>>(base?: I): ListSubscriptionPlansRequest {
+    return ListSubscriptionPlansRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListSubscriptionPlansRequest>, I>>(_: I): ListSubscriptionPlansRequest {
+    const message = createBaseListSubscriptionPlansRequest();
+    return message;
+  },
+};
+
+function createBaseListSubscriptionPlansResponse(): ListSubscriptionPlansResponse {
+  return { plans: [] };
+}
+
+export const ListSubscriptionPlansResponse: MessageFns<ListSubscriptionPlansResponse> = {
+  encode(message: ListSubscriptionPlansResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.plans) {
+      SubscriptionPlanVersion.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListSubscriptionPlansResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListSubscriptionPlansResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.plans.push(SubscriptionPlanVersion.decode(reader, reader.uint32()));
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListSubscriptionPlansResponse {
+    return {
+      plans: globalThis.Array.isArray(object?.plans)
+        ? object.plans.map((e: any) => SubscriptionPlanVersion.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ListSubscriptionPlansResponse): unknown {
+    const obj: any = {};
+    if (message.plans?.length) {
+      obj.plans = message.plans.map((e) => SubscriptionPlanVersion.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListSubscriptionPlansResponse>, I>>(base?: I): ListSubscriptionPlansResponse {
+    return ListSubscriptionPlansResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListSubscriptionPlansResponse>, I>>(
+    object: I,
+  ): ListSubscriptionPlansResponse {
+    const message = createBaseListSubscriptionPlansResponse();
+    message.plans = object.plans?.map((e) => SubscriptionPlanVersion.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseGetSubscriptionRequest(): GetSubscriptionRequest {
+  return { accountId: "" };
+}
+
+export const GetSubscriptionRequest: MessageFns<GetSubscriptionRequest> = {
+  encode(message: GetSubscriptionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetSubscriptionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetSubscriptionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetSubscriptionRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetSubscriptionRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetSubscriptionRequest>, I>>(base?: I): GetSubscriptionRequest {
+    return GetSubscriptionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetSubscriptionRequest>, I>>(object: I): GetSubscriptionRequest {
+    const message = createBaseGetSubscriptionRequest();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetSubscriptionResponse(): GetSubscriptionResponse {
+  return { subscription: undefined };
+}
+
+export const GetSubscriptionResponse: MessageFns<GetSubscriptionResponse> = {
+  encode(message: GetSubscriptionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscription !== undefined) {
+      AccountSubscription.encode(message.subscription, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetSubscriptionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetSubscriptionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscription = AccountSubscription.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetSubscriptionResponse {
+    return { subscription: isSet(object.subscription) ? AccountSubscription.fromJSON(object.subscription) : undefined };
+  },
+
+  toJSON(message: GetSubscriptionResponse): unknown {
+    const obj: any = {};
+    if (message.subscription !== undefined) {
+      obj.subscription = AccountSubscription.toJSON(message.subscription);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetSubscriptionResponse>, I>>(base?: I): GetSubscriptionResponse {
+    return GetSubscriptionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetSubscriptionResponse>, I>>(object: I): GetSubscriptionResponse {
+    const message = createBaseGetSubscriptionResponse();
+    message.subscription = (object.subscription !== undefined && object.subscription !== null)
+      ? AccountSubscription.fromPartial(object.subscription)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePurchaseSubscriptionRequest(): PurchaseSubscriptionRequest {
+  return { accountId: "", planVersionId: "", idempotencyKey: "" };
+}
+
+export const PurchaseSubscriptionRequest: MessageFns<PurchaseSubscriptionRequest> = {
+  encode(message: PurchaseSubscriptionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.planVersionId !== "") {
+      writer.uint32(18).string(message.planVersionId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PurchaseSubscriptionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePurchaseSubscriptionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.planVersionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PurchaseSubscriptionRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      planVersionId: isSet(object.planVersionId)
+        ? globalThis.String(object.planVersionId)
+        : isSet(object.plan_version_id)
+        ? globalThis.String(object.plan_version_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: PurchaseSubscriptionRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.planVersionId !== "") {
+      obj.planVersionId = message.planVersionId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PurchaseSubscriptionRequest>, I>>(base?: I): PurchaseSubscriptionRequest {
+    return PurchaseSubscriptionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PurchaseSubscriptionRequest>, I>>(object: I): PurchaseSubscriptionRequest {
+    const message = createBasePurchaseSubscriptionRequest();
+    message.accountId = object.accountId ?? "";
+    message.planVersionId = object.planVersionId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBasePurchaseSubscriptionResponse(): PurchaseSubscriptionResponse {
+  return { subscription: undefined, invoice: undefined };
+}
+
+export const PurchaseSubscriptionResponse: MessageFns<PurchaseSubscriptionResponse> = {
+  encode(message: PurchaseSubscriptionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscription !== undefined) {
+      AccountSubscription.encode(message.subscription, writer.uint32(10).fork()).join();
+    }
+    if (message.invoice !== undefined) {
+      SubscriptionInvoice.encode(message.invoice, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PurchaseSubscriptionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePurchaseSubscriptionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscription = AccountSubscription.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.invoice = SubscriptionInvoice.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PurchaseSubscriptionResponse {
+    return {
+      subscription: isSet(object.subscription) ? AccountSubscription.fromJSON(object.subscription) : undefined,
+      invoice: isSet(object.invoice) ? SubscriptionInvoice.fromJSON(object.invoice) : undefined,
+    };
+  },
+
+  toJSON(message: PurchaseSubscriptionResponse): unknown {
+    const obj: any = {};
+    if (message.subscription !== undefined) {
+      obj.subscription = AccountSubscription.toJSON(message.subscription);
+    }
+    if (message.invoice !== undefined) {
+      obj.invoice = SubscriptionInvoice.toJSON(message.invoice);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PurchaseSubscriptionResponse>, I>>(base?: I): PurchaseSubscriptionResponse {
+    return PurchaseSubscriptionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PurchaseSubscriptionResponse>, I>>(object: I): PurchaseSubscriptionResponse {
+    const message = createBasePurchaseSubscriptionResponse();
+    message.subscription = (object.subscription !== undefined && object.subscription !== null)
+      ? AccountSubscription.fromPartial(object.subscription)
+      : undefined;
+    message.invoice = (object.invoice !== undefined && object.invoice !== null)
+      ? SubscriptionInvoice.fromPartial(object.invoice)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRenewSubscriptionRequest(): RenewSubscriptionRequest {
+  return { accountId: "", planVersionId: "", idempotencyKey: "" };
+}
+
+export const RenewSubscriptionRequest: MessageFns<RenewSubscriptionRequest> = {
+  encode(message: RenewSubscriptionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.planVersionId !== "") {
+      writer.uint32(18).string(message.planVersionId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewSubscriptionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRenewSubscriptionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.planVersionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RenewSubscriptionRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      planVersionId: isSet(object.planVersionId)
+        ? globalThis.String(object.planVersionId)
+        : isSet(object.plan_version_id)
+        ? globalThis.String(object.plan_version_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: RenewSubscriptionRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.planVersionId !== "") {
+      obj.planVersionId = message.planVersionId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenewSubscriptionRequest>, I>>(base?: I): RenewSubscriptionRequest {
+    return RenewSubscriptionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenewSubscriptionRequest>, I>>(object: I): RenewSubscriptionRequest {
+    const message = createBaseRenewSubscriptionRequest();
+    message.accountId = object.accountId ?? "";
+    message.planVersionId = object.planVersionId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseRenewSubscriptionResponse(): RenewSubscriptionResponse {
+  return { subscription: undefined, invoice: undefined };
+}
+
+export const RenewSubscriptionResponse: MessageFns<RenewSubscriptionResponse> = {
+  encode(message: RenewSubscriptionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscription !== undefined) {
+      AccountSubscription.encode(message.subscription, writer.uint32(10).fork()).join();
+    }
+    if (message.invoice !== undefined) {
+      SubscriptionInvoice.encode(message.invoice, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewSubscriptionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRenewSubscriptionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscription = AccountSubscription.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.invoice = SubscriptionInvoice.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RenewSubscriptionResponse {
+    return {
+      subscription: isSet(object.subscription) ? AccountSubscription.fromJSON(object.subscription) : undefined,
+      invoice: isSet(object.invoice) ? SubscriptionInvoice.fromJSON(object.invoice) : undefined,
+    };
+  },
+
+  toJSON(message: RenewSubscriptionResponse): unknown {
+    const obj: any = {};
+    if (message.subscription !== undefined) {
+      obj.subscription = AccountSubscription.toJSON(message.subscription);
+    }
+    if (message.invoice !== undefined) {
+      obj.invoice = SubscriptionInvoice.toJSON(message.invoice);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RenewSubscriptionResponse>, I>>(base?: I): RenewSubscriptionResponse {
+    return RenewSubscriptionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RenewSubscriptionResponse>, I>>(object: I): RenewSubscriptionResponse {
+    const message = createBaseRenewSubscriptionResponse();
+    message.subscription = (object.subscription !== undefined && object.subscription !== null)
+      ? AccountSubscription.fromPartial(object.subscription)
+      : undefined;
+    message.invoice = (object.invoice !== undefined && object.invoice !== null)
+      ? SubscriptionInvoice.fromPartial(object.invoice)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCancelSubscriptionRequest(): CancelSubscriptionRequest {
+  return { accountId: "", idempotencyKey: "", resumeAutoRenew: false };
+}
+
+export const CancelSubscriptionRequest: MessageFns<CancelSubscriptionRequest> = {
+  encode(message: CancelSubscriptionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.resumeAutoRenew !== false) {
+      writer.uint32(24).bool(message.resumeAutoRenew);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelSubscriptionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCancelSubscriptionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.resumeAutoRenew = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CancelSubscriptionRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      resumeAutoRenew: isSet(object.resumeAutoRenew)
+        ? globalThis.Boolean(object.resumeAutoRenew)
+        : isSet(object.resume_auto_renew)
+        ? globalThis.Boolean(object.resume_auto_renew)
+        : false,
+    };
+  },
+
+  toJSON(message: CancelSubscriptionRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.resumeAutoRenew !== false) {
+      obj.resumeAutoRenew = message.resumeAutoRenew;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CancelSubscriptionRequest>, I>>(base?: I): CancelSubscriptionRequest {
+    return CancelSubscriptionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CancelSubscriptionRequest>, I>>(object: I): CancelSubscriptionRequest {
+    const message = createBaseCancelSubscriptionRequest();
+    message.accountId = object.accountId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.resumeAutoRenew = object.resumeAutoRenew ?? false;
+    return message;
+  },
+};
+
+function createBaseCancelSubscriptionResponse(): CancelSubscriptionResponse {
+  return { subscription: undefined };
+}
+
+export const CancelSubscriptionResponse: MessageFns<CancelSubscriptionResponse> = {
+  encode(message: CancelSubscriptionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscription !== undefined) {
+      AccountSubscription.encode(message.subscription, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CancelSubscriptionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCancelSubscriptionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscription = AccountSubscription.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CancelSubscriptionResponse {
+    return { subscription: isSet(object.subscription) ? AccountSubscription.fromJSON(object.subscription) : undefined };
+  },
+
+  toJSON(message: CancelSubscriptionResponse): unknown {
+    const obj: any = {};
+    if (message.subscription !== undefined) {
+      obj.subscription = AccountSubscription.toJSON(message.subscription);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CancelSubscriptionResponse>, I>>(base?: I): CancelSubscriptionResponse {
+    return CancelSubscriptionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CancelSubscriptionResponse>, I>>(object: I): CancelSubscriptionResponse {
+    const message = createBaseCancelSubscriptionResponse();
+    message.subscription = (object.subscription !== undefined && object.subscription !== null)
+      ? AccountSubscription.fromPartial(object.subscription)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSchedulePlanChangeRequest(): SchedulePlanChangeRequest {
+  return { accountId: "", planVersionId: "", idempotencyKey: "" };
+}
+
+export const SchedulePlanChangeRequest: MessageFns<SchedulePlanChangeRequest> = {
+  encode(message: SchedulePlanChangeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.planVersionId !== "") {
+      writer.uint32(18).string(message.planVersionId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SchedulePlanChangeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSchedulePlanChangeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.planVersionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SchedulePlanChangeRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      planVersionId: isSet(object.planVersionId)
+        ? globalThis.String(object.planVersionId)
+        : isSet(object.plan_version_id)
+        ? globalThis.String(object.plan_version_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: SchedulePlanChangeRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.planVersionId !== "") {
+      obj.planVersionId = message.planVersionId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SchedulePlanChangeRequest>, I>>(base?: I): SchedulePlanChangeRequest {
+    return SchedulePlanChangeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SchedulePlanChangeRequest>, I>>(object: I): SchedulePlanChangeRequest {
+    const message = createBaseSchedulePlanChangeRequest();
+    message.accountId = object.accountId ?? "";
+    message.planVersionId = object.planVersionId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseSchedulePlanChangeResponse(): SchedulePlanChangeResponse {
+  return { subscription: undefined };
+}
+
+export const SchedulePlanChangeResponse: MessageFns<SchedulePlanChangeResponse> = {
+  encode(message: SchedulePlanChangeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.subscription !== undefined) {
+      AccountSubscription.encode(message.subscription, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SchedulePlanChangeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSchedulePlanChangeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.subscription = AccountSubscription.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SchedulePlanChangeResponse {
+    return { subscription: isSet(object.subscription) ? AccountSubscription.fromJSON(object.subscription) : undefined };
+  },
+
+  toJSON(message: SchedulePlanChangeResponse): unknown {
+    const obj: any = {};
+    if (message.subscription !== undefined) {
+      obj.subscription = AccountSubscription.toJSON(message.subscription);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SchedulePlanChangeResponse>, I>>(base?: I): SchedulePlanChangeResponse {
+    return SchedulePlanChangeResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SchedulePlanChangeResponse>, I>>(object: I): SchedulePlanChangeResponse {
+    const message = createBaseSchedulePlanChangeResponse();
+    message.subscription = (object.subscription !== undefined && object.subscription !== null)
+      ? AccountSubscription.fromPartial(object.subscription)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListInvoicesRequest(): ListInvoicesRequest {
+  return { accountId: "", page: undefined };
+}
+
+export const ListInvoicesRequest: MessageFns<ListInvoicesRequest> = {
+  encode(message: ListInvoicesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.page !== undefined) {
+      CursorPageRequest.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListInvoicesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListInvoicesRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageRequest.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListInvoicesRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      page: isSet(object.page) ? CursorPageRequest.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListInvoicesRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageRequest.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListInvoicesRequest>, I>>(base?: I): ListInvoicesRequest {
+    return ListInvoicesRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListInvoicesRequest>, I>>(object: I): ListInvoicesRequest {
+    const message = createBaseListInvoicesRequest();
+    message.accountId = object.accountId ?? "";
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageRequest.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListInvoicesResponse(): ListInvoicesResponse {
+  return { invoices: [], page: undefined };
+}
+
+export const ListInvoicesResponse: MessageFns<ListInvoicesResponse> = {
+  encode(message: ListInvoicesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.invoices) {
+      SubscriptionInvoice.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.page !== undefined) {
+      CursorPageResponse.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListInvoicesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListInvoicesResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.invoices.push(SubscriptionInvoice.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListInvoicesResponse {
+    return {
+      invoices: globalThis.Array.isArray(object?.invoices)
+        ? object.invoices.map((e: any) => SubscriptionInvoice.fromJSON(e))
+        : [],
+      page: isSet(object.page) ? CursorPageResponse.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListInvoicesResponse): unknown {
+    const obj: any = {};
+    if (message.invoices?.length) {
+      obj.invoices = message.invoices.map((e) => SubscriptionInvoice.toJSON(e));
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageResponse.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListInvoicesResponse>, I>>(base?: I): ListInvoicesResponse {
+    return ListInvoicesResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListInvoicesResponse>, I>>(object: I): ListInvoicesResponse {
+    const message = createBaseListInvoicesResponse();
+    message.invoices = object.invoices?.map((e) => SubscriptionInvoice.fromPartial(e)) || [];
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageResponse.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetInvoiceRequest(): GetInvoiceRequest {
+  return { accountId: "", invoiceId: "" };
+}
+
+export const GetInvoiceRequest: MessageFns<GetInvoiceRequest> = {
+  encode(message: GetInvoiceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.invoiceId !== "") {
+      writer.uint32(18).string(message.invoiceId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetInvoiceRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetInvoiceRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.invoiceId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetInvoiceRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      invoiceId: isSet(object.invoiceId)
+        ? globalThis.String(object.invoiceId)
+        : isSet(object.invoice_id)
+        ? globalThis.String(object.invoice_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetInvoiceRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.invoiceId !== "") {
+      obj.invoiceId = message.invoiceId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetInvoiceRequest>, I>>(base?: I): GetInvoiceRequest {
+    return GetInvoiceRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetInvoiceRequest>, I>>(object: I): GetInvoiceRequest {
+    const message = createBaseGetInvoiceRequest();
+    message.accountId = object.accountId ?? "";
+    message.invoiceId = object.invoiceId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetInvoiceResponse(): GetInvoiceResponse {
+  return { invoice: undefined };
+}
+
+export const GetInvoiceResponse: MessageFns<GetInvoiceResponse> = {
+  encode(message: GetInvoiceResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.invoice !== undefined) {
+      SubscriptionInvoice.encode(message.invoice, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetInvoiceResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetInvoiceResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.invoice = SubscriptionInvoice.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetInvoiceResponse {
+    return { invoice: isSet(object.invoice) ? SubscriptionInvoice.fromJSON(object.invoice) : undefined };
+  },
+
+  toJSON(message: GetInvoiceResponse): unknown {
+    const obj: any = {};
+    if (message.invoice !== undefined) {
+      obj.invoice = SubscriptionInvoice.toJSON(message.invoice);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetInvoiceResponse>, I>>(base?: I): GetInvoiceResponse {
+    return GetInvoiceResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetInvoiceResponse>, I>>(object: I): GetInvoiceResponse {
+    const message = createBaseGetInvoiceResponse();
+    message.invoice = (object.invoice !== undefined && object.invoice !== null)
+      ? SubscriptionInvoice.fromPartial(object.invoice)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetDepositAddressRequest(): GetDepositAddressRequest {
+  return { accountId: "", chainId: "" };
+}
+
+export const GetDepositAddressRequest: MessageFns<GetDepositAddressRequest> = {
+  encode(message: GetDepositAddressRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.chainId !== "") {
+      writer.uint32(18).string(message.chainId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetDepositAddressRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetDepositAddressRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.chainId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetDepositAddressRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      chainId: isSet(object.chainId)
+        ? globalThis.String(object.chainId)
+        : isSet(object.chain_id)
+        ? globalThis.String(object.chain_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetDepositAddressRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.chainId !== "") {
+      obj.chainId = message.chainId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetDepositAddressRequest>, I>>(base?: I): GetDepositAddressRequest {
+    return GetDepositAddressRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetDepositAddressRequest>, I>>(object: I): GetDepositAddressRequest {
+    const message = createBaseGetDepositAddressRequest();
+    message.accountId = object.accountId ?? "";
+    message.chainId = object.chainId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetDepositAddressResponse(): GetDepositAddressResponse {
+  return { chainId: "", address: "" };
+}
+
+export const GetDepositAddressResponse: MessageFns<GetDepositAddressResponse> = {
+  encode(message: GetDepositAddressResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.chainId !== "") {
+      writer.uint32(10).string(message.chainId);
+    }
+    if (message.address !== "") {
+      writer.uint32(18).string(message.address);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetDepositAddressResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetDepositAddressResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.chainId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.address = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetDepositAddressResponse {
+    return {
+      chainId: isSet(object.chainId)
+        ? globalThis.String(object.chainId)
+        : isSet(object.chain_id)
+        ? globalThis.String(object.chain_id)
+        : "",
+      address: isSet(object.address) ? globalThis.String(object.address) : "",
+    };
+  },
+
+  toJSON(message: GetDepositAddressResponse): unknown {
+    const obj: any = {};
+    if (message.chainId !== "") {
+      obj.chainId = message.chainId;
+    }
+    if (message.address !== "") {
+      obj.address = message.address;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetDepositAddressResponse>, I>>(base?: I): GetDepositAddressResponse {
+    return GetDepositAddressResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetDepositAddressResponse>, I>>(object: I): GetDepositAddressResponse {
+    const message = createBaseGetDepositAddressResponse();
+    message.chainId = object.chainId ?? "";
+    message.address = object.address ?? "";
+    return message;
+  },
+};
+
+function createBaseTopupOrder(): TopupOrder {
+  return {
+    orderId: "",
+    channel: "",
+    status: "",
+    providerReference: "",
+    destinationChainId: "",
+    destinationAddress: "",
+    netMicroUsd: 0n,
+    createdAtUnixMs: 0n,
+  };
+}
+
+export const TopupOrder: MessageFns<TopupOrder> = {
+  encode(message: TopupOrder, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.orderId !== "") {
+      writer.uint32(10).string(message.orderId);
+    }
+    if (message.channel !== "") {
+      writer.uint32(18).string(message.channel);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    if (message.providerReference !== "") {
+      writer.uint32(34).string(message.providerReference);
+    }
+    if (message.destinationChainId !== "") {
+      writer.uint32(42).string(message.destinationChainId);
+    }
+    if (message.destinationAddress !== "") {
+      writer.uint32(50).string(message.destinationAddress);
+    }
+    if (message.netMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.netMicroUsd) !== message.netMicroUsd) {
+        throw new globalThis.Error("value provided for field message.netMicroUsd of type int64 too large");
+      }
+      writer.uint32(56).int64(message.netMicroUsd);
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.createdAtUnixMs) !== message.createdAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.createdAtUnixMs of type int64 too large");
+      }
+      writer.uint32(64).int64(message.createdAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TopupOrder {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseTopupOrder();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.orderId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.channel = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.providerReference = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.destinationChainId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.destinationAddress = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 56) {
+              break;
+            }
+
+            message.netMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.createdAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): TopupOrder {
+    return {
+      orderId: isSet(object.orderId)
+        ? globalThis.String(object.orderId)
+        : isSet(object.order_id)
+        ? globalThis.String(object.order_id)
+        : "",
+      channel: isSet(object.channel) ? globalThis.String(object.channel) : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      providerReference: isSet(object.providerReference)
+        ? globalThis.String(object.providerReference)
+        : isSet(object.provider_reference)
+        ? globalThis.String(object.provider_reference)
+        : "",
+      destinationChainId: isSet(object.destinationChainId)
+        ? globalThis.String(object.destinationChainId)
+        : isSet(object.destination_chain_id)
+        ? globalThis.String(object.destination_chain_id)
+        : "",
+      destinationAddress: isSet(object.destinationAddress)
+        ? globalThis.String(object.destinationAddress)
+        : isSet(object.destination_address)
+        ? globalThis.String(object.destination_address)
+        : "",
+      netMicroUsd: isSet(object.netMicroUsd)
+        ? BigInt(object.netMicroUsd)
+        : isSet(object.net_micro_usd)
+        ? BigInt(object.net_micro_usd)
+        : 0n,
+      createdAtUnixMs: isSet(object.createdAtUnixMs)
+        ? BigInt(object.createdAtUnixMs)
+        : isSet(object.created_at_unix_ms)
+        ? BigInt(object.created_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: TopupOrder): unknown {
+    const obj: any = {};
+    if (message.orderId !== "") {
+      obj.orderId = message.orderId;
+    }
+    if (message.channel !== "") {
+      obj.channel = message.channel;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.providerReference !== "") {
+      obj.providerReference = message.providerReference;
+    }
+    if (message.destinationChainId !== "") {
+      obj.destinationChainId = message.destinationChainId;
+    }
+    if (message.destinationAddress !== "") {
+      obj.destinationAddress = message.destinationAddress;
+    }
+    if (message.netMicroUsd !== 0n) {
+      obj.netMicroUsd = message.netMicroUsd.toString();
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      obj.createdAtUnixMs = message.createdAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TopupOrder>, I>>(base?: I): TopupOrder {
+    return TopupOrder.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TopupOrder>, I>>(object: I): TopupOrder {
+    const message = createBaseTopupOrder();
+    message.orderId = object.orderId ?? "";
+    message.channel = object.channel ?? "";
+    message.status = object.status ?? "";
+    message.providerReference = object.providerReference ?? "";
+    message.destinationChainId = object.destinationChainId ?? "";
+    message.destinationAddress = object.destinationAddress ?? "";
+    message.netMicroUsd = (object.netMicroUsd !== undefined && object.netMicroUsd !== null)
+      ? BigInt(object.netMicroUsd)
+      : 0n;
+    message.createdAtUnixMs = (object.createdAtUnixMs !== undefined && object.createdAtUnixMs !== null)
+      ? BigInt(object.createdAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseCreateTopupOrderRequest(): CreateTopupOrderRequest {
+  return {
+    accountId: "",
+    idempotencyKey: "",
+    channel: "",
+    sourceChainId: "",
+    sourceAssetId: "",
+    sourceAmountAtomicDec: "",
+    quoteReference: "",
+    requestedUsdCents: 0n,
+  };
+}
+
+export const CreateTopupOrderRequest: MessageFns<CreateTopupOrderRequest> = {
+  encode(message: CreateTopupOrderRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.channel !== "") {
+      writer.uint32(26).string(message.channel);
+    }
+    if (message.sourceChainId !== "") {
+      writer.uint32(34).string(message.sourceChainId);
+    }
+    if (message.sourceAssetId !== "") {
+      writer.uint32(42).string(message.sourceAssetId);
+    }
+    if (message.sourceAmountAtomicDec !== "") {
+      writer.uint32(50).string(message.sourceAmountAtomicDec);
+    }
+    if (message.quoteReference !== "") {
+      writer.uint32(58).string(message.quoteReference);
+    }
+    if (message.requestedUsdCents !== 0n) {
+      if (BigInt.asIntN(64, message.requestedUsdCents) !== message.requestedUsdCents) {
+        throw new globalThis.Error("value provided for field message.requestedUsdCents of type int64 too large");
+      }
+      writer.uint32(64).int64(message.requestedUsdCents);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateTopupOrderRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreateTopupOrderRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.channel = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.sourceChainId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.sourceAssetId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.sourceAmountAtomicDec = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.quoteReference = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.requestedUsdCents = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreateTopupOrderRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      channel: isSet(object.channel) ? globalThis.String(object.channel) : "",
+      sourceChainId: isSet(object.sourceChainId)
+        ? globalThis.String(object.sourceChainId)
+        : isSet(object.source_chain_id)
+        ? globalThis.String(object.source_chain_id)
+        : "",
+      sourceAssetId: isSet(object.sourceAssetId)
+        ? globalThis.String(object.sourceAssetId)
+        : isSet(object.source_asset_id)
+        ? globalThis.String(object.source_asset_id)
+        : "",
+      sourceAmountAtomicDec: isSet(object.sourceAmountAtomicDec)
+        ? globalThis.String(object.sourceAmountAtomicDec)
+        : isSet(object.source_amount_atomic_dec)
+        ? globalThis.String(object.source_amount_atomic_dec)
+        : "",
+      quoteReference: isSet(object.quoteReference)
+        ? globalThis.String(object.quoteReference)
+        : isSet(object.quote_reference)
+        ? globalThis.String(object.quote_reference)
+        : "",
+      requestedUsdCents: isSet(object.requestedUsdCents)
+        ? BigInt(object.requestedUsdCents)
+        : isSet(object.requested_usd_cents)
+        ? BigInt(object.requested_usd_cents)
+        : 0n,
+    };
+  },
+
+  toJSON(message: CreateTopupOrderRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.channel !== "") {
+      obj.channel = message.channel;
+    }
+    if (message.sourceChainId !== "") {
+      obj.sourceChainId = message.sourceChainId;
+    }
+    if (message.sourceAssetId !== "") {
+      obj.sourceAssetId = message.sourceAssetId;
+    }
+    if (message.sourceAmountAtomicDec !== "") {
+      obj.sourceAmountAtomicDec = message.sourceAmountAtomicDec;
+    }
+    if (message.quoteReference !== "") {
+      obj.quoteReference = message.quoteReference;
+    }
+    if (message.requestedUsdCents !== 0n) {
+      obj.requestedUsdCents = message.requestedUsdCents.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreateTopupOrderRequest>, I>>(base?: I): CreateTopupOrderRequest {
+    return CreateTopupOrderRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateTopupOrderRequest>, I>>(object: I): CreateTopupOrderRequest {
+    const message = createBaseCreateTopupOrderRequest();
+    message.accountId = object.accountId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.channel = object.channel ?? "";
+    message.sourceChainId = object.sourceChainId ?? "";
+    message.sourceAssetId = object.sourceAssetId ?? "";
+    message.sourceAmountAtomicDec = object.sourceAmountAtomicDec ?? "";
+    message.quoteReference = object.quoteReference ?? "";
+    message.requestedUsdCents = (object.requestedUsdCents !== undefined && object.requestedUsdCents !== null)
+      ? BigInt(object.requestedUsdCents)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseCreateTopupOrderResponse(): CreateTopupOrderResponse {
+  return { order: undefined };
+}
+
+export const CreateTopupOrderResponse: MessageFns<CreateTopupOrderResponse> = {
+  encode(message: CreateTopupOrderResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.order !== undefined) {
+      TopupOrder.encode(message.order, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreateTopupOrderResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreateTopupOrderResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.order = TopupOrder.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreateTopupOrderResponse {
+    return { order: isSet(object.order) ? TopupOrder.fromJSON(object.order) : undefined };
+  },
+
+  toJSON(message: CreateTopupOrderResponse): unknown {
+    const obj: any = {};
+    if (message.order !== undefined) {
+      obj.order = TopupOrder.toJSON(message.order);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreateTopupOrderResponse>, I>>(base?: I): CreateTopupOrderResponse {
+    return CreateTopupOrderResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreateTopupOrderResponse>, I>>(object: I): CreateTopupOrderResponse {
+    const message = createBaseCreateTopupOrderResponse();
+    message.order = (object.order !== undefined && object.order !== null)
+      ? TopupOrder.fromPartial(object.order)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRecordStripePaymentRequest(): RecordStripePaymentRequest {
+  return { eventId: "", paymentId: "", checkoutSessionId: "", currency: "", paidMinorUnits: 0n, occurredAtUnixMs: 0n };
+}
+
+export const RecordStripePaymentRequest: MessageFns<RecordStripePaymentRequest> = {
+  encode(message: RecordStripePaymentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.eventId !== "") {
+      writer.uint32(10).string(message.eventId);
+    }
+    if (message.paymentId !== "") {
+      writer.uint32(18).string(message.paymentId);
+    }
+    if (message.checkoutSessionId !== "") {
+      writer.uint32(26).string(message.checkoutSessionId);
+    }
+    if (message.currency !== "") {
+      writer.uint32(34).string(message.currency);
+    }
+    if (message.paidMinorUnits !== 0n) {
+      if (BigInt.asIntN(64, message.paidMinorUnits) !== message.paidMinorUnits) {
+        throw new globalThis.Error("value provided for field message.paidMinorUnits of type int64 too large");
+      }
+      writer.uint32(40).int64(message.paidMinorUnits);
+    }
+    if (message.occurredAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.occurredAtUnixMs) !== message.occurredAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.occurredAtUnixMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.occurredAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecordStripePaymentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRecordStripePaymentRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.eventId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.paymentId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.checkoutSessionId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.currency = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.paidMinorUnits = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.occurredAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RecordStripePaymentRequest {
+    return {
+      eventId: isSet(object.eventId)
+        ? globalThis.String(object.eventId)
+        : isSet(object.event_id)
+        ? globalThis.String(object.event_id)
+        : "",
+      paymentId: isSet(object.paymentId)
+        ? globalThis.String(object.paymentId)
+        : isSet(object.payment_id)
+        ? globalThis.String(object.payment_id)
+        : "",
+      checkoutSessionId: isSet(object.checkoutSessionId)
+        ? globalThis.String(object.checkoutSessionId)
+        : isSet(object.checkout_session_id)
+        ? globalThis.String(object.checkout_session_id)
+        : "",
+      currency: isSet(object.currency) ? globalThis.String(object.currency) : "",
+      paidMinorUnits: isSet(object.paidMinorUnits)
+        ? BigInt(object.paidMinorUnits)
+        : isSet(object.paid_minor_units)
+        ? BigInt(object.paid_minor_units)
+        : 0n,
+      occurredAtUnixMs: isSet(object.occurredAtUnixMs)
+        ? BigInt(object.occurredAtUnixMs)
+        : isSet(object.occurred_at_unix_ms)
+        ? BigInt(object.occurred_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: RecordStripePaymentRequest): unknown {
+    const obj: any = {};
+    if (message.eventId !== "") {
+      obj.eventId = message.eventId;
+    }
+    if (message.paymentId !== "") {
+      obj.paymentId = message.paymentId;
+    }
+    if (message.checkoutSessionId !== "") {
+      obj.checkoutSessionId = message.checkoutSessionId;
+    }
+    if (message.currency !== "") {
+      obj.currency = message.currency;
+    }
+    if (message.paidMinorUnits !== 0n) {
+      obj.paidMinorUnits = message.paidMinorUnits.toString();
+    }
+    if (message.occurredAtUnixMs !== 0n) {
+      obj.occurredAtUnixMs = message.occurredAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RecordStripePaymentRequest>, I>>(base?: I): RecordStripePaymentRequest {
+    return RecordStripePaymentRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RecordStripePaymentRequest>, I>>(object: I): RecordStripePaymentRequest {
+    const message = createBaseRecordStripePaymentRequest();
+    message.eventId = object.eventId ?? "";
+    message.paymentId = object.paymentId ?? "";
+    message.checkoutSessionId = object.checkoutSessionId ?? "";
+    message.currency = object.currency ?? "";
+    message.paidMinorUnits = (object.paidMinorUnits !== undefined && object.paidMinorUnits !== null)
+      ? BigInt(object.paidMinorUnits)
+      : 0n;
+    message.occurredAtUnixMs = (object.occurredAtUnixMs !== undefined && object.occurredAtUnixMs !== null)
+      ? BigInt(object.occurredAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseRecordStripePaymentResponse(): RecordStripePaymentResponse {
+  return { order: undefined };
+}
+
+export const RecordStripePaymentResponse: MessageFns<RecordStripePaymentResponse> = {
+  encode(message: RecordStripePaymentResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.order !== undefined) {
+      TopupOrder.encode(message.order, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RecordStripePaymentResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRecordStripePaymentResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.order = TopupOrder.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RecordStripePaymentResponse {
+    return { order: isSet(object.order) ? TopupOrder.fromJSON(object.order) : undefined };
+  },
+
+  toJSON(message: RecordStripePaymentResponse): unknown {
+    const obj: any = {};
+    if (message.order !== undefined) {
+      obj.order = TopupOrder.toJSON(message.order);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RecordStripePaymentResponse>, I>>(base?: I): RecordStripePaymentResponse {
+    return RecordStripePaymentResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RecordStripePaymentResponse>, I>>(object: I): RecordStripePaymentResponse {
+    const message = createBaseRecordStripePaymentResponse();
+    message.order = (object.order !== undefined && object.order !== null)
+      ? TopupOrder.fromPartial(object.order)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListTopupsRequest(): ListTopupsRequest {
+  return { accountId: "", page: undefined, orderId: "" };
+}
+
+export const ListTopupsRequest: MessageFns<ListTopupsRequest> = {
+  encode(message: ListTopupsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.page !== undefined) {
+      CursorPageRequest.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    if (message.orderId !== "") {
+      writer.uint32(26).string(message.orderId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTopupsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListTopupsRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageRequest.decode(reader, reader.uint32());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.orderId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListTopupsRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      page: isSet(object.page) ? CursorPageRequest.fromJSON(object.page) : undefined,
+      orderId: isSet(object.orderId)
+        ? globalThis.String(object.orderId)
+        : isSet(object.order_id)
+        ? globalThis.String(object.order_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ListTopupsRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageRequest.toJSON(message.page);
+    }
+    if (message.orderId !== "") {
+      obj.orderId = message.orderId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListTopupsRequest>, I>>(base?: I): ListTopupsRequest {
+    return ListTopupsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListTopupsRequest>, I>>(object: I): ListTopupsRequest {
+    const message = createBaseListTopupsRequest();
+    message.accountId = object.accountId ?? "";
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageRequest.fromPartial(object.page)
+      : undefined;
+    message.orderId = object.orderId ?? "";
+    return message;
+  },
+};
+
+function createBaseListTopupsResponse(): ListTopupsResponse {
+  return { topups: [], page: undefined };
+}
+
+export const ListTopupsResponse: MessageFns<ListTopupsResponse> = {
+  encode(message: ListTopupsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.topups) {
+      TopupOrder.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.page !== undefined) {
+      CursorPageResponse.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListTopupsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListTopupsResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.topups.push(TopupOrder.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListTopupsResponse {
+    return {
+      topups: globalThis.Array.isArray(object?.topups) ? object.topups.map((e: any) => TopupOrder.fromJSON(e)) : [],
+      page: isSet(object.page) ? CursorPageResponse.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListTopupsResponse): unknown {
+    const obj: any = {};
+    if (message.topups?.length) {
+      obj.topups = message.topups.map((e) => TopupOrder.toJSON(e));
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageResponse.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListTopupsResponse>, I>>(base?: I): ListTopupsResponse {
+    return ListTopupsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListTopupsResponse>, I>>(object: I): ListTopupsResponse {
+    const message = createBaseListTopupsResponse();
+    message.topups = object.topups?.map((e) => TopupOrder.fromPartial(e)) || [];
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageResponse.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseLinkedWallet(): LinkedWallet {
+  return { accountId: "", walletAddress: "", chainId: 0n, linkedAtUnixSec: 0n, siweProofRef: "" };
+}
+
+export const LinkedWallet: MessageFns<LinkedWallet> = {
+  encode(message: LinkedWallet, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.walletAddress !== "") {
+      writer.uint32(18).string(message.walletAddress);
+    }
+    if (message.chainId !== 0n) {
+      if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
+        throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.chainId);
+    }
+    if (message.linkedAtUnixSec !== 0n) {
+      if (BigInt.asIntN(64, message.linkedAtUnixSec) !== message.linkedAtUnixSec) {
+        throw new globalThis.Error("value provided for field message.linkedAtUnixSec of type int64 too large");
+      }
+      writer.uint32(32).int64(message.linkedAtUnixSec);
+    }
+    if (message.siweProofRef !== "") {
+      writer.uint32(42).string(message.siweProofRef);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LinkedWallet {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLinkedWallet();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.walletAddress = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.chainId = reader.uint64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.linkedAtUnixSec = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.siweProofRef = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LinkedWallet {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      walletAddress: isSet(object.walletAddress)
+        ? globalThis.String(object.walletAddress)
+        : isSet(object.wallet_address)
+        ? globalThis.String(object.wallet_address)
+        : "",
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : isSet(object.chain_id) ? BigInt(object.chain_id) : 0n,
+      linkedAtUnixSec: isSet(object.linkedAtUnixSec)
+        ? BigInt(object.linkedAtUnixSec)
+        : isSet(object.linked_at_unix_sec)
+        ? BigInt(object.linked_at_unix_sec)
+        : 0n,
+      siweProofRef: isSet(object.siweProofRef)
+        ? globalThis.String(object.siweProofRef)
+        : isSet(object.siwe_proof_ref)
+        ? globalThis.String(object.siwe_proof_ref)
+        : "",
+    };
+  },
+
+  toJSON(message: LinkedWallet): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.walletAddress !== "") {
+      obj.walletAddress = message.walletAddress;
+    }
+    if (message.chainId !== 0n) {
+      obj.chainId = message.chainId.toString();
+    }
+    if (message.linkedAtUnixSec !== 0n) {
+      obj.linkedAtUnixSec = message.linkedAtUnixSec.toString();
+    }
+    if (message.siweProofRef !== "") {
+      obj.siweProofRef = message.siweProofRef;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LinkedWallet>, I>>(base?: I): LinkedWallet {
+    return LinkedWallet.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LinkedWallet>, I>>(object: I): LinkedWallet {
+    const message = createBaseLinkedWallet();
+    message.accountId = object.accountId ?? "";
+    message.walletAddress = object.walletAddress ?? "";
+    message.chainId = (object.chainId !== undefined && object.chainId !== null) ? BigInt(object.chainId) : 0n;
+    message.linkedAtUnixSec = (object.linkedAtUnixSec !== undefined && object.linkedAtUnixSec !== null)
+      ? BigInt(object.linkedAtUnixSec)
+      : 0n;
+    message.siweProofRef = object.siweProofRef ?? "";
+    return message;
+  },
+};
+
+function createBaseLinkWalletRequest(): LinkWalletRequest {
+  return {
+    accountId: "",
+    walletAddress: "",
+    chainId: 0n,
+    siweMessage: "",
+    signature: Buffer.alloc(0),
+    siweProofRef: "",
+    idempotencyKey: "",
+  };
+}
+
+export const LinkWalletRequest: MessageFns<LinkWalletRequest> = {
+  encode(message: LinkWalletRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.walletAddress !== "") {
+      writer.uint32(18).string(message.walletAddress);
+    }
+    if (message.chainId !== 0n) {
+      if (BigInt.asUintN(64, message.chainId) !== message.chainId) {
+        throw new globalThis.Error("value provided for field message.chainId of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.chainId);
+    }
+    if (message.siweMessage !== "") {
+      writer.uint32(34).string(message.siweMessage);
+    }
+    if (message.signature.length !== 0) {
+      writer.uint32(42).bytes(message.signature);
+    }
+    if (message.siweProofRef !== "") {
+      writer.uint32(50).string(message.siweProofRef);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(58).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LinkWalletRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLinkWalletRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.walletAddress = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.chainId = reader.uint64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.siweMessage = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.signature = Buffer.from(reader.bytes());
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.siweProofRef = reader.string();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LinkWalletRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      walletAddress: isSet(object.walletAddress)
+        ? globalThis.String(object.walletAddress)
+        : isSet(object.wallet_address)
+        ? globalThis.String(object.wallet_address)
+        : "",
+      chainId: isSet(object.chainId) ? BigInt(object.chainId) : isSet(object.chain_id) ? BigInt(object.chain_id) : 0n,
+      siweMessage: isSet(object.siweMessage)
+        ? globalThis.String(object.siweMessage)
+        : isSet(object.siwe_message)
+        ? globalThis.String(object.siwe_message)
+        : "",
+      signature: isSet(object.signature) ? Buffer.from(bytesFromBase64(object.signature)) : Buffer.alloc(0),
+      siweProofRef: isSet(object.siweProofRef)
+        ? globalThis.String(object.siweProofRef)
+        : isSet(object.siwe_proof_ref)
+        ? globalThis.String(object.siwe_proof_ref)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: LinkWalletRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.walletAddress !== "") {
+      obj.walletAddress = message.walletAddress;
+    }
+    if (message.chainId !== 0n) {
+      obj.chainId = message.chainId.toString();
+    }
+    if (message.siweMessage !== "") {
+      obj.siweMessage = message.siweMessage;
+    }
+    if (message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    if (message.siweProofRef !== "") {
+      obj.siweProofRef = message.siweProofRef;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LinkWalletRequest>, I>>(base?: I): LinkWalletRequest {
+    return LinkWalletRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LinkWalletRequest>, I>>(object: I): LinkWalletRequest {
+    const message = createBaseLinkWalletRequest();
+    message.accountId = object.accountId ?? "";
+    message.walletAddress = object.walletAddress ?? "";
+    message.chainId = (object.chainId !== undefined && object.chainId !== null) ? BigInt(object.chainId) : 0n;
+    message.siweMessage = object.siweMessage ?? "";
+    message.signature = object.signature ?? Buffer.alloc(0);
+    message.siweProofRef = object.siweProofRef ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseLinkWalletResponse(): LinkWalletResponse {
+  return { link: undefined };
+}
+
+export const LinkWalletResponse: MessageFns<LinkWalletResponse> = {
+  encode(message: LinkWalletResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.link !== undefined) {
+      LinkedWallet.encode(message.link, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LinkWalletResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLinkWalletResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.link = LinkedWallet.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LinkWalletResponse {
+    return { link: isSet(object.link) ? LinkedWallet.fromJSON(object.link) : undefined };
+  },
+
+  toJSON(message: LinkWalletResponse): unknown {
+    const obj: any = {};
+    if (message.link !== undefined) {
+      obj.link = LinkedWallet.toJSON(message.link);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LinkWalletResponse>, I>>(base?: I): LinkWalletResponse {
+    return LinkWalletResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LinkWalletResponse>, I>>(object: I): LinkWalletResponse {
+    const message = createBaseLinkWalletResponse();
+    message.link = (object.link !== undefined && object.link !== null)
+      ? LinkedWallet.fromPartial(object.link)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetWalletLinkRequest(): GetWalletLinkRequest {
+  return { accountId: "" };
+}
+
+export const GetWalletLinkRequest: MessageFns<GetWalletLinkRequest> = {
+  encode(message: GetWalletLinkRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetWalletLinkRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetWalletLinkRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetWalletLinkRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetWalletLinkRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetWalletLinkRequest>, I>>(base?: I): GetWalletLinkRequest {
+    return GetWalletLinkRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetWalletLinkRequest>, I>>(object: I): GetWalletLinkRequest {
+    const message = createBaseGetWalletLinkRequest();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetWalletLinkResponse(): GetWalletLinkResponse {
+  return { link: undefined };
+}
+
+export const GetWalletLinkResponse: MessageFns<GetWalletLinkResponse> = {
+  encode(message: GetWalletLinkResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.link !== undefined) {
+      LinkedWallet.encode(message.link, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetWalletLinkResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetWalletLinkResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.link = LinkedWallet.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetWalletLinkResponse {
+    return { link: isSet(object.link) ? LinkedWallet.fromJSON(object.link) : undefined };
+  },
+
+  toJSON(message: GetWalletLinkResponse): unknown {
+    const obj: any = {};
+    if (message.link !== undefined) {
+      obj.link = LinkedWallet.toJSON(message.link);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetWalletLinkResponse>, I>>(base?: I): GetWalletLinkResponse {
+    return GetWalletLinkResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetWalletLinkResponse>, I>>(object: I): GetWalletLinkResponse {
+    const message = createBaseGetWalletLinkResponse();
+    message.link = (object.link !== undefined && object.link !== null)
+      ? LinkedWallet.fromPartial(object.link)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseAcceptFundedTermRequest(): AcceptFundedTermRequest {
+  return { accountId: "", termId: "", termsVersion: "", idempotencyKey: "" };
+}
+
+export const AcceptFundedTermRequest: MessageFns<AcceptFundedTermRequest> = {
+  encode(message: AcceptFundedTermRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.termId !== "") {
+      writer.uint32(18).string(message.termId);
+    }
+    if (message.termsVersion !== "") {
+      writer.uint32(26).string(message.termsVersion);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(34).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AcceptFundedTermRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAcceptFundedTermRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.termsVersion = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AcceptFundedTermRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+      termsVersion: isSet(object.termsVersion)
+        ? globalThis.String(object.termsVersion)
+        : isSet(object.terms_version)
+        ? globalThis.String(object.terms_version)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: AcceptFundedTermRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    if (message.termsVersion !== "") {
+      obj.termsVersion = message.termsVersion;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AcceptFundedTermRequest>, I>>(base?: I): AcceptFundedTermRequest {
+    return AcceptFundedTermRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AcceptFundedTermRequest>, I>>(object: I): AcceptFundedTermRequest {
+    const message = createBaseAcceptFundedTermRequest();
+    message.accountId = object.accountId ?? "";
+    message.termId = object.termId ?? "";
+    message.termsVersion = object.termsVersion ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseAcceptFundedTermResponse(): AcceptFundedTermResponse {
+  return { acceptance: undefined };
+}
+
+export const AcceptFundedTermResponse: MessageFns<AcceptFundedTermResponse> = {
+  encode(message: AcceptFundedTermResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.acceptance !== undefined) {
+      TermAcceptance.encode(message.acceptance, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AcceptFundedTermResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAcceptFundedTermResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.acceptance = TermAcceptance.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AcceptFundedTermResponse {
+    return { acceptance: isSet(object.acceptance) ? TermAcceptance.fromJSON(object.acceptance) : undefined };
+  },
+
+  toJSON(message: AcceptFundedTermResponse): unknown {
+    const obj: any = {};
+    if (message.acceptance !== undefined) {
+      obj.acceptance = TermAcceptance.toJSON(message.acceptance);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AcceptFundedTermResponse>, I>>(base?: I): AcceptFundedTermResponse {
+    return AcceptFundedTermResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AcceptFundedTermResponse>, I>>(object: I): AcceptFundedTermResponse {
+    const message = createBaseAcceptFundedTermResponse();
+    message.acceptance = (object.acceptance !== undefined && object.acceptance !== null)
+      ? TermAcceptance.fromPartial(object.acceptance)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetCurrentFundedTermRequest(): GetCurrentFundedTermRequest {
+  return { accountId: "" };
+}
+
+export const GetCurrentFundedTermRequest: MessageFns<GetCurrentFundedTermRequest> = {
+  encode(message: GetCurrentFundedTermRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCurrentFundedTermRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetCurrentFundedTermRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetCurrentFundedTermRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetCurrentFundedTermRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetCurrentFundedTermRequest>, I>>(base?: I): GetCurrentFundedTermRequest {
+    return GetCurrentFundedTermRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetCurrentFundedTermRequest>, I>>(object: I): GetCurrentFundedTermRequest {
+    const message = createBaseGetCurrentFundedTermRequest();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetCurrentFundedTermResponse(): GetCurrentFundedTermResponse {
+  return { currentTerm: undefined, acceptance: undefined };
+}
+
+export const GetCurrentFundedTermResponse: MessageFns<GetCurrentFundedTermResponse> = {
+  encode(message: GetCurrentFundedTermResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.currentTerm !== undefined) {
+      FundedTermConfig.encode(message.currentTerm, writer.uint32(10).fork()).join();
+    }
+    if (message.acceptance !== undefined) {
+      TermAcceptance.encode(message.acceptance, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetCurrentFundedTermResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetCurrentFundedTermResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.currentTerm = FundedTermConfig.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.acceptance = TermAcceptance.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetCurrentFundedTermResponse {
+    return {
+      currentTerm: isSet(object.currentTerm)
+        ? FundedTermConfig.fromJSON(object.currentTerm)
+        : isSet(object.current_term)
+        ? FundedTermConfig.fromJSON(object.current_term)
+        : undefined,
+      acceptance: isSet(object.acceptance) ? TermAcceptance.fromJSON(object.acceptance) : undefined,
+    };
+  },
+
+  toJSON(message: GetCurrentFundedTermResponse): unknown {
+    const obj: any = {};
+    if (message.currentTerm !== undefined) {
+      obj.currentTerm = FundedTermConfig.toJSON(message.currentTerm);
+    }
+    if (message.acceptance !== undefined) {
+      obj.acceptance = TermAcceptance.toJSON(message.acceptance);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetCurrentFundedTermResponse>, I>>(base?: I): GetCurrentFundedTermResponse {
+    return GetCurrentFundedTermResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetCurrentFundedTermResponse>, I>>(object: I): GetCurrentFundedTermResponse {
+    const message = createBaseGetCurrentFundedTermResponse();
+    message.currentTerm = (object.currentTerm !== undefined && object.currentTerm !== null)
+      ? FundedTermConfig.fromPartial(object.currentTerm)
+      : undefined;
+    message.acceptance = (object.acceptance !== undefined && object.acceptance !== null)
+      ? TermAcceptance.fromPartial(object.acceptance)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePrepareAccountMergeRequest(): PrepareAccountMergeRequest {
+  return { accountId: "", sourceAccountId: "", idempotencyKey: "", verifiedSourceProofRef: "" };
+}
+
+export const PrepareAccountMergeRequest: MessageFns<PrepareAccountMergeRequest> = {
+  encode(message: PrepareAccountMergeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.sourceAccountId !== "") {
+      writer.uint32(18).string(message.sourceAccountId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    if (message.verifiedSourceProofRef !== "") {
+      writer.uint32(34).string(message.verifiedSourceProofRef);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PrepareAccountMergeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePrepareAccountMergeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.sourceAccountId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.verifiedSourceProofRef = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PrepareAccountMergeRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      sourceAccountId: isSet(object.sourceAccountId)
+        ? globalThis.String(object.sourceAccountId)
+        : isSet(object.source_account_id)
+        ? globalThis.String(object.source_account_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      verifiedSourceProofRef: isSet(object.verifiedSourceProofRef)
+        ? globalThis.String(object.verifiedSourceProofRef)
+        : isSet(object.verified_source_proof_ref)
+        ? globalThis.String(object.verified_source_proof_ref)
+        : "",
+    };
+  },
+
+  toJSON(message: PrepareAccountMergeRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.sourceAccountId !== "") {
+      obj.sourceAccountId = message.sourceAccountId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.verifiedSourceProofRef !== "") {
+      obj.verifiedSourceProofRef = message.verifiedSourceProofRef;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PrepareAccountMergeRequest>, I>>(base?: I): PrepareAccountMergeRequest {
+    return PrepareAccountMergeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PrepareAccountMergeRequest>, I>>(object: I): PrepareAccountMergeRequest {
+    const message = createBasePrepareAccountMergeRequest();
+    message.accountId = object.accountId ?? "";
+    message.sourceAccountId = object.sourceAccountId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.verifiedSourceProofRef = object.verifiedSourceProofRef ?? "";
+    return message;
+  },
+};
+
+function createBasePrepareAccountMergeResponse(): PrepareAccountMergeResponse {
+  return { mergeId: "", blockers: [], expiresAtUnixMs: 0n };
+}
+
+export const PrepareAccountMergeResponse: MessageFns<PrepareAccountMergeResponse> = {
+  encode(message: PrepareAccountMergeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mergeId !== "") {
+      writer.uint32(10).string(message.mergeId);
+    }
+    for (const v of message.blockers) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.expiresAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.expiresAtUnixMs) !== message.expiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.expiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(24).int64(message.expiresAtUnixMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PrepareAccountMergeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePrepareAccountMergeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.mergeId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.blockers.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.expiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PrepareAccountMergeResponse {
+    return {
+      mergeId: isSet(object.mergeId)
+        ? globalThis.String(object.mergeId)
+        : isSet(object.merge_id)
+        ? globalThis.String(object.merge_id)
+        : "",
+      blockers: globalThis.Array.isArray(object?.blockers) ? object.blockers.map((e: any) => globalThis.String(e)) : [],
+      expiresAtUnixMs: isSet(object.expiresAtUnixMs)
+        ? BigInt(object.expiresAtUnixMs)
+        : isSet(object.expires_at_unix_ms)
+        ? BigInt(object.expires_at_unix_ms)
+        : 0n,
+    };
+  },
+
+  toJSON(message: PrepareAccountMergeResponse): unknown {
+    const obj: any = {};
+    if (message.mergeId !== "") {
+      obj.mergeId = message.mergeId;
+    }
+    if (message.blockers?.length) {
+      obj.blockers = message.blockers;
+    }
+    if (message.expiresAtUnixMs !== 0n) {
+      obj.expiresAtUnixMs = message.expiresAtUnixMs.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PrepareAccountMergeResponse>, I>>(base?: I): PrepareAccountMergeResponse {
+    return PrepareAccountMergeResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PrepareAccountMergeResponse>, I>>(object: I): PrepareAccountMergeResponse {
+    const message = createBasePrepareAccountMergeResponse();
+    message.mergeId = object.mergeId ?? "";
+    message.blockers = object.blockers?.map((e) => e) || [];
+    message.expiresAtUnixMs = (object.expiresAtUnixMs !== undefined && object.expiresAtUnixMs !== null)
+      ? BigInt(object.expiresAtUnixMs)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseCommitAccountMergeRequest(): CommitAccountMergeRequest {
+  return { accountId: "", mergeId: "", idempotencyKey: "" };
+}
+
+export const CommitAccountMergeRequest: MessageFns<CommitAccountMergeRequest> = {
+  encode(message: CommitAccountMergeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.mergeId !== "") {
+      writer.uint32(18).string(message.mergeId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CommitAccountMergeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCommitAccountMergeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.mergeId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CommitAccountMergeRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      mergeId: isSet(object.mergeId)
+        ? globalThis.String(object.mergeId)
+        : isSet(object.merge_id)
+        ? globalThis.String(object.merge_id)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: CommitAccountMergeRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.mergeId !== "") {
+      obj.mergeId = message.mergeId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CommitAccountMergeRequest>, I>>(base?: I): CommitAccountMergeRequest {
+    return CommitAccountMergeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CommitAccountMergeRequest>, I>>(object: I): CommitAccountMergeRequest {
+    const message = createBaseCommitAccountMergeRequest();
+    message.accountId = object.accountId ?? "";
+    message.mergeId = object.mergeId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseCommitAccountMergeResponse(): CommitAccountMergeResponse {
+  return { status: "" };
+}
+
+export const CommitAccountMergeResponse: MessageFns<CommitAccountMergeResponse> = {
+  encode(message: CommitAccountMergeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== "") {
+      writer.uint32(10).string(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CommitAccountMergeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCommitAccountMergeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CommitAccountMergeResponse {
+    return { status: isSet(object.status) ? globalThis.String(object.status) : "" };
+  },
+
+  toJSON(message: CommitAccountMergeResponse): unknown {
+    const obj: any = {};
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CommitAccountMergeResponse>, I>>(base?: I): CommitAccountMergeResponse {
+    return CommitAccountMergeResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CommitAccountMergeResponse>, I>>(object: I): CommitAccountMergeResponse {
+    const message = createBaseCommitAccountMergeResponse();
+    message.status = object.status ?? "";
+    return message;
+  },
+};
+
+function createBaseAccountUsage(): AccountUsage {
+  return {
+    requestId: "",
+    apiKeyId: "",
+    modelId: "",
+    selectedOfferingId: "",
+    servingOfferingId: "",
+    fallbackUsed: false,
+    fallbackReason: "",
+    createdAtUnixMs: 0n,
+    status: "",
+    acceptedHardMaxMicroUsd: 0n,
+    settledBuckets: [],
+    usage: undefined,
+  };
+}
+
+export const AccountUsage: MessageFns<AccountUsage> = {
+  encode(message: AccountUsage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.apiKeyId !== "") {
+      writer.uint32(18).string(message.apiKeyId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(26).string(message.modelId);
+    }
+    if (message.selectedOfferingId !== "") {
+      writer.uint32(34).string(message.selectedOfferingId);
+    }
+    if (message.servingOfferingId !== "") {
+      writer.uint32(42).string(message.servingOfferingId);
+    }
+    if (message.fallbackUsed !== false) {
+      writer.uint32(48).bool(message.fallbackUsed);
+    }
+    if (message.fallbackReason !== "") {
+      writer.uint32(58).string(message.fallbackReason);
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.createdAtUnixMs) !== message.createdAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.createdAtUnixMs of type int64 too large");
+      }
+      writer.uint32(64).int64(message.createdAtUnixMs);
+    }
+    if (message.status !== "") {
+      writer.uint32(74).string(message.status);
+    }
+    if (message.acceptedHardMaxMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.acceptedHardMaxMicroUsd) !== message.acceptedHardMaxMicroUsd) {
+        throw new globalThis.Error("value provided for field message.acceptedHardMaxMicroUsd of type int64 too large");
+      }
+      writer.uint32(80).int64(message.acceptedHardMaxMicroUsd);
+    }
+    for (const v of message.settledBuckets) {
+      BucketAllocationLine.encode(v!, writer.uint32(90).fork()).join();
+    }
+    if (message.usage !== undefined) {
+      UsageBound.encode(message.usage, writer.uint32(98).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AccountUsage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAccountUsage();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.modelId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.selectedOfferingId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.servingOfferingId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.fallbackUsed = reader.bool();
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.fallbackReason = reader.string();
+            continue;
+          }
+          case 8: {
+            if (tag !== 64) {
+              break;
+            }
+
+            message.createdAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 9: {
+            if (tag !== 74) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.acceptedHardMaxMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 11: {
+            if (tag !== 90) {
+              break;
+            }
+
+            message.settledBuckets.push(BucketAllocationLine.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 12: {
+            if (tag !== 98) {
+              break;
+            }
+
+            message.usage = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AccountUsage {
+    return {
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : "",
+      selectedOfferingId: isSet(object.selectedOfferingId)
+        ? globalThis.String(object.selectedOfferingId)
+        : isSet(object.selected_offering_id)
+        ? globalThis.String(object.selected_offering_id)
+        : "",
+      servingOfferingId: isSet(object.servingOfferingId)
+        ? globalThis.String(object.servingOfferingId)
+        : isSet(object.serving_offering_id)
+        ? globalThis.String(object.serving_offering_id)
+        : "",
+      fallbackUsed: isSet(object.fallbackUsed)
+        ? globalThis.Boolean(object.fallbackUsed)
+        : isSet(object.fallback_used)
+        ? globalThis.Boolean(object.fallback_used)
+        : false,
+      fallbackReason: isSet(object.fallbackReason)
+        ? globalThis.String(object.fallbackReason)
+        : isSet(object.fallback_reason)
+        ? globalThis.String(object.fallback_reason)
+        : "",
+      createdAtUnixMs: isSet(object.createdAtUnixMs)
+        ? BigInt(object.createdAtUnixMs)
+        : isSet(object.created_at_unix_ms)
+        ? BigInt(object.created_at_unix_ms)
+        : 0n,
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+      acceptedHardMaxMicroUsd: isSet(object.acceptedHardMaxMicroUsd)
+        ? BigInt(object.acceptedHardMaxMicroUsd)
+        : isSet(object.accepted_hard_max_micro_usd)
+        ? BigInt(object.accepted_hard_max_micro_usd)
+        : 0n,
+      settledBuckets: globalThis.Array.isArray(object?.settledBuckets)
+        ? object.settledBuckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : globalThis.Array.isArray(object?.settled_buckets)
+        ? object.settled_buckets.map((e: any) => BucketAllocationLine.fromJSON(e))
+        : [],
+      usage: isSet(object.usage) ? UsageBound.fromJSON(object.usage) : undefined,
+    };
+  },
+
+  toJSON(message: AccountUsage): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.selectedOfferingId !== "") {
+      obj.selectedOfferingId = message.selectedOfferingId;
+    }
+    if (message.servingOfferingId !== "") {
+      obj.servingOfferingId = message.servingOfferingId;
+    }
+    if (message.fallbackUsed !== false) {
+      obj.fallbackUsed = message.fallbackUsed;
+    }
+    if (message.fallbackReason !== "") {
+      obj.fallbackReason = message.fallbackReason;
+    }
+    if (message.createdAtUnixMs !== 0n) {
+      obj.createdAtUnixMs = message.createdAtUnixMs.toString();
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    if (message.acceptedHardMaxMicroUsd !== 0n) {
+      obj.acceptedHardMaxMicroUsd = message.acceptedHardMaxMicroUsd.toString();
+    }
+    if (message.settledBuckets?.length) {
+      obj.settledBuckets = message.settledBuckets.map((e) => BucketAllocationLine.toJSON(e));
+    }
+    if (message.usage !== undefined) {
+      obj.usage = UsageBound.toJSON(message.usage);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AccountUsage>, I>>(base?: I): AccountUsage {
+    return AccountUsage.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AccountUsage>, I>>(object: I): AccountUsage {
+    const message = createBaseAccountUsage();
+    message.requestId = object.requestId ?? "";
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.selectedOfferingId = object.selectedOfferingId ?? "";
+    message.servingOfferingId = object.servingOfferingId ?? "";
+    message.fallbackUsed = object.fallbackUsed ?? false;
+    message.fallbackReason = object.fallbackReason ?? "";
+    message.createdAtUnixMs = (object.createdAtUnixMs !== undefined && object.createdAtUnixMs !== null)
+      ? BigInt(object.createdAtUnixMs)
+      : 0n;
+    message.status = object.status ?? "";
+    message.acceptedHardMaxMicroUsd =
+      (object.acceptedHardMaxMicroUsd !== undefined && object.acceptedHardMaxMicroUsd !== null)
+        ? BigInt(object.acceptedHardMaxMicroUsd)
+        : 0n;
+    message.settledBuckets = object.settledBuckets?.map((e) => BucketAllocationLine.fromPartial(e)) || [];
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? UsageBound.fromPartial(object.usage)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListUsageRequest(): ListUsageRequest {
+  return { accountId: "", page: undefined, apiKeyId: "", sinceUnixMs: 0n, untilUnixMs: 0n, modelId: "" };
+}
+
+export const ListUsageRequest: MessageFns<ListUsageRequest> = {
+  encode(message: ListUsageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.page !== undefined) {
+      CursorPageRequest.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    if (message.apiKeyId !== "") {
+      writer.uint32(26).string(message.apiKeyId);
+    }
+    if (message.sinceUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.sinceUnixMs) !== message.sinceUnixMs) {
+        throw new globalThis.Error("value provided for field message.sinceUnixMs of type int64 too large");
+      }
+      writer.uint32(32).int64(message.sinceUnixMs);
+    }
+    if (message.untilUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.untilUnixMs) !== message.untilUnixMs) {
+        throw new globalThis.Error("value provided for field message.untilUnixMs of type int64 too large");
+      }
+      writer.uint32(40).int64(message.untilUnixMs);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(50).string(message.modelId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListUsageRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListUsageRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageRequest.decode(reader, reader.uint32());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.apiKeyId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.sinceUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.untilUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.modelId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListUsageRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      page: isSet(object.page) ? CursorPageRequest.fromJSON(object.page) : undefined,
+      apiKeyId: isSet(object.apiKeyId)
+        ? globalThis.String(object.apiKeyId)
+        : isSet(object.api_key_id)
+        ? globalThis.String(object.api_key_id)
+        : "",
+      sinceUnixMs: isSet(object.sinceUnixMs)
+        ? BigInt(object.sinceUnixMs)
+        : isSet(object.since_unix_ms)
+        ? BigInt(object.since_unix_ms)
+        : 0n,
+      untilUnixMs: isSet(object.untilUnixMs)
+        ? BigInt(object.untilUnixMs)
+        : isSet(object.until_unix_ms)
+        ? BigInt(object.until_unix_ms)
+        : 0n,
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ListUsageRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageRequest.toJSON(message.page);
+    }
+    if (message.apiKeyId !== "") {
+      obj.apiKeyId = message.apiKeyId;
+    }
+    if (message.sinceUnixMs !== 0n) {
+      obj.sinceUnixMs = message.sinceUnixMs.toString();
+    }
+    if (message.untilUnixMs !== 0n) {
+      obj.untilUnixMs = message.untilUnixMs.toString();
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListUsageRequest>, I>>(base?: I): ListUsageRequest {
+    return ListUsageRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListUsageRequest>, I>>(object: I): ListUsageRequest {
+    const message = createBaseListUsageRequest();
+    message.accountId = object.accountId ?? "";
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageRequest.fromPartial(object.page)
+      : undefined;
+    message.apiKeyId = object.apiKeyId ?? "";
+    message.sinceUnixMs = (object.sinceUnixMs !== undefined && object.sinceUnixMs !== null)
+      ? BigInt(object.sinceUnixMs)
+      : 0n;
+    message.untilUnixMs = (object.untilUnixMs !== undefined && object.untilUnixMs !== null)
+      ? BigInt(object.untilUnixMs)
+      : 0n;
+    message.modelId = object.modelId ?? "";
+    return message;
+  },
+};
+
+function createBaseListUsageResponse(): ListUsageResponse {
+  return { records: [], page: undefined };
+}
+
+export const ListUsageResponse: MessageFns<ListUsageResponse> = {
+  encode(message: ListUsageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.records) {
+      AccountUsage.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.page !== undefined) {
+      CursorPageResponse.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListUsageResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListUsageResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.records.push(AccountUsage.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListUsageResponse {
+    return {
+      records: globalThis.Array.isArray(object?.records)
+        ? object.records.map((e: any) => AccountUsage.fromJSON(e))
+        : [],
+      page: isSet(object.page) ? CursorPageResponse.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListUsageResponse): unknown {
+    const obj: any = {};
+    if (message.records?.length) {
+      obj.records = message.records.map((e) => AccountUsage.toJSON(e));
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageResponse.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListUsageResponse>, I>>(base?: I): ListUsageResponse {
+    return ListUsageResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListUsageResponse>, I>>(object: I): ListUsageResponse {
+    const message = createBaseListUsageResponse();
+    message.records = object.records?.map((e) => AccountUsage.fromPartial(e)) || [];
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageResponse.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetUsageDetailRequest(): GetUsageDetailRequest {
+  return { accountId: "", requestId: "" };
+}
+
+export const GetUsageDetailRequest: MessageFns<GetUsageDetailRequest> = {
+  encode(message: GetUsageDetailRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(18).string(message.requestId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUsageDetailRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetUsageDetailRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetUsageDetailRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetUsageDetailRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetUsageDetailRequest>, I>>(base?: I): GetUsageDetailRequest {
+    return GetUsageDetailRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetUsageDetailRequest>, I>>(object: I): GetUsageDetailRequest {
+    const message = createBaseGetUsageDetailRequest();
+    message.accountId = object.accountId ?? "";
+    message.requestId = object.requestId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetUsageDetailResponse(): GetUsageDetailResponse {
+  return { usage: undefined };
+}
+
+export const GetUsageDetailResponse: MessageFns<GetUsageDetailResponse> = {
+  encode(message: GetUsageDetailResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.usage !== undefined) {
+      AccountUsage.encode(message.usage, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetUsageDetailResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetUsageDetailResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.usage = AccountUsage.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetUsageDetailResponse {
+    return { usage: isSet(object.usage) ? AccountUsage.fromJSON(object.usage) : undefined };
+  },
+
+  toJSON(message: GetUsageDetailResponse): unknown {
+    const obj: any = {};
+    if (message.usage !== undefined) {
+      obj.usage = AccountUsage.toJSON(message.usage);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetUsageDetailResponse>, I>>(base?: I): GetUsageDetailResponse {
+    return GetUsageDetailResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetUsageDetailResponse>, I>>(object: I): GetUsageDetailResponse {
+    const message = createBaseGetUsageDetailResponse();
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? AccountUsage.fromPartial(object.usage)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseAccountNotice(): AccountNotice {
+  return { noticeId: "", kind: "", issuedAtUnixMs: 0n, readAtUnixMs: 0n, fromPlanVersionId: "", toPlanVersionId: "" };
+}
+
+export const AccountNotice: MessageFns<AccountNotice> = {
+  encode(message: AccountNotice, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.noticeId !== "") {
+      writer.uint32(10).string(message.noticeId);
+    }
+    if (message.kind !== "") {
+      writer.uint32(18).string(message.kind);
+    }
+    if (message.issuedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.issuedAtUnixMs) !== message.issuedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.issuedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(24).int64(message.issuedAtUnixMs);
+    }
+    if (message.readAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.readAtUnixMs) !== message.readAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.readAtUnixMs of type int64 too large");
+      }
+      writer.uint32(32).int64(message.readAtUnixMs);
+    }
+    if (message.fromPlanVersionId !== "") {
+      writer.uint32(42).string(message.fromPlanVersionId);
+    }
+    if (message.toPlanVersionId !== "") {
+      writer.uint32(50).string(message.toPlanVersionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AccountNotice {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAccountNotice();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.noticeId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.kind = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.issuedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.readAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.fromPlanVersionId = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.toPlanVersionId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AccountNotice {
+    return {
+      noticeId: isSet(object.noticeId)
+        ? globalThis.String(object.noticeId)
+        : isSet(object.notice_id)
+        ? globalThis.String(object.notice_id)
+        : "",
+      kind: isSet(object.kind) ? globalThis.String(object.kind) : "",
+      issuedAtUnixMs: isSet(object.issuedAtUnixMs)
+        ? BigInt(object.issuedAtUnixMs)
+        : isSet(object.issued_at_unix_ms)
+        ? BigInt(object.issued_at_unix_ms)
+        : 0n,
+      readAtUnixMs: isSet(object.readAtUnixMs)
+        ? BigInt(object.readAtUnixMs)
+        : isSet(object.read_at_unix_ms)
+        ? BigInt(object.read_at_unix_ms)
+        : 0n,
+      fromPlanVersionId: isSet(object.fromPlanVersionId)
+        ? globalThis.String(object.fromPlanVersionId)
+        : isSet(object.from_plan_version_id)
+        ? globalThis.String(object.from_plan_version_id)
+        : "",
+      toPlanVersionId: isSet(object.toPlanVersionId)
+        ? globalThis.String(object.toPlanVersionId)
+        : isSet(object.to_plan_version_id)
+        ? globalThis.String(object.to_plan_version_id)
+        : "",
+    };
+  },
+
+  toJSON(message: AccountNotice): unknown {
+    const obj: any = {};
+    if (message.noticeId !== "") {
+      obj.noticeId = message.noticeId;
+    }
+    if (message.kind !== "") {
+      obj.kind = message.kind;
+    }
+    if (message.issuedAtUnixMs !== 0n) {
+      obj.issuedAtUnixMs = message.issuedAtUnixMs.toString();
+    }
+    if (message.readAtUnixMs !== 0n) {
+      obj.readAtUnixMs = message.readAtUnixMs.toString();
+    }
+    if (message.fromPlanVersionId !== "") {
+      obj.fromPlanVersionId = message.fromPlanVersionId;
+    }
+    if (message.toPlanVersionId !== "") {
+      obj.toPlanVersionId = message.toPlanVersionId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AccountNotice>, I>>(base?: I): AccountNotice {
+    return AccountNotice.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AccountNotice>, I>>(object: I): AccountNotice {
+    const message = createBaseAccountNotice();
+    message.noticeId = object.noticeId ?? "";
+    message.kind = object.kind ?? "";
+    message.issuedAtUnixMs = (object.issuedAtUnixMs !== undefined && object.issuedAtUnixMs !== null)
+      ? BigInt(object.issuedAtUnixMs)
+      : 0n;
+    message.readAtUnixMs = (object.readAtUnixMs !== undefined && object.readAtUnixMs !== null)
+      ? BigInt(object.readAtUnixMs)
+      : 0n;
+    message.fromPlanVersionId = object.fromPlanVersionId ?? "";
+    message.toPlanVersionId = object.toPlanVersionId ?? "";
+    return message;
+  },
+};
+
+function createBaseListAccountNoticesRequest(): ListAccountNoticesRequest {
+  return { accountId: "", page: undefined };
+}
+
+export const ListAccountNoticesRequest: MessageFns<ListAccountNoticesRequest> = {
+  encode(message: ListAccountNoticesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.page !== undefined) {
+      CursorPageRequest.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListAccountNoticesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListAccountNoticesRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageRequest.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListAccountNoticesRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      page: isSet(object.page) ? CursorPageRequest.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListAccountNoticesRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageRequest.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListAccountNoticesRequest>, I>>(base?: I): ListAccountNoticesRequest {
+    return ListAccountNoticesRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListAccountNoticesRequest>, I>>(object: I): ListAccountNoticesRequest {
+    const message = createBaseListAccountNoticesRequest();
+    message.accountId = object.accountId ?? "";
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageRequest.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseListAccountNoticesResponse(): ListAccountNoticesResponse {
+  return { notices: [], page: undefined };
+}
+
+export const ListAccountNoticesResponse: MessageFns<ListAccountNoticesResponse> = {
+  encode(message: ListAccountNoticesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.notices) {
+      AccountNotice.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.page !== undefined) {
+      CursorPageResponse.encode(message.page, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListAccountNoticesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseListAccountNoticesResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.notices.push(AccountNotice.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.page = CursorPageResponse.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ListAccountNoticesResponse {
+    return {
+      notices: globalThis.Array.isArray(object?.notices)
+        ? object.notices.map((e: any) => AccountNotice.fromJSON(e))
+        : [],
+      page: isSet(object.page) ? CursorPageResponse.fromJSON(object.page) : undefined,
+    };
+  },
+
+  toJSON(message: ListAccountNoticesResponse): unknown {
+    const obj: any = {};
+    if (message.notices?.length) {
+      obj.notices = message.notices.map((e) => AccountNotice.toJSON(e));
+    }
+    if (message.page !== undefined) {
+      obj.page = CursorPageResponse.toJSON(message.page);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ListAccountNoticesResponse>, I>>(base?: I): ListAccountNoticesResponse {
+    return ListAccountNoticesResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ListAccountNoticesResponse>, I>>(object: I): ListAccountNoticesResponse {
+    const message = createBaseListAccountNoticesResponse();
+    message.notices = object.notices?.map((e) => AccountNotice.fromPartial(e)) || [];
+    message.page = (object.page !== undefined && object.page !== null)
+      ? CursorPageResponse.fromPartial(object.page)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseAckAccountNoticeRequest(): AckAccountNoticeRequest {
+  return { accountId: "", noticeId: "" };
+}
+
+export const AckAccountNoticeRequest: MessageFns<AckAccountNoticeRequest> = {
+  encode(message: AckAccountNoticeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.noticeId !== "") {
+      writer.uint32(18).string(message.noticeId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AckAccountNoticeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAckAccountNoticeRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.noticeId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AckAccountNoticeRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      noticeId: isSet(object.noticeId)
+        ? globalThis.String(object.noticeId)
+        : isSet(object.notice_id)
+        ? globalThis.String(object.notice_id)
+        : "",
+    };
+  },
+
+  toJSON(message: AckAccountNoticeRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.noticeId !== "") {
+      obj.noticeId = message.noticeId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AckAccountNoticeRequest>, I>>(base?: I): AckAccountNoticeRequest {
+    return AckAccountNoticeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AckAccountNoticeRequest>, I>>(object: I): AckAccountNoticeRequest {
+    const message = createBaseAckAccountNoticeRequest();
+    message.accountId = object.accountId ?? "";
+    message.noticeId = object.noticeId ?? "";
+    return message;
+  },
+};
+
+function createBaseAckAccountNoticeResponse(): AckAccountNoticeResponse {
+  return { notice: undefined };
+}
+
+export const AckAccountNoticeResponse: MessageFns<AckAccountNoticeResponse> = {
+  encode(message: AckAccountNoticeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.notice !== undefined) {
+      AccountNotice.encode(message.notice, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AckAccountNoticeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAckAccountNoticeResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.notice = AccountNotice.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AckAccountNoticeResponse {
+    return { notice: isSet(object.notice) ? AccountNotice.fromJSON(object.notice) : undefined };
+  },
+
+  toJSON(message: AckAccountNoticeResponse): unknown {
+    const obj: any = {};
+    if (message.notice !== undefined) {
+      obj.notice = AccountNotice.toJSON(message.notice);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AckAccountNoticeResponse>, I>>(base?: I): AckAccountNoticeResponse {
+    return AckAccountNoticeResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AckAccountNoticeResponse>, I>>(object: I): AckAccountNoticeResponse {
+    const message = createBaseAckAccountNoticeResponse();
+    message.notice = (object.notice !== undefined && object.notice !== null)
+      ? AccountNotice.fromPartial(object.notice)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseGetReferralSummaryRequest(): GetReferralSummaryRequest {
+  return { accountId: "" };
+}
+
+export const GetReferralSummaryRequest: MessageFns<GetReferralSummaryRequest> = {
+  encode(message: GetReferralSummaryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetReferralSummaryRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetReferralSummaryRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetReferralSummaryRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+    };
+  },
+
+  toJSON(message: GetReferralSummaryRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetReferralSummaryRequest>, I>>(base?: I): GetReferralSummaryRequest {
+    return GetReferralSummaryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetReferralSummaryRequest>, I>>(object: I): GetReferralSummaryRequest {
+    const message = createBaseGetReferralSummaryRequest();
+    message.accountId = object.accountId ?? "";
+    return message;
+  },
+};
+
+function createBaseGetReferralSummaryResponse(): GetReferralSummaryResponse {
+  return { referralCode: "", rewardedCredits: 0n, availableCredits: 0n, referredAccounts: 0n };
+}
+
+export const GetReferralSummaryResponse: MessageFns<GetReferralSummaryResponse> = {
+  encode(message: GetReferralSummaryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.referralCode !== "") {
+      writer.uint32(10).string(message.referralCode);
+    }
+    if (message.rewardedCredits !== 0n) {
+      if (BigInt.asIntN(64, message.rewardedCredits) !== message.rewardedCredits) {
+        throw new globalThis.Error("value provided for field message.rewardedCredits of type int64 too large");
+      }
+      writer.uint32(16).int64(message.rewardedCredits);
+    }
+    if (message.availableCredits !== 0n) {
+      if (BigInt.asIntN(64, message.availableCredits) !== message.availableCredits) {
+        throw new globalThis.Error("value provided for field message.availableCredits of type int64 too large");
+      }
+      writer.uint32(24).int64(message.availableCredits);
+    }
+    if (message.referredAccounts !== 0n) {
+      if (BigInt.asIntN(64, message.referredAccounts) !== message.referredAccounts) {
+        throw new globalThis.Error("value provided for field message.referredAccounts of type int64 too large");
+      }
+      writer.uint32(32).int64(message.referredAccounts);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetReferralSummaryResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetReferralSummaryResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.referralCode = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.rewardedCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.availableCredits = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.referredAccounts = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetReferralSummaryResponse {
+    return {
+      referralCode: isSet(object.referralCode)
+        ? globalThis.String(object.referralCode)
+        : isSet(object.referral_code)
+        ? globalThis.String(object.referral_code)
+        : "",
+      rewardedCredits: isSet(object.rewardedCredits)
+        ? BigInt(object.rewardedCredits)
+        : isSet(object.rewarded_credits)
+        ? BigInt(object.rewarded_credits)
+        : 0n,
+      availableCredits: isSet(object.availableCredits)
+        ? BigInt(object.availableCredits)
+        : isSet(object.available_credits)
+        ? BigInt(object.available_credits)
+        : 0n,
+      referredAccounts: isSet(object.referredAccounts)
+        ? BigInt(object.referredAccounts)
+        : isSet(object.referred_accounts)
+        ? BigInt(object.referred_accounts)
+        : 0n,
+    };
+  },
+
+  toJSON(message: GetReferralSummaryResponse): unknown {
+    const obj: any = {};
+    if (message.referralCode !== "") {
+      obj.referralCode = message.referralCode;
+    }
+    if (message.rewardedCredits !== 0n) {
+      obj.rewardedCredits = message.rewardedCredits.toString();
+    }
+    if (message.availableCredits !== 0n) {
+      obj.availableCredits = message.availableCredits.toString();
+    }
+    if (message.referredAccounts !== 0n) {
+      obj.referredAccounts = message.referredAccounts.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetReferralSummaryResponse>, I>>(base?: I): GetReferralSummaryResponse {
+    return GetReferralSummaryResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetReferralSummaryResponse>, I>>(object: I): GetReferralSummaryResponse {
+    const message = createBaseGetReferralSummaryResponse();
+    message.referralCode = object.referralCode ?? "";
+    message.rewardedCredits = (object.rewardedCredits !== undefined && object.rewardedCredits !== null)
+      ? BigInt(object.rewardedCredits)
+      : 0n;
+    message.availableCredits = (object.availableCredits !== undefined && object.availableCredits !== null)
+      ? BigInt(object.availableCredits)
+      : 0n;
+    message.referredAccounts = (object.referredAccounts !== undefined && object.referredAccounts !== null)
+      ? BigInt(object.referredAccounts)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseSetReferralAttributionRequest(): SetReferralAttributionRequest {
+  return { accountId: "", referralCode: "", idempotencyKey: "" };
+}
+
+export const SetReferralAttributionRequest: MessageFns<SetReferralAttributionRequest> = {
+  encode(message: SetReferralAttributionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.accountId !== "") {
+      writer.uint32(10).string(message.accountId);
+    }
+    if (message.referralCode !== "") {
+      writer.uint32(18).string(message.referralCode);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(26).string(message.idempotencyKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetReferralAttributionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetReferralAttributionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.referralCode = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetReferralAttributionRequest {
+    return {
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      referralCode: isSet(object.referralCode)
+        ? globalThis.String(object.referralCode)
+        : isSet(object.referral_code)
+        ? globalThis.String(object.referral_code)
+        : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+    };
+  },
+
+  toJSON(message: SetReferralAttributionRequest): unknown {
+    const obj: any = {};
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.referralCode !== "") {
+      obj.referralCode = message.referralCode;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetReferralAttributionRequest>, I>>(base?: I): SetReferralAttributionRequest {
+    return SetReferralAttributionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetReferralAttributionRequest>, I>>(
+    object: I,
+  ): SetReferralAttributionRequest {
+    const message = createBaseSetReferralAttributionRequest();
+    message.accountId = object.accountId ?? "";
+    message.referralCode = object.referralCode ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    return message;
+  },
+};
+
+function createBaseSetReferralAttributionResponse(): SetReferralAttributionResponse {
+  return { attributed: false };
+}
+
+export const SetReferralAttributionResponse: MessageFns<SetReferralAttributionResponse> = {
+  encode(message: SetReferralAttributionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.attributed !== false) {
+      writer.uint32(8).bool(message.attributed);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetReferralAttributionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetReferralAttributionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.attributed = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetReferralAttributionResponse {
+    return { attributed: isSet(object.attributed) ? globalThis.Boolean(object.attributed) : false };
+  },
+
+  toJSON(message: SetReferralAttributionResponse): unknown {
+    const obj: any = {};
+    if (message.attributed !== false) {
+      obj.attributed = message.attributed;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetReferralAttributionResponse>, I>>(base?: I): SetReferralAttributionResponse {
+    return SetReferralAttributionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetReferralAttributionResponse>, I>>(
+    object: I,
+  ): SetReferralAttributionResponse {
+    const message = createBaseSetReferralAttributionResponse();
+    message.attributed = object.attributed ?? false;
+    return message;
+  },
+};
+
+function createBaseOperatorContext(): OperatorContext {
+  return {
+    operatorId: "",
+    authenticationMethod: 0,
+    reason: "",
+    idempotencyKey: "",
+    sourceIp: "",
+    stepUpVerifiedAtUnixMs: 0n,
+    stepUpProofRef: "",
+  };
+}
+
+export const OperatorContext: MessageFns<OperatorContext> = {
+  encode(message: OperatorContext, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operatorId !== "") {
+      writer.uint32(10).string(message.operatorId);
+    }
+    if (message.authenticationMethod !== 0) {
+      writer.uint32(16).int32(message.authenticationMethod);
+    }
+    if (message.reason !== "") {
+      writer.uint32(26).string(message.reason);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(34).string(message.idempotencyKey);
+    }
+    if (message.sourceIp !== "") {
+      writer.uint32(42).string(message.sourceIp);
+    }
+    if (message.stepUpVerifiedAtUnixMs !== 0n) {
+      if (BigInt.asIntN(64, message.stepUpVerifiedAtUnixMs) !== message.stepUpVerifiedAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.stepUpVerifiedAtUnixMs of type int64 too large");
+      }
+      writer.uint32(48).int64(message.stepUpVerifiedAtUnixMs);
+    }
+    if (message.stepUpProofRef !== "") {
+      writer.uint32(58).string(message.stepUpProofRef);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): OperatorContext {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseOperatorContext();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operatorId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.authenticationMethod = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.reason = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.idempotencyKey = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.sourceIp = reader.string();
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.stepUpVerifiedAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
+          case 7: {
+            if (tag !== 58) {
+              break;
+            }
+
+            message.stepUpProofRef = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): OperatorContext {
+    return {
+      operatorId: isSet(object.operatorId)
+        ? globalThis.String(object.operatorId)
+        : isSet(object.operator_id)
+        ? globalThis.String(object.operator_id)
+        : "",
+      authenticationMethod: isSet(object.authenticationMethod)
+        ? operatorAuthenticationMethodFromJSON(object.authenticationMethod)
+        : isSet(object.authentication_method)
+        ? operatorAuthenticationMethodFromJSON(object.authentication_method)
+        : 0,
+      reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : isSet(object.idempotency_key)
+        ? globalThis.String(object.idempotency_key)
+        : "",
+      sourceIp: isSet(object.sourceIp)
+        ? globalThis.String(object.sourceIp)
+        : isSet(object.source_ip)
+        ? globalThis.String(object.source_ip)
+        : "",
+      stepUpVerifiedAtUnixMs: isSet(object.stepUpVerifiedAtUnixMs)
+        ? BigInt(object.stepUpVerifiedAtUnixMs)
+        : isSet(object.step_up_verified_at_unix_ms)
+        ? BigInt(object.step_up_verified_at_unix_ms)
+        : 0n,
+      stepUpProofRef: isSet(object.stepUpProofRef)
+        ? globalThis.String(object.stepUpProofRef)
+        : isSet(object.step_up_proof_ref)
+        ? globalThis.String(object.step_up_proof_ref)
+        : "",
+    };
+  },
+
+  toJSON(message: OperatorContext): unknown {
+    const obj: any = {};
+    if (message.operatorId !== "") {
+      obj.operatorId = message.operatorId;
+    }
+    if (message.authenticationMethod !== 0) {
+      obj.authenticationMethod = operatorAuthenticationMethodToJSON(message.authenticationMethod);
+    }
+    if (message.reason !== "") {
+      obj.reason = message.reason;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.sourceIp !== "") {
+      obj.sourceIp = message.sourceIp;
+    }
+    if (message.stepUpVerifiedAtUnixMs !== 0n) {
+      obj.stepUpVerifiedAtUnixMs = message.stepUpVerifiedAtUnixMs.toString();
+    }
+    if (message.stepUpProofRef !== "") {
+      obj.stepUpProofRef = message.stepUpProofRef;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<OperatorContext>, I>>(base?: I): OperatorContext {
+    return OperatorContext.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<OperatorContext>, I>>(object: I): OperatorContext {
+    const message = createBaseOperatorContext();
+    message.operatorId = object.operatorId ?? "";
+    message.authenticationMethod = object.authenticationMethod ?? 0;
+    message.reason = object.reason ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.sourceIp = object.sourceIp ?? "";
+    message.stepUpVerifiedAtUnixMs =
+      (object.stepUpVerifiedAtUnixMs !== undefined && object.stepUpVerifiedAtUnixMs !== null)
+        ? BigInt(object.stepUpVerifiedAtUnixMs)
+        : 0n;
+    message.stepUpProofRef = object.stepUpProofRef ?? "";
+    return message;
+  },
+};
+
+function createBaseAdminMutationResult(): AdminMutationResult {
+  return { auditId: "", resourceId: "", status: "" };
+}
+
+export const AdminMutationResult: MessageFns<AdminMutationResult> = {
+  encode(message: AdminMutationResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.auditId !== "") {
+      writer.uint32(10).string(message.auditId);
+    }
+    if (message.resourceId !== "") {
+      writer.uint32(18).string(message.resourceId);
+    }
+    if (message.status !== "") {
+      writer.uint32(26).string(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AdminMutationResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseAdminMutationResult();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.auditId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.resourceId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.status = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): AdminMutationResult {
+    return {
+      auditId: isSet(object.auditId)
+        ? globalThis.String(object.auditId)
+        : isSet(object.audit_id)
+        ? globalThis.String(object.audit_id)
+        : "",
+      resourceId: isSet(object.resourceId)
+        ? globalThis.String(object.resourceId)
+        : isSet(object.resource_id)
+        ? globalThis.String(object.resource_id)
+        : "",
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+    };
+  },
+
+  toJSON(message: AdminMutationResult): unknown {
+    const obj: any = {};
+    if (message.auditId !== "") {
+      obj.auditId = message.auditId;
+    }
+    if (message.resourceId !== "") {
+      obj.resourceId = message.resourceId;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<AdminMutationResult>, I>>(base?: I): AdminMutationResult {
+    return AdminMutationResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<AdminMutationResult>, I>>(object: I): AdminMutationResult {
+    const message = createBaseAdminMutationResult();
+    message.auditId = object.auditId ?? "";
+    message.resourceId = object.resourceId ?? "";
+    message.status = object.status ?? "";
+    return message;
+  },
+};
+
+function createBasePlanCostValidation(): PlanCostValidation {
+  return {
+    catalogVersion: "",
+    basicWorstCostMicroUsd: 0n,
+    premiumWorstCostMicroUsd: 0n,
+    minimumContributionMicroUsd: 0n,
+    violations: [],
+  };
+}
+
+export const PlanCostValidation: MessageFns<PlanCostValidation> = {
+  encode(message: PlanCostValidation, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.catalogVersion !== "") {
+      writer.uint32(10).string(message.catalogVersion);
+    }
+    if (message.basicWorstCostMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.basicWorstCostMicroUsd) !== message.basicWorstCostMicroUsd) {
+        throw new globalThis.Error("value provided for field message.basicWorstCostMicroUsd of type int64 too large");
+      }
+      writer.uint32(16).int64(message.basicWorstCostMicroUsd);
+    }
+    if (message.premiumWorstCostMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.premiumWorstCostMicroUsd) !== message.premiumWorstCostMicroUsd) {
+        throw new globalThis.Error("value provided for field message.premiumWorstCostMicroUsd of type int64 too large");
+      }
+      writer.uint32(24).int64(message.premiumWorstCostMicroUsd);
+    }
+    if (message.minimumContributionMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.minimumContributionMicroUsd) !== message.minimumContributionMicroUsd) {
+        throw new globalThis.Error(
+          "value provided for field message.minimumContributionMicroUsd of type int64 too large",
+        );
+      }
+      writer.uint32(32).int64(message.minimumContributionMicroUsd);
+    }
+    for (const v of message.violations) {
+      writer.uint32(42).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PlanCostValidation {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePlanCostValidation();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.catalogVersion = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.basicWorstCostMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.premiumWorstCostMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.minimumContributionMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.violations.push(reader.string());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PlanCostValidation {
+    return {
+      catalogVersion: isSet(object.catalogVersion)
+        ? globalThis.String(object.catalogVersion)
+        : isSet(object.catalog_version)
+        ? globalThis.String(object.catalog_version)
+        : "",
+      basicWorstCostMicroUsd: isSet(object.basicWorstCostMicroUsd)
+        ? BigInt(object.basicWorstCostMicroUsd)
+        : isSet(object.basic_worst_cost_micro_usd)
+        ? BigInt(object.basic_worst_cost_micro_usd)
+        : 0n,
+      premiumWorstCostMicroUsd: isSet(object.premiumWorstCostMicroUsd)
+        ? BigInt(object.premiumWorstCostMicroUsd)
+        : isSet(object.premium_worst_cost_micro_usd)
+        ? BigInt(object.premium_worst_cost_micro_usd)
+        : 0n,
+      minimumContributionMicroUsd: isSet(object.minimumContributionMicroUsd)
+        ? BigInt(object.minimumContributionMicroUsd)
+        : isSet(object.minimum_contribution_micro_usd)
+        ? BigInt(object.minimum_contribution_micro_usd)
+        : 0n,
+      violations: globalThis.Array.isArray(object?.violations)
+        ? object.violations.map((e: any) => globalThis.String(e))
+        : [],
+    };
+  },
+
+  toJSON(message: PlanCostValidation): unknown {
+    const obj: any = {};
+    if (message.catalogVersion !== "") {
+      obj.catalogVersion = message.catalogVersion;
+    }
+    if (message.basicWorstCostMicroUsd !== 0n) {
+      obj.basicWorstCostMicroUsd = message.basicWorstCostMicroUsd.toString();
+    }
+    if (message.premiumWorstCostMicroUsd !== 0n) {
+      obj.premiumWorstCostMicroUsd = message.premiumWorstCostMicroUsd.toString();
+    }
+    if (message.minimumContributionMicroUsd !== 0n) {
+      obj.minimumContributionMicroUsd = message.minimumContributionMicroUsd.toString();
+    }
+    if (message.violations?.length) {
+      obj.violations = message.violations;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PlanCostValidation>, I>>(base?: I): PlanCostValidation {
+    return PlanCostValidation.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PlanCostValidation>, I>>(object: I): PlanCostValidation {
+    const message = createBasePlanCostValidation();
+    message.catalogVersion = object.catalogVersion ?? "";
+    message.basicWorstCostMicroUsd =
+      (object.basicWorstCostMicroUsd !== undefined && object.basicWorstCostMicroUsd !== null)
+        ? BigInt(object.basicWorstCostMicroUsd)
+        : 0n;
+    message.premiumWorstCostMicroUsd =
+      (object.premiumWorstCostMicroUsd !== undefined && object.premiumWorstCostMicroUsd !== null)
+        ? BigInt(object.premiumWorstCostMicroUsd)
+        : 0n;
+    message.minimumContributionMicroUsd =
+      (object.minimumContributionMicroUsd !== undefined && object.minimumContributionMicroUsd !== null)
+        ? BigInt(object.minimumContributionMicroUsd)
+        : 0n;
+    message.violations = object.violations?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseCreatePlanDraftRequest(): CreatePlanDraftRequest {
+  return { operator: undefined, plan: undefined };
+}
+
+export const CreatePlanDraftRequest: MessageFns<CreatePlanDraftRequest> = {
+  encode(message: CreatePlanDraftRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.plan !== undefined) {
+      SubscriptionPlanVersion.encode(message.plan, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreatePlanDraftRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreatePlanDraftRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.plan = SubscriptionPlanVersion.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreatePlanDraftRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      plan: isSet(object.plan) ? SubscriptionPlanVersion.fromJSON(object.plan) : undefined,
+    };
+  },
+
+  toJSON(message: CreatePlanDraftRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.plan !== undefined) {
+      obj.plan = SubscriptionPlanVersion.toJSON(message.plan);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreatePlanDraftRequest>, I>>(base?: I): CreatePlanDraftRequest {
+    return CreatePlanDraftRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreatePlanDraftRequest>, I>>(object: I): CreatePlanDraftRequest {
+    const message = createBaseCreatePlanDraftRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.plan = (object.plan !== undefined && object.plan !== null)
+      ? SubscriptionPlanVersion.fromPartial(object.plan)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseCreatePlanDraftResponse(): CreatePlanDraftResponse {
+  return { result: undefined };
+}
+
+export const CreatePlanDraftResponse: MessageFns<CreatePlanDraftResponse> = {
+  encode(message: CreatePlanDraftResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): CreatePlanDraftResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseCreatePlanDraftResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): CreatePlanDraftResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: CreatePlanDraftResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<CreatePlanDraftResponse>, I>>(base?: I): CreatePlanDraftResponse {
+    return CreatePlanDraftResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<CreatePlanDraftResponse>, I>>(object: I): CreatePlanDraftResponse {
+    const message = createBaseCreatePlanDraftResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseValidatePlanVersionRequest(): ValidatePlanVersionRequest {
+  return { versionId: "" };
+}
+
+export const ValidatePlanVersionRequest: MessageFns<ValidatePlanVersionRequest> = {
+  encode(message: ValidatePlanVersionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.versionId !== "") {
+      writer.uint32(10).string(message.versionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ValidatePlanVersionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseValidatePlanVersionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.versionId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ValidatePlanVersionRequest {
+    return {
+      versionId: isSet(object.versionId)
+        ? globalThis.String(object.versionId)
+        : isSet(object.version_id)
+        ? globalThis.String(object.version_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ValidatePlanVersionRequest): unknown {
+    const obj: any = {};
+    if (message.versionId !== "") {
+      obj.versionId = message.versionId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ValidatePlanVersionRequest>, I>>(base?: I): ValidatePlanVersionRequest {
+    return ValidatePlanVersionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ValidatePlanVersionRequest>, I>>(object: I): ValidatePlanVersionRequest {
+    const message = createBaseValidatePlanVersionRequest();
+    message.versionId = object.versionId ?? "";
+    return message;
+  },
+};
+
+function createBaseValidatePlanVersionResponse(): ValidatePlanVersionResponse {
+  return { validation: undefined };
+}
+
+export const ValidatePlanVersionResponse: MessageFns<ValidatePlanVersionResponse> = {
+  encode(message: ValidatePlanVersionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.validation !== undefined) {
+      PlanCostValidation.encode(message.validation, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ValidatePlanVersionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseValidatePlanVersionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.validation = PlanCostValidation.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ValidatePlanVersionResponse {
+    return { validation: isSet(object.validation) ? PlanCostValidation.fromJSON(object.validation) : undefined };
+  },
+
+  toJSON(message: ValidatePlanVersionResponse): unknown {
+    const obj: any = {};
+    if (message.validation !== undefined) {
+      obj.validation = PlanCostValidation.toJSON(message.validation);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ValidatePlanVersionResponse>, I>>(base?: I): ValidatePlanVersionResponse {
+    return ValidatePlanVersionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ValidatePlanVersionResponse>, I>>(object: I): ValidatePlanVersionResponse {
+    const message = createBaseValidatePlanVersionResponse();
+    message.validation = (object.validation !== undefined && object.validation !== null)
+      ? PlanCostValidation.fromPartial(object.validation)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePreviewPlanImpactRequest(): PreviewPlanImpactRequest {
+  return { versionId: "" };
+}
+
+export const PreviewPlanImpactRequest: MessageFns<PreviewPlanImpactRequest> = {
+  encode(message: PreviewPlanImpactRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.versionId !== "") {
+      writer.uint32(10).string(message.versionId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewPlanImpactRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePreviewPlanImpactRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.versionId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PreviewPlanImpactRequest {
+    return {
+      versionId: isSet(object.versionId)
+        ? globalThis.String(object.versionId)
+        : isSet(object.version_id)
+        ? globalThis.String(object.version_id)
+        : "",
+    };
+  },
+
+  toJSON(message: PreviewPlanImpactRequest): unknown {
+    const obj: any = {};
+    if (message.versionId !== "") {
+      obj.versionId = message.versionId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PreviewPlanImpactRequest>, I>>(base?: I): PreviewPlanImpactRequest {
+    return PreviewPlanImpactRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PreviewPlanImpactRequest>, I>>(object: I): PreviewPlanImpactRequest {
+    const message = createBasePreviewPlanImpactRequest();
+    message.versionId = object.versionId ?? "";
+    return message;
+  },
+};
+
+function createBasePreviewPlanImpactResponse(): PreviewPlanImpactResponse {
+  return { affectedSubscriptions: 0n, adverseChanges: [], validation: undefined };
+}
+
+export const PreviewPlanImpactResponse: MessageFns<PreviewPlanImpactResponse> = {
+  encode(message: PreviewPlanImpactResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.affectedSubscriptions !== 0n) {
+      if (BigInt.asIntN(64, message.affectedSubscriptions) !== message.affectedSubscriptions) {
+        throw new globalThis.Error("value provided for field message.affectedSubscriptions of type int64 too large");
+      }
+      writer.uint32(8).int64(message.affectedSubscriptions);
+    }
+    for (const v of message.adverseChanges) {
+      writer.uint32(18).string(v!);
+    }
+    if (message.validation !== undefined) {
+      PlanCostValidation.encode(message.validation, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreviewPlanImpactResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePreviewPlanImpactResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.affectedSubscriptions = reader.int64() as bigint;
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.adverseChanges.push(reader.string());
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.validation = PlanCostValidation.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PreviewPlanImpactResponse {
+    return {
+      affectedSubscriptions: isSet(object.affectedSubscriptions)
+        ? BigInt(object.affectedSubscriptions)
+        : isSet(object.affected_subscriptions)
+        ? BigInt(object.affected_subscriptions)
+        : 0n,
+      adverseChanges: globalThis.Array.isArray(object?.adverseChanges)
+        ? object.adverseChanges.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.adverse_changes)
+        ? object.adverse_changes.map((e: any) => globalThis.String(e))
+        : [],
+      validation: isSet(object.validation) ? PlanCostValidation.fromJSON(object.validation) : undefined,
+    };
+  },
+
+  toJSON(message: PreviewPlanImpactResponse): unknown {
+    const obj: any = {};
+    if (message.affectedSubscriptions !== 0n) {
+      obj.affectedSubscriptions = message.affectedSubscriptions.toString();
+    }
+    if (message.adverseChanges?.length) {
+      obj.adverseChanges = message.adverseChanges;
+    }
+    if (message.validation !== undefined) {
+      obj.validation = PlanCostValidation.toJSON(message.validation);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PreviewPlanImpactResponse>, I>>(base?: I): PreviewPlanImpactResponse {
+    return PreviewPlanImpactResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PreviewPlanImpactResponse>, I>>(object: I): PreviewPlanImpactResponse {
+    const message = createBasePreviewPlanImpactResponse();
+    message.affectedSubscriptions =
+      (object.affectedSubscriptions !== undefined && object.affectedSubscriptions !== null)
+        ? BigInt(object.affectedSubscriptions)
+        : 0n;
+    message.adverseChanges = object.adverseChanges?.map((e) => e) || [];
+    message.validation = (object.validation !== undefined && object.validation !== null)
+      ? PlanCostValidation.fromPartial(object.validation)
+      : undefined;
+    return message;
+  },
+};
+
+function createBasePublishPlanVersionRequest(): PublishPlanVersionRequest {
+  return { operator: undefined, versionId: "", expectedCatalogVersion: "" };
+}
+
+export const PublishPlanVersionRequest: MessageFns<PublishPlanVersionRequest> = {
+  encode(message: PublishPlanVersionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.versionId !== "") {
+      writer.uint32(18).string(message.versionId);
+    }
+    if (message.expectedCatalogVersion !== "") {
+      writer.uint32(26).string(message.expectedCatalogVersion);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PublishPlanVersionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePublishPlanVersionRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.versionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.expectedCatalogVersion = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PublishPlanVersionRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      versionId: isSet(object.versionId)
+        ? globalThis.String(object.versionId)
+        : isSet(object.version_id)
+        ? globalThis.String(object.version_id)
+        : "",
+      expectedCatalogVersion: isSet(object.expectedCatalogVersion)
+        ? globalThis.String(object.expectedCatalogVersion)
+        : isSet(object.expected_catalog_version)
+        ? globalThis.String(object.expected_catalog_version)
+        : "",
+    };
+  },
+
+  toJSON(message: PublishPlanVersionRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.versionId !== "") {
+      obj.versionId = message.versionId;
+    }
+    if (message.expectedCatalogVersion !== "") {
+      obj.expectedCatalogVersion = message.expectedCatalogVersion;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PublishPlanVersionRequest>, I>>(base?: I): PublishPlanVersionRequest {
+    return PublishPlanVersionRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PublishPlanVersionRequest>, I>>(object: I): PublishPlanVersionRequest {
+    const message = createBasePublishPlanVersionRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.versionId = object.versionId ?? "";
+    message.expectedCatalogVersion = object.expectedCatalogVersion ?? "";
+    return message;
+  },
+};
+
+function createBasePublishPlanVersionResponse(): PublishPlanVersionResponse {
+  return { result: undefined };
+}
+
+export const PublishPlanVersionResponse: MessageFns<PublishPlanVersionResponse> = {
+  encode(message: PublishPlanVersionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PublishPlanVersionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBasePublishPlanVersionResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): PublishPlanVersionResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: PublishPlanVersionResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<PublishPlanVersionResponse>, I>>(base?: I): PublishPlanVersionResponse {
+    return PublishPlanVersionResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<PublishPlanVersionResponse>, I>>(object: I): PublishPlanVersionResponse {
+    const message = createBasePublishPlanVersionResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSetPlanSalesStatusRequest(): SetPlanSalesStatusRequest {
+  return { operator: undefined, versionId: "", salesStatus: "" };
+}
+
+export const SetPlanSalesStatusRequest: MessageFns<SetPlanSalesStatusRequest> = {
+  encode(message: SetPlanSalesStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.versionId !== "") {
+      writer.uint32(18).string(message.versionId);
+    }
+    if (message.salesStatus !== "") {
+      writer.uint32(26).string(message.salesStatus);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPlanSalesStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetPlanSalesStatusRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.versionId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.salesStatus = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetPlanSalesStatusRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      versionId: isSet(object.versionId)
+        ? globalThis.String(object.versionId)
+        : isSet(object.version_id)
+        ? globalThis.String(object.version_id)
+        : "",
+      salesStatus: isSet(object.salesStatus)
+        ? globalThis.String(object.salesStatus)
+        : isSet(object.sales_status)
+        ? globalThis.String(object.sales_status)
+        : "",
+    };
+  },
+
+  toJSON(message: SetPlanSalesStatusRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.versionId !== "") {
+      obj.versionId = message.versionId;
+    }
+    if (message.salesStatus !== "") {
+      obj.salesStatus = message.salesStatus;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPlanSalesStatusRequest>, I>>(base?: I): SetPlanSalesStatusRequest {
+    return SetPlanSalesStatusRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPlanSalesStatusRequest>, I>>(object: I): SetPlanSalesStatusRequest {
+    const message = createBaseSetPlanSalesStatusRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.versionId = object.versionId ?? "";
+    message.salesStatus = object.salesStatus ?? "";
+    return message;
+  },
+};
+
+function createBaseSetPlanSalesStatusResponse(): SetPlanSalesStatusResponse {
+  return { result: undefined };
+}
+
+export const SetPlanSalesStatusResponse: MessageFns<SetPlanSalesStatusResponse> = {
+  encode(message: SetPlanSalesStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPlanSalesStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetPlanSalesStatusResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetPlanSalesStatusResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: SetPlanSalesStatusResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetPlanSalesStatusResponse>, I>>(base?: I): SetPlanSalesStatusResponse {
+    return SetPlanSalesStatusResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetPlanSalesStatusResponse>, I>>(object: I): SetPlanSalesStatusResponse {
+    const message = createBaseSetPlanSalesStatusResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSetSpendingLockRequest(): SetSpendingLockRequest {
+  return { operator: undefined, accountId: "", locked: false };
+}
+
+export const SetSpendingLockRequest: MessageFns<SetSpendingLockRequest> = {
+  encode(message: SetSpendingLockRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.accountId !== "") {
+      writer.uint32(18).string(message.accountId);
+    }
+    if (message.locked !== false) {
+      writer.uint32(24).bool(message.locked);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetSpendingLockRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetSpendingLockRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.locked = reader.bool();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetSpendingLockRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      locked: isSet(object.locked) ? globalThis.Boolean(object.locked) : false,
+    };
+  },
+
+  toJSON(message: SetSpendingLockRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.locked !== false) {
+      obj.locked = message.locked;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetSpendingLockRequest>, I>>(base?: I): SetSpendingLockRequest {
+    return SetSpendingLockRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetSpendingLockRequest>, I>>(object: I): SetSpendingLockRequest {
+    const message = createBaseSetSpendingLockRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.accountId = object.accountId ?? "";
+    message.locked = object.locked ?? false;
+    return message;
+  },
+};
+
+function createBaseSetSpendingLockResponse(): SetSpendingLockResponse {
+  return { result: undefined };
+}
+
+export const SetSpendingLockResponse: MessageFns<SetSpendingLockResponse> = {
+  encode(message: SetSpendingLockResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetSpendingLockResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetSpendingLockResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetSpendingLockResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: SetSpendingLockResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetSpendingLockResponse>, I>>(base?: I): SetSpendingLockResponse {
+    return SetSpendingLockResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetSpendingLockResponse>, I>>(object: I): SetSpendingLockResponse {
+    const message = createBaseSetSpendingLockResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseManualLedgerAdjustmentRequest(): ManualLedgerAdjustmentRequest {
+  return {
+    operator: undefined,
+    accountId: "",
+    fundingBucket: 0,
+    sourceId: "",
+    creditDelta: 0n,
+    dollarDeltaMicroUsd: 0n,
+  };
+}
+
+export const ManualLedgerAdjustmentRequest: MessageFns<ManualLedgerAdjustmentRequest> = {
+  encode(message: ManualLedgerAdjustmentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.accountId !== "") {
+      writer.uint32(18).string(message.accountId);
+    }
+    if (message.fundingBucket !== 0) {
+      writer.uint32(24).int32(message.fundingBucket);
+    }
+    if (message.sourceId !== "") {
+      writer.uint32(34).string(message.sourceId);
+    }
+    if (message.creditDelta !== 0n) {
+      if (BigInt.asIntN(64, message.creditDelta) !== message.creditDelta) {
+        throw new globalThis.Error("value provided for field message.creditDelta of type int64 too large");
+      }
+      writer.uint32(40).int64(message.creditDelta);
+    }
+    if (message.dollarDeltaMicroUsd !== 0n) {
+      if (BigInt.asIntN(64, message.dollarDeltaMicroUsd) !== message.dollarDeltaMicroUsd) {
+        throw new globalThis.Error("value provided for field message.dollarDeltaMicroUsd of type int64 too large");
+      }
+      writer.uint32(48).int64(message.dollarDeltaMicroUsd);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ManualLedgerAdjustmentRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseManualLedgerAdjustmentRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.accountId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.fundingBucket = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.sourceId = reader.string();
+            continue;
+          }
+          case 5: {
+            if (tag !== 40) {
+              break;
+            }
+
+            message.creditDelta = reader.int64() as bigint;
+            continue;
+          }
+          case 6: {
+            if (tag !== 48) {
+              break;
+            }
+
+            message.dollarDeltaMicroUsd = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ManualLedgerAdjustmentRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      accountId: isSet(object.accountId)
+        ? globalThis.String(object.accountId)
+        : isSet(object.account_id)
+        ? globalThis.String(object.account_id)
+        : "",
+      fundingBucket: isSet(object.fundingBucket)
+        ? fundingBucketFromJSON(object.fundingBucket)
+        : isSet(object.funding_bucket)
+        ? fundingBucketFromJSON(object.funding_bucket)
+        : 0,
+      sourceId: isSet(object.sourceId)
+        ? globalThis.String(object.sourceId)
+        : isSet(object.source_id)
+        ? globalThis.String(object.source_id)
+        : "",
+      creditDelta: isSet(object.creditDelta)
+        ? BigInt(object.creditDelta)
+        : isSet(object.credit_delta)
+        ? BigInt(object.credit_delta)
+        : 0n,
+      dollarDeltaMicroUsd: isSet(object.dollarDeltaMicroUsd)
+        ? BigInt(object.dollarDeltaMicroUsd)
+        : isSet(object.dollar_delta_micro_usd)
+        ? BigInt(object.dollar_delta_micro_usd)
+        : 0n,
+    };
+  },
+
+  toJSON(message: ManualLedgerAdjustmentRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.accountId !== "") {
+      obj.accountId = message.accountId;
+    }
+    if (message.fundingBucket !== 0) {
+      obj.fundingBucket = fundingBucketToJSON(message.fundingBucket);
+    }
+    if (message.sourceId !== "") {
+      obj.sourceId = message.sourceId;
+    }
+    if (message.creditDelta !== 0n) {
+      obj.creditDelta = message.creditDelta.toString();
+    }
+    if (message.dollarDeltaMicroUsd !== 0n) {
+      obj.dollarDeltaMicroUsd = message.dollarDeltaMicroUsd.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ManualLedgerAdjustmentRequest>, I>>(base?: I): ManualLedgerAdjustmentRequest {
+    return ManualLedgerAdjustmentRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ManualLedgerAdjustmentRequest>, I>>(
+    object: I,
+  ): ManualLedgerAdjustmentRequest {
+    const message = createBaseManualLedgerAdjustmentRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.accountId = object.accountId ?? "";
+    message.fundingBucket = object.fundingBucket ?? 0;
+    message.sourceId = object.sourceId ?? "";
+    message.creditDelta = (object.creditDelta !== undefined && object.creditDelta !== null)
+      ? BigInt(object.creditDelta)
+      : 0n;
+    message.dollarDeltaMicroUsd = (object.dollarDeltaMicroUsd !== undefined && object.dollarDeltaMicroUsd !== null)
+      ? BigInt(object.dollarDeltaMicroUsd)
+      : 0n;
+    return message;
+  },
+};
+
+function createBaseManualLedgerAdjustmentResponse(): ManualLedgerAdjustmentResponse {
+  return { result: undefined };
+}
+
+export const ManualLedgerAdjustmentResponse: MessageFns<ManualLedgerAdjustmentResponse> = {
+  encode(message: ManualLedgerAdjustmentResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ManualLedgerAdjustmentResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseManualLedgerAdjustmentResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ManualLedgerAdjustmentResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ManualLedgerAdjustmentResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ManualLedgerAdjustmentResponse>, I>>(base?: I): ManualLedgerAdjustmentResponse {
+    return ManualLedgerAdjustmentResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ManualLedgerAdjustmentResponse>, I>>(
+    object: I,
+  ): ManualLedgerAdjustmentResponse {
+    const message = createBaseManualLedgerAdjustmentResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseResolveDepositReorgHoldRequest(): ResolveDepositReorgHoldRequest {
+  return { operator: undefined, holdId: "", decision: "" };
+}
+
+export const ResolveDepositReorgHoldRequest: MessageFns<ResolveDepositReorgHoldRequest> = {
+  encode(message: ResolveDepositReorgHoldRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.holdId !== "") {
+      writer.uint32(18).string(message.holdId);
+    }
+    if (message.decision !== "") {
+      writer.uint32(26).string(message.decision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveDepositReorgHoldRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveDepositReorgHoldRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.holdId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.decision = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveDepositReorgHoldRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      holdId: isSet(object.holdId)
+        ? globalThis.String(object.holdId)
+        : isSet(object.hold_id)
+        ? globalThis.String(object.hold_id)
+        : "",
+      decision: isSet(object.decision) ? globalThis.String(object.decision) : "",
+    };
+  },
+
+  toJSON(message: ResolveDepositReorgHoldRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.holdId !== "") {
+      obj.holdId = message.holdId;
+    }
+    if (message.decision !== "") {
+      obj.decision = message.decision;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveDepositReorgHoldRequest>, I>>(base?: I): ResolveDepositReorgHoldRequest {
+    return ResolveDepositReorgHoldRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveDepositReorgHoldRequest>, I>>(
+    object: I,
+  ): ResolveDepositReorgHoldRequest {
+    const message = createBaseResolveDepositReorgHoldRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.holdId = object.holdId ?? "";
+    message.decision = object.decision ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveDepositReorgHoldResponse(): ResolveDepositReorgHoldResponse {
+  return { result: undefined };
+}
+
+export const ResolveDepositReorgHoldResponse: MessageFns<ResolveDepositReorgHoldResponse> = {
+  encode(message: ResolveDepositReorgHoldResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveDepositReorgHoldResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveDepositReorgHoldResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveDepositReorgHoldResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ResolveDepositReorgHoldResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveDepositReorgHoldResponse>, I>>(base?: I): ResolveDepositReorgHoldResponse {
+    return ResolveDepositReorgHoldResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveDepositReorgHoldResponse>, I>>(
+    object: I,
+  ): ResolveDepositReorgHoldResponse {
+    const message = createBaseResolveDepositReorgHoldResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseReviewTopupRequest(): ReviewTopupRequest {
+  return { operator: undefined, orderId: "", decision: "", evidenceRef: "" };
+}
+
+export const ReviewTopupRequest: MessageFns<ReviewTopupRequest> = {
+  encode(message: ReviewTopupRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.orderId !== "") {
+      writer.uint32(18).string(message.orderId);
+    }
+    if (message.decision !== "") {
+      writer.uint32(26).string(message.decision);
+    }
+    if (message.evidenceRef !== "") {
+      writer.uint32(34).string(message.evidenceRef);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReviewTopupRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseReviewTopupRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.orderId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.decision = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.evidenceRef = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ReviewTopupRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      orderId: isSet(object.orderId)
+        ? globalThis.String(object.orderId)
+        : isSet(object.order_id)
+        ? globalThis.String(object.order_id)
+        : "",
+      decision: isSet(object.decision) ? globalThis.String(object.decision) : "",
+      evidenceRef: isSet(object.evidenceRef)
+        ? globalThis.String(object.evidenceRef)
+        : isSet(object.evidence_ref)
+        ? globalThis.String(object.evidence_ref)
+        : "",
+    };
+  },
+
+  toJSON(message: ReviewTopupRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.orderId !== "") {
+      obj.orderId = message.orderId;
+    }
+    if (message.decision !== "") {
+      obj.decision = message.decision;
+    }
+    if (message.evidenceRef !== "") {
+      obj.evidenceRef = message.evidenceRef;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ReviewTopupRequest>, I>>(base?: I): ReviewTopupRequest {
+    return ReviewTopupRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ReviewTopupRequest>, I>>(object: I): ReviewTopupRequest {
+    const message = createBaseReviewTopupRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.orderId = object.orderId ?? "";
+    message.decision = object.decision ?? "";
+    message.evidenceRef = object.evidenceRef ?? "";
+    return message;
+  },
+};
+
+function createBaseReviewTopupResponse(): ReviewTopupResponse {
+  return { result: undefined };
+}
+
+export const ReviewTopupResponse: MessageFns<ReviewTopupResponse> = {
+  encode(message: ReviewTopupResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReviewTopupResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseReviewTopupResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ReviewTopupResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ReviewTopupResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ReviewTopupResponse>, I>>(base?: I): ReviewTopupResponse {
+    return ReviewTopupResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ReviewTopupResponse>, I>>(object: I): ReviewTopupResponse {
+    const message = createBaseReviewTopupResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRevokeReferralRewardRequest(): RevokeReferralRewardRequest {
+  return { operator: undefined, rewardId: "" };
+}
+
+export const RevokeReferralRewardRequest: MessageFns<RevokeReferralRewardRequest> = {
+  encode(message: RevokeReferralRewardRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.rewardId !== "") {
+      writer.uint32(18).string(message.rewardId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeReferralRewardRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRevokeReferralRewardRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.rewardId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RevokeReferralRewardRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      rewardId: isSet(object.rewardId)
+        ? globalThis.String(object.rewardId)
+        : isSet(object.reward_id)
+        ? globalThis.String(object.reward_id)
+        : "",
+    };
+  },
+
+  toJSON(message: RevokeReferralRewardRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.rewardId !== "") {
+      obj.rewardId = message.rewardId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RevokeReferralRewardRequest>, I>>(base?: I): RevokeReferralRewardRequest {
+    return RevokeReferralRewardRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RevokeReferralRewardRequest>, I>>(object: I): RevokeReferralRewardRequest {
+    const message = createBaseRevokeReferralRewardRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.rewardId = object.rewardId ?? "";
+    return message;
+  },
+};
+
+function createBaseRevokeReferralRewardResponse(): RevokeReferralRewardResponse {
+  return { result: undefined };
+}
+
+export const RevokeReferralRewardResponse: MessageFns<RevokeReferralRewardResponse> = {
+  encode(message: RevokeReferralRewardResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevokeReferralRewardResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRevokeReferralRewardResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RevokeReferralRewardResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: RevokeReferralRewardResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RevokeReferralRewardResponse>, I>>(base?: I): RevokeReferralRewardResponse {
+    return RevokeReferralRewardResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RevokeReferralRewardResponse>, I>>(object: I): RevokeReferralRewardResponse {
+    const message = createBaseRevokeReferralRewardResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseResolveDiscrepancyRequest(): ResolveDiscrepancyRequest {
+  return { operator: undefined, discrepancyId: "", disposition: "" };
+}
+
+export const ResolveDiscrepancyRequest: MessageFns<ResolveDiscrepancyRequest> = {
+  encode(message: ResolveDiscrepancyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.discrepancyId !== "") {
+      writer.uint32(18).string(message.discrepancyId);
+    }
+    if (message.disposition !== "") {
+      writer.uint32(26).string(message.disposition);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveDiscrepancyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveDiscrepancyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.discrepancyId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.disposition = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveDiscrepancyRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      discrepancyId: isSet(object.discrepancyId)
+        ? globalThis.String(object.discrepancyId)
+        : isSet(object.discrepancy_id)
+        ? globalThis.String(object.discrepancy_id)
+        : "",
+      disposition: isSet(object.disposition) ? globalThis.String(object.disposition) : "",
+    };
+  },
+
+  toJSON(message: ResolveDiscrepancyRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.discrepancyId !== "") {
+      obj.discrepancyId = message.discrepancyId;
+    }
+    if (message.disposition !== "") {
+      obj.disposition = message.disposition;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveDiscrepancyRequest>, I>>(base?: I): ResolveDiscrepancyRequest {
+    return ResolveDiscrepancyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveDiscrepancyRequest>, I>>(object: I): ResolveDiscrepancyRequest {
+    const message = createBaseResolveDiscrepancyRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.discrepancyId = object.discrepancyId ?? "";
+    message.disposition = object.disposition ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveDiscrepancyResponse(): ResolveDiscrepancyResponse {
+  return { result: undefined };
+}
+
+export const ResolveDiscrepancyResponse: MessageFns<ResolveDiscrepancyResponse> = {
+  encode(message: ResolveDiscrepancyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveDiscrepancyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveDiscrepancyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveDiscrepancyResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ResolveDiscrepancyResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveDiscrepancyResponse>, I>>(base?: I): ResolveDiscrepancyResponse {
+    return ResolveDiscrepancyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveDiscrepancyResponse>, I>>(object: I): ResolveDiscrepancyResponse {
+    const message = createBaseResolveDiscrepancyResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseRefundSettledRequestRequest(): RefundSettledRequestRequest {
+  return { operator: undefined, requestId: "" };
+}
+
+export const RefundSettledRequestRequest: MessageFns<RefundSettledRequestRequest> = {
+  encode(message: RefundSettledRequestRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.requestId !== "") {
+      writer.uint32(18).string(message.requestId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RefundSettledRequestRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRefundSettledRequestRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.requestId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RefundSettledRequestRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+    };
+  },
+
+  toJSON(message: RefundSettledRequestRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RefundSettledRequestRequest>, I>>(base?: I): RefundSettledRequestRequest {
+    return RefundSettledRequestRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RefundSettledRequestRequest>, I>>(object: I): RefundSettledRequestRequest {
+    const message = createBaseRefundSettledRequestRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.requestId = object.requestId ?? "";
+    return message;
+  },
+};
+
+function createBaseRefundSettledRequestResponse(): RefundSettledRequestResponse {
+  return { result: undefined };
+}
+
+export const RefundSettledRequestResponse: MessageFns<RefundSettledRequestResponse> = {
+  encode(message: RefundSettledRequestResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RefundSettledRequestResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseRefundSettledRequestResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): RefundSettledRequestResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: RefundSettledRequestResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RefundSettledRequestResponse>, I>>(base?: I): RefundSettledRequestResponse {
+    return RefundSettledRequestResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RefundSettledRequestResponse>, I>>(object: I): RefundSettledRequestResponse {
+    const message = createBaseRefundSettledRequestResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpsertFundedTermRequest(): UpsertFundedTermRequest {
+  return { operator: undefined, term: undefined, refundReserveBps: undefined };
+}
+
+export const UpsertFundedTermRequest: MessageFns<UpsertFundedTermRequest> = {
+  encode(message: UpsertFundedTermRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.term !== undefined) {
+      FundedTermConfig.encode(message.term, writer.uint32(18).fork()).join();
+    }
+    if (message.refundReserveBps !== undefined) {
+      writer.uint32(24).uint32(message.refundReserveBps);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpsertFundedTermRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpsertFundedTermRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.term = FundedTermConfig.decode(reader, reader.uint32());
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.refundReserveBps = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpsertFundedTermRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      term: isSet(object.term) ? FundedTermConfig.fromJSON(object.term) : undefined,
+      refundReserveBps: isSet(object.refundReserveBps)
+        ? globalThis.Number(object.refundReserveBps)
+        : isSet(object.refund_reserve_bps)
+        ? globalThis.Number(object.refund_reserve_bps)
+        : undefined,
+    };
+  },
+
+  toJSON(message: UpsertFundedTermRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.term !== undefined) {
+      obj.term = FundedTermConfig.toJSON(message.term);
+    }
+    if (message.refundReserveBps !== undefined) {
+      obj.refundReserveBps = Math.round(message.refundReserveBps);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpsertFundedTermRequest>, I>>(base?: I): UpsertFundedTermRequest {
+    return UpsertFundedTermRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpsertFundedTermRequest>, I>>(object: I): UpsertFundedTermRequest {
+    const message = createBaseUpsertFundedTermRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.term = (object.term !== undefined && object.term !== null)
+      ? FundedTermConfig.fromPartial(object.term)
+      : undefined;
+    message.refundReserveBps = object.refundReserveBps ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpsertFundedTermResponse(): UpsertFundedTermResponse {
+  return { result: undefined };
+}
+
+export const UpsertFundedTermResponse: MessageFns<UpsertFundedTermResponse> = {
+  encode(message: UpsertFundedTermResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpsertFundedTermResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpsertFundedTermResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpsertFundedTermResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: UpsertFundedTermResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpsertFundedTermResponse>, I>>(base?: I): UpsertFundedTermResponse {
+    return UpsertFundedTermResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpsertFundedTermResponse>, I>>(object: I): UpsertFundedTermResponse {
+    const message = createBaseUpsertFundedTermResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseLockFundedTermRequest(): LockFundedTermRequest {
+  return { operator: undefined, termId: "", fundingReservationId: "" };
+}
+
+export const LockFundedTermRequest: MessageFns<LockFundedTermRequest> = {
+  encode(message: LockFundedTermRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.termId !== "") {
+      writer.uint32(18).string(message.termId);
+    }
+    if (message.fundingReservationId !== "") {
+      writer.uint32(26).string(message.fundingReservationId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LockFundedTermRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLockFundedTermRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.fundingReservationId = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LockFundedTermRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+      fundingReservationId: isSet(object.fundingReservationId)
+        ? globalThis.String(object.fundingReservationId)
+        : isSet(object.funding_reservation_id)
+        ? globalThis.String(object.funding_reservation_id)
+        : "",
+    };
+  },
+
+  toJSON(message: LockFundedTermRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    if (message.fundingReservationId !== "") {
+      obj.fundingReservationId = message.fundingReservationId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LockFundedTermRequest>, I>>(base?: I): LockFundedTermRequest {
+    return LockFundedTermRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LockFundedTermRequest>, I>>(object: I): LockFundedTermRequest {
+    const message = createBaseLockFundedTermRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.termId = object.termId ?? "";
+    message.fundingReservationId = object.fundingReservationId ?? "";
+    return message;
+  },
+};
+
+function createBaseLockFundedTermResponse(): LockFundedTermResponse {
+  return { result: undefined };
+}
+
+export const LockFundedTermResponse: MessageFns<LockFundedTermResponse> = {
+  encode(message: LockFundedTermResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): LockFundedTermResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseLockFundedTermResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): LockFundedTermResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: LockFundedTermResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LockFundedTermResponse>, I>>(base?: I): LockFundedTermResponse {
+    return LockFundedTermResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LockFundedTermResponse>, I>>(object: I): LockFundedTermResponse {
+    const message = createBaseLockFundedTermResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSetCoverageThrottlePolicyRequest(): SetCoverageThrottlePolicyRequest {
+  return { operator: undefined, policy: undefined };
+}
+
+export const SetCoverageThrottlePolicyRequest: MessageFns<SetCoverageThrottlePolicyRequest> = {
+  encode(message: SetCoverageThrottlePolicyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.policy !== undefined) {
+      AitCoverageThrottlePolicy.encode(message.policy, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetCoverageThrottlePolicyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetCoverageThrottlePolicyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.policy = AitCoverageThrottlePolicy.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetCoverageThrottlePolicyRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      policy: isSet(object.policy) ? AitCoverageThrottlePolicy.fromJSON(object.policy) : undefined,
+    };
+  },
+
+  toJSON(message: SetCoverageThrottlePolicyRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.policy !== undefined) {
+      obj.policy = AitCoverageThrottlePolicy.toJSON(message.policy);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetCoverageThrottlePolicyRequest>, I>>(
+    base?: I,
+  ): SetCoverageThrottlePolicyRequest {
+    return SetCoverageThrottlePolicyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetCoverageThrottlePolicyRequest>, I>>(
+    object: I,
+  ): SetCoverageThrottlePolicyRequest {
+    const message = createBaseSetCoverageThrottlePolicyRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.policy = (object.policy !== undefined && object.policy !== null)
+      ? AitCoverageThrottlePolicy.fromPartial(object.policy)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseSetCoverageThrottlePolicyResponse(): SetCoverageThrottlePolicyResponse {
+  return { result: undefined };
+}
+
+export const SetCoverageThrottlePolicyResponse: MessageFns<SetCoverageThrottlePolicyResponse> = {
+  encode(message: SetCoverageThrottlePolicyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetCoverageThrottlePolicyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseSetCoverageThrottlePolicyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): SetCoverageThrottlePolicyResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: SetCoverageThrottlePolicyResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<SetCoverageThrottlePolicyResponse>, I>>(
+    base?: I,
+  ): SetCoverageThrottlePolicyResponse {
+    return SetCoverageThrottlePolicyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<SetCoverageThrottlePolicyResponse>, I>>(
+    object: I,
+  ): SetCoverageThrottlePolicyResponse {
+    const message = createBaseSetCoverageThrottlePolicyResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateSystemSettingRequest(): UpdateSystemSettingRequest {
+  return { operator: undefined, settingKey: "", valueJson: Buffer.alloc(0) };
+}
+
+export const UpdateSystemSettingRequest: MessageFns<UpdateSystemSettingRequest> = {
+  encode(message: UpdateSystemSettingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.settingKey !== "") {
+      writer.uint32(18).string(message.settingKey);
+    }
+    if (message.valueJson.length !== 0) {
+      writer.uint32(26).bytes(message.valueJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateSystemSettingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateSystemSettingRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.settingKey = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.valueJson = Buffer.from(reader.bytes());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateSystemSettingRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      settingKey: isSet(object.settingKey)
+        ? globalThis.String(object.settingKey)
+        : isSet(object.setting_key)
+        ? globalThis.String(object.setting_key)
+        : "",
+      valueJson: isSet(object.valueJson)
+        ? Buffer.from(bytesFromBase64(object.valueJson))
+        : isSet(object.value_json)
+        ? Buffer.from(bytesFromBase64(object.value_json))
+        : Buffer.alloc(0),
+    };
+  },
+
+  toJSON(message: UpdateSystemSettingRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.settingKey !== "") {
+      obj.settingKey = message.settingKey;
+    }
+    if (message.valueJson.length !== 0) {
+      obj.valueJson = base64FromBytes(message.valueJson);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateSystemSettingRequest>, I>>(base?: I): UpdateSystemSettingRequest {
+    return UpdateSystemSettingRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateSystemSettingRequest>, I>>(object: I): UpdateSystemSettingRequest {
+    const message = createBaseUpdateSystemSettingRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.settingKey = object.settingKey ?? "";
+    message.valueJson = object.valueJson ?? Buffer.alloc(0);
+    return message;
+  },
+};
+
+function createBaseUpdateSystemSettingResponse(): UpdateSystemSettingResponse {
+  return { result: undefined };
+}
+
+export const UpdateSystemSettingResponse: MessageFns<UpdateSystemSettingResponse> = {
+  encode(message: UpdateSystemSettingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateSystemSettingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateSystemSettingResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateSystemSettingResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: UpdateSystemSettingResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateSystemSettingResponse>, I>>(base?: I): UpdateSystemSettingResponse {
+    return UpdateSystemSettingResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateSystemSettingResponse>, I>>(object: I): UpdateSystemSettingResponse {
+    const message = createBaseUpdateSystemSettingResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateFreeModelQuotaPolicyRequest(): UpdateFreeModelQuotaPolicyRequest {
+  return { operator: undefined, modelId: "", dailyFreeRequestsLimit: 0n, dailyFreeEquivalentCreditsLimit: 0n };
+}
+
+export const UpdateFreeModelQuotaPolicyRequest: MessageFns<UpdateFreeModelQuotaPolicyRequest> = {
+  encode(message: UpdateFreeModelQuotaPolicyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.dailyFreeRequestsLimit !== 0n) {
+      if (BigInt.asIntN(64, message.dailyFreeRequestsLimit) !== message.dailyFreeRequestsLimit) {
+        throw new globalThis.Error("value provided for field message.dailyFreeRequestsLimit of type int64 too large");
+      }
+      writer.uint32(24).int64(message.dailyFreeRequestsLimit);
+    }
+    if (message.dailyFreeEquivalentCreditsLimit !== 0n) {
+      if (BigInt.asIntN(64, message.dailyFreeEquivalentCreditsLimit) !== message.dailyFreeEquivalentCreditsLimit) {
+        throw new globalThis.Error(
+          "value provided for field message.dailyFreeEquivalentCreditsLimit of type int64 too large",
+        );
+      }
+      writer.uint32(32).int64(message.dailyFreeEquivalentCreditsLimit);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateFreeModelQuotaPolicyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateFreeModelQuotaPolicyRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.modelId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.dailyFreeRequestsLimit = reader.int64() as bigint;
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.dailyFreeEquivalentCreditsLimit = reader.int64() as bigint;
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateFreeModelQuotaPolicyRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      modelId: isSet(object.modelId)
+        ? globalThis.String(object.modelId)
+        : isSet(object.model_id)
+        ? globalThis.String(object.model_id)
+        : "",
+      dailyFreeRequestsLimit: isSet(object.dailyFreeRequestsLimit)
+        ? BigInt(object.dailyFreeRequestsLimit)
+        : isSet(object.daily_free_requests_limit)
+        ? BigInt(object.daily_free_requests_limit)
+        : 0n,
+      dailyFreeEquivalentCreditsLimit: isSet(object.dailyFreeEquivalentCreditsLimit)
+        ? BigInt(object.dailyFreeEquivalentCreditsLimit)
+        : isSet(object.daily_free_equivalent_credits_limit)
+        ? BigInt(object.daily_free_equivalent_credits_limit)
+        : 0n,
+    };
+  },
+
+  toJSON(message: UpdateFreeModelQuotaPolicyRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.dailyFreeRequestsLimit !== 0n) {
+      obj.dailyFreeRequestsLimit = message.dailyFreeRequestsLimit.toString();
+    }
+    if (message.dailyFreeEquivalentCreditsLimit !== 0n) {
+      obj.dailyFreeEquivalentCreditsLimit = message.dailyFreeEquivalentCreditsLimit.toString();
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateFreeModelQuotaPolicyRequest>, I>>(
+    base?: I,
+  ): UpdateFreeModelQuotaPolicyRequest {
+    return UpdateFreeModelQuotaPolicyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateFreeModelQuotaPolicyRequest>, I>>(
+    object: I,
+  ): UpdateFreeModelQuotaPolicyRequest {
+    const message = createBaseUpdateFreeModelQuotaPolicyRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.modelId = object.modelId ?? "";
+    message.dailyFreeRequestsLimit =
+      (object.dailyFreeRequestsLimit !== undefined && object.dailyFreeRequestsLimit !== null)
+        ? BigInt(object.dailyFreeRequestsLimit)
+        : 0n;
+    message.dailyFreeEquivalentCreditsLimit =
+      (object.dailyFreeEquivalentCreditsLimit !== undefined && object.dailyFreeEquivalentCreditsLimit !== null)
+        ? BigInt(object.dailyFreeEquivalentCreditsLimit)
+        : 0n;
+    return message;
+  },
+};
+
+function createBaseUpdateFreeModelQuotaPolicyResponse(): UpdateFreeModelQuotaPolicyResponse {
+  return { result: undefined };
+}
+
+export const UpdateFreeModelQuotaPolicyResponse: MessageFns<UpdateFreeModelQuotaPolicyResponse> = {
+  encode(message: UpdateFreeModelQuotaPolicyResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateFreeModelQuotaPolicyResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseUpdateFreeModelQuotaPolicyResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): UpdateFreeModelQuotaPolicyResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: UpdateFreeModelQuotaPolicyResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<UpdateFreeModelQuotaPolicyResponse>, I>>(
+    base?: I,
+  ): UpdateFreeModelQuotaPolicyResponse {
+    return UpdateFreeModelQuotaPolicyResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<UpdateFreeModelQuotaPolicyResponse>, I>>(
+    object: I,
+  ): UpdateFreeModelQuotaPolicyResponse {
+    const message = createBaseUpdateFreeModelQuotaPolicyResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseResolveUncertainJobRequest(): ResolveUncertainJobRequest {
+  return { operator: undefined, operationId: "", action: 0, verifiedOutputs: [], verifiedUsage: undefined };
+}
+
+export const ResolveUncertainJobRequest: MessageFns<ResolveUncertainJobRequest> = {
+  encode(message: ResolveUncertainJobRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.operationId !== "") {
+      writer.uint32(18).string(message.operationId);
+    }
+    if (message.action !== 0) {
+      writer.uint32(24).int32(message.action);
+    }
+    for (const v of message.verifiedOutputs) {
+      MediaOutputSettlementItem.encode(v!, writer.uint32(34).fork()).join();
+    }
+    if (message.verifiedUsage !== undefined) {
+      UsageBound.encode(message.verifiedUsage, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveUncertainJobRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveUncertainJobRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.operationId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.action = reader.int32() as any;
+            continue;
+          }
+          case 4: {
+            if (tag !== 34) {
+              break;
+            }
+
+            message.verifiedOutputs.push(MediaOutputSettlementItem.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 5: {
+            if (tag !== 42) {
+              break;
+            }
+
+            message.verifiedUsage = UsageBound.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveUncertainJobRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      operationId: isSet(object.operationId)
+        ? globalThis.String(object.operationId)
+        : isSet(object.operation_id)
+        ? globalThis.String(object.operation_id)
+        : "",
+      action: isSet(object.action) ? uncertainResolutionActionFromJSON(object.action) : 0,
+      verifiedOutputs: globalThis.Array.isArray(object?.verifiedOutputs)
+        ? object.verifiedOutputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : globalThis.Array.isArray(object?.verified_outputs)
+        ? object.verified_outputs.map((e: any) => MediaOutputSettlementItem.fromJSON(e))
+        : [],
+      verifiedUsage: isSet(object.verifiedUsage)
+        ? UsageBound.fromJSON(object.verifiedUsage)
+        : isSet(object.verified_usage)
+        ? UsageBound.fromJSON(object.verified_usage)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ResolveUncertainJobRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.operationId !== "") {
+      obj.operationId = message.operationId;
+    }
+    if (message.action !== 0) {
+      obj.action = uncertainResolutionActionToJSON(message.action);
+    }
+    if (message.verifiedOutputs?.length) {
+      obj.verifiedOutputs = message.verifiedOutputs.map((e) => MediaOutputSettlementItem.toJSON(e));
+    }
+    if (message.verifiedUsage !== undefined) {
+      obj.verifiedUsage = UsageBound.toJSON(message.verifiedUsage);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveUncertainJobRequest>, I>>(base?: I): ResolveUncertainJobRequest {
+    return ResolveUncertainJobRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveUncertainJobRequest>, I>>(object: I): ResolveUncertainJobRequest {
+    const message = createBaseResolveUncertainJobRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.operationId = object.operationId ?? "";
+    message.action = object.action ?? 0;
+    message.verifiedOutputs = object.verifiedOutputs?.map((e) => MediaOutputSettlementItem.fromPartial(e)) || [];
+    message.verifiedUsage = (object.verifiedUsage !== undefined && object.verifiedUsage !== null)
+      ? UsageBound.fromPartial(object.verifiedUsage)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseResolveUncertainJobResponse(): ResolveUncertainJobResponse {
+  return { result: undefined };
+}
+
+export const ResolveUncertainJobResponse: MessageFns<ResolveUncertainJobResponse> = {
+  encode(message: ResolveUncertainJobResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveUncertainJobResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveUncertainJobResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveUncertainJobResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ResolveUncertainJobResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveUncertainJobResponse>, I>>(base?: I): ResolveUncertainJobResponse {
+    return ResolveUncertainJobResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveUncertainJobResponse>, I>>(object: I): ResolveUncertainJobResponse {
+    const message = createBaseResolveUncertainJobResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseModerateMaterialRequest(): ModerateMaterialRequest {
+  return { operator: undefined, materialId: "", decision: "" };
+}
+
+export const ModerateMaterialRequest: MessageFns<ModerateMaterialRequest> = {
+  encode(message: ModerateMaterialRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.materialId !== "") {
+      writer.uint32(18).string(message.materialId);
+    }
+    if (message.decision !== "") {
+      writer.uint32(26).string(message.decision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ModerateMaterialRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseModerateMaterialRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.materialId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.decision = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ModerateMaterialRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      materialId: isSet(object.materialId)
+        ? globalThis.String(object.materialId)
+        : isSet(object.material_id)
+        ? globalThis.String(object.material_id)
+        : "",
+      decision: isSet(object.decision) ? globalThis.String(object.decision) : "",
+    };
+  },
+
+  toJSON(message: ModerateMaterialRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.materialId !== "") {
+      obj.materialId = message.materialId;
+    }
+    if (message.decision !== "") {
+      obj.decision = message.decision;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModerateMaterialRequest>, I>>(base?: I): ModerateMaterialRequest {
+    return ModerateMaterialRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModerateMaterialRequest>, I>>(object: I): ModerateMaterialRequest {
+    const message = createBaseModerateMaterialRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.materialId = object.materialId ?? "";
+    message.decision = object.decision ?? "";
+    return message;
+  },
+};
+
+function createBaseModerateMaterialResponse(): ModerateMaterialResponse {
+  return { result: undefined };
+}
+
+export const ModerateMaterialResponse: MessageFns<ModerateMaterialResponse> = {
+  encode(message: ModerateMaterialResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ModerateMaterialResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseModerateMaterialResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ModerateMaterialResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ModerateMaterialResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModerateMaterialResponse>, I>>(base?: I): ModerateMaterialResponse {
+    return ModerateMaterialResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModerateMaterialResponse>, I>>(object: I): ModerateMaterialResponse {
+    const message = createBaseModerateMaterialResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseResolveAppealRequest(): ResolveAppealRequest {
+  return { operator: undefined, appealId: "", decision: "" };
+}
+
+export const ResolveAppealRequest: MessageFns<ResolveAppealRequest> = {
+  encode(message: ResolveAppealRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.operator !== undefined) {
+      OperatorContext.encode(message.operator, writer.uint32(10).fork()).join();
+    }
+    if (message.appealId !== "") {
+      writer.uint32(18).string(message.appealId);
+    }
+    if (message.decision !== "") {
+      writer.uint32(26).string(message.decision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveAppealRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveAppealRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.operator = OperatorContext.decode(reader, reader.uint32());
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.appealId = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.decision = reader.string();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveAppealRequest {
+    return {
+      operator: isSet(object.operator) ? OperatorContext.fromJSON(object.operator) : undefined,
+      appealId: isSet(object.appealId)
+        ? globalThis.String(object.appealId)
+        : isSet(object.appeal_id)
+        ? globalThis.String(object.appeal_id)
+        : "",
+      decision: isSet(object.decision) ? globalThis.String(object.decision) : "",
+    };
+  },
+
+  toJSON(message: ResolveAppealRequest): unknown {
+    const obj: any = {};
+    if (message.operator !== undefined) {
+      obj.operator = OperatorContext.toJSON(message.operator);
+    }
+    if (message.appealId !== "") {
+      obj.appealId = message.appealId;
+    }
+    if (message.decision !== "") {
+      obj.decision = message.decision;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveAppealRequest>, I>>(base?: I): ResolveAppealRequest {
+    return ResolveAppealRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveAppealRequest>, I>>(object: I): ResolveAppealRequest {
+    const message = createBaseResolveAppealRequest();
+    message.operator = (object.operator !== undefined && object.operator !== null)
+      ? OperatorContext.fromPartial(object.operator)
+      : undefined;
+    message.appealId = object.appealId ?? "";
+    message.decision = object.decision ?? "";
+    return message;
+  },
+};
+
+function createBaseResolveAppealResponse(): ResolveAppealResponse {
+  return { result: undefined };
+}
+
+export const ResolveAppealResponse: MessageFns<ResolveAppealResponse> = {
+  encode(message: ResolveAppealResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.result !== undefined) {
+      AdminMutationResult.encode(message.result, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ResolveAppealResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseResolveAppealResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.result = AdminMutationResult.decode(reader, reader.uint32());
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): ResolveAppealResponse {
+    return { result: isSet(object.result) ? AdminMutationResult.fromJSON(object.result) : undefined };
+  },
+
+  toJSON(message: ResolveAppealResponse): unknown {
+    const obj: any = {};
+    if (message.result !== undefined) {
+      obj.result = AdminMutationResult.toJSON(message.result);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ResolveAppealResponse>, I>>(base?: I): ResolveAppealResponse {
+    return ResolveAppealResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ResolveAppealResponse>, I>>(object: I): ResolveAppealResponse {
+    const message = createBaseResolveAppealResponse();
+    message.result = (object.result !== undefined && object.result !== null)
+      ? AdminMutationResult.fromPartial(object.result)
+      : undefined;
+    return message;
+  },
+};
+
+/** BillingExecutionService is the intra-datacenter execution and ledger contract hosted by Go billing-service. */
 export type BillingExecutionServiceService = typeof BillingExecutionServiceService;
 export const BillingExecutionServiceService = {
   /**
@@ -9090,7 +23896,7 @@ export const BillingExecutionServiceService = {
   },
   /**
    * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   * records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
    */
   settle: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/Settle" as const,
@@ -9112,7 +23918,7 @@ export const BillingExecutionServiceService = {
       Buffer.from(MarkUncertainResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): MarkUncertainResponse => MarkUncertainResponse.decode(value),
   },
-  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline. */
   resolveUncertain: {
     path: "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain" as const,
     requestStream: false as const,
@@ -9123,6 +23929,46 @@ export const BillingExecutionServiceService = {
     responseSerialize: (value: ResolveUncertainResponse): Buffer =>
       Buffer.from(ResolveUncertainResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ResolveUncertainResponse => ResolveUncertainResponse.decode(value),
+  },
+  /** A durable, fenced observation written as soon as the upstream status or identifiers are known. */
+  recordAttemptObservation: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/RecordAttemptObservation" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RecordAttemptObservationRequest): Buffer =>
+      Buffer.from(RecordAttemptObservationRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RecordAttemptObservationRequest =>
+      RecordAttemptObservationRequest.decode(value),
+    responseSerialize: (value: RecordAttemptObservationResponse): Buffer =>
+      Buffer.from(RecordAttemptObservationResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RecordAttemptObservationResponse =>
+      RecordAttemptObservationResponse.decode(value),
+  },
+  /** Claims expired execution work without authorizing a new upstream dispatch. */
+  claimExecutionRecovery: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/ClaimExecutionRecovery" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ClaimExecutionRecoveryRequest): Buffer =>
+      Buffer.from(ClaimExecutionRecoveryRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ClaimExecutionRecoveryRequest => ClaimExecutionRecoveryRequest.decode(value),
+    responseSerialize: (value: ClaimExecutionRecoveryResponse): Buffer =>
+      Buffer.from(ClaimExecutionRecoveryResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ClaimExecutionRecoveryResponse =>
+      ClaimExecutionRecoveryResponse.decode(value),
+  },
+  /** Reports the active, durably imported admission snapshot on the authoritative billing instance. */
+  getBillingCatalogState: {
+    path: "/maxshot.gateway_internal.v1.BillingExecutionService/GetBillingCatalogState" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetBillingCatalogStateRequest): Buffer =>
+      Buffer.from(GetBillingCatalogStateRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetBillingCatalogStateRequest => GetBillingCatalogStateRequest.decode(value),
+    responseSerialize: (value: GetBillingCatalogStateResponse): Buffer =>
+      Buffer.from(GetBillingCatalogStateResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetBillingCatalogStateResponse =>
+      GetBillingCatalogStateResponse.decode(value),
   },
 } as const;
 
@@ -9154,13 +24000,19 @@ export interface BillingExecutionServiceServer extends UntypedServiceImplementat
   extendExecutionLease: handleUnaryCall<ExtendExecutionLeaseRequest, ExtendExecutionLeaseResponse>;
   /**
    * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   * records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
    */
   settle: handleUnaryCall<SettleRequest, SettleResponse>;
   /** MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue. */
   markUncertain: handleUnaryCall<MarkUncertainRequest, MarkUncertainResponse>;
-  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline. */
   resolveUncertain: handleUnaryCall<ResolveUncertainRequest, ResolveUncertainResponse>;
+  /** A durable, fenced observation written as soon as the upstream status or identifiers are known. */
+  recordAttemptObservation: handleUnaryCall<RecordAttemptObservationRequest, RecordAttemptObservationResponse>;
+  /** Claims expired execution work without authorizing a new upstream dispatch. */
+  claimExecutionRecovery: handleUnaryCall<ClaimExecutionRecoveryRequest, ClaimExecutionRecoveryResponse>;
+  /** Reports the active, durably imported admission snapshot on the authoritative billing instance. */
+  getBillingCatalogState: handleUnaryCall<GetBillingCatalogStateRequest, GetBillingCatalogStateResponse>;
 }
 
 export interface BillingExecutionServiceClient extends Client {
@@ -9275,7 +24127,7 @@ export interface BillingExecutionServiceClient extends Client {
   ): ClientUnaryCall;
   /**
    * Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-   * records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+   * records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
    */
   settle(
     request: SettleRequest,
@@ -9308,7 +24160,7 @@ export interface BillingExecutionServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: MarkUncertainResponse) => void,
   ): ClientUnaryCall;
-  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36). */
+  /** ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline. */
   resolveUncertain(
     request: ResolveUncertainRequest,
     callback: (error: ServiceError | null, response: ResolveUncertainResponse) => void,
@@ -9324,6 +24176,54 @@ export interface BillingExecutionServiceClient extends Client {
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: ResolveUncertainResponse) => void,
   ): ClientUnaryCall;
+  /** A durable, fenced observation written as soon as the upstream status or identifiers are known. */
+  recordAttemptObservation(
+    request: RecordAttemptObservationRequest,
+    callback: (error: ServiceError | null, response: RecordAttemptObservationResponse) => void,
+  ): ClientUnaryCall;
+  recordAttemptObservation(
+    request: RecordAttemptObservationRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RecordAttemptObservationResponse) => void,
+  ): ClientUnaryCall;
+  recordAttemptObservation(
+    request: RecordAttemptObservationRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RecordAttemptObservationResponse) => void,
+  ): ClientUnaryCall;
+  /** Claims expired execution work without authorizing a new upstream dispatch. */
+  claimExecutionRecovery(
+    request: ClaimExecutionRecoveryRequest,
+    callback: (error: ServiceError | null, response: ClaimExecutionRecoveryResponse) => void,
+  ): ClientUnaryCall;
+  claimExecutionRecovery(
+    request: ClaimExecutionRecoveryRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ClaimExecutionRecoveryResponse) => void,
+  ): ClientUnaryCall;
+  claimExecutionRecovery(
+    request: ClaimExecutionRecoveryRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ClaimExecutionRecoveryResponse) => void,
+  ): ClientUnaryCall;
+  /** Reports the active, durably imported admission snapshot on the authoritative billing instance. */
+  getBillingCatalogState(
+    request: GetBillingCatalogStateRequest,
+    callback: (error: ServiceError | null, response: GetBillingCatalogStateResponse) => void,
+  ): ClientUnaryCall;
+  getBillingCatalogState(
+    request: GetBillingCatalogStateRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetBillingCatalogStateResponse) => void,
+  ): ClientUnaryCall;
+  getBillingCatalogState(
+    request: GetBillingCatalogStateRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetBillingCatalogStateResponse) => void,
+  ): ClientUnaryCall;
 }
 
 export const BillingExecutionServiceClient = makeGenericClientConstructor(
@@ -9338,6 +24238,1445 @@ export const BillingExecutionServiceClient = makeGenericClientConstructor(
   service: typeof BillingExecutionServiceService;
   serviceName: string;
 };
+
+/**
+ * All methods are internal. account_id is derived from the authenticated Web principal,
+ * never trusted from a public request body. Writes derive idempotency from the operation and its inputs.
+ */
+export type AccountManagementServiceService = typeof AccountManagementServiceService;
+export const AccountManagementServiceService = {
+  registerAccount: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/RegisterAccount" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RegisterAccountRequest): Buffer =>
+      Buffer.from(RegisterAccountRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RegisterAccountRequest => RegisterAccountRequest.decode(value),
+    responseSerialize: (value: RegisterAccountResponse): Buffer =>
+      Buffer.from(RegisterAccountResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RegisterAccountResponse => RegisterAccountResponse.decode(value),
+  },
+  createApiKey: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/CreateApiKey" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: CreateApiKeyRequest): Buffer => Buffer.from(CreateApiKeyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateApiKeyRequest => CreateApiKeyRequest.decode(value),
+    responseSerialize: (value: CreateApiKeyResponse): Buffer =>
+      Buffer.from(CreateApiKeyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CreateApiKeyResponse => CreateApiKeyResponse.decode(value),
+  },
+  updateApiKey: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/UpdateApiKey" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpdateApiKeyRequest): Buffer => Buffer.from(UpdateApiKeyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateApiKeyRequest => UpdateApiKeyRequest.decode(value),
+    responseSerialize: (value: UpdateApiKeyResponse): Buffer =>
+      Buffer.from(UpdateApiKeyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpdateApiKeyResponse => UpdateApiKeyResponse.decode(value),
+  },
+  revokeApiKey: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/RevokeApiKey" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RevokeApiKeyRequest): Buffer => Buffer.from(RevokeApiKeyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RevokeApiKeyRequest => RevokeApiKeyRequest.decode(value),
+    responseSerialize: (value: RevokeApiKeyResponse): Buffer =>
+      Buffer.from(RevokeApiKeyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RevokeApiKeyResponse => RevokeApiKeyResponse.decode(value),
+  },
+  listApiKeys: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListApiKeys" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListApiKeysRequest): Buffer => Buffer.from(ListApiKeysRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListApiKeysRequest => ListApiKeysRequest.decode(value),
+    responseSerialize: (value: ListApiKeysResponse): Buffer => Buffer.from(ListApiKeysResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListApiKeysResponse => ListApiKeysResponse.decode(value),
+  },
+  getAccountFunding: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetAccountFunding" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetAccountFundingRequest): Buffer =>
+      Buffer.from(GetAccountFundingRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetAccountFundingRequest => GetAccountFundingRequest.decode(value),
+    responseSerialize: (value: GetAccountFundingResponse): Buffer =>
+      Buffer.from(GetAccountFundingResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetAccountFundingResponse => GetAccountFundingResponse.decode(value),
+  },
+  updateAccountSettings: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/UpdateAccountSettings" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpdateAccountSettingsRequest): Buffer =>
+      Buffer.from(UpdateAccountSettingsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateAccountSettingsRequest => UpdateAccountSettingsRequest.decode(value),
+    responseSerialize: (value: UpdateAccountSettingsResponse): Buffer =>
+      Buffer.from(UpdateAccountSettingsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpdateAccountSettingsResponse => UpdateAccountSettingsResponse.decode(value),
+  },
+  listSubscriptionPlans: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListSubscriptionPlans" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListSubscriptionPlansRequest): Buffer =>
+      Buffer.from(ListSubscriptionPlansRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListSubscriptionPlansRequest => ListSubscriptionPlansRequest.decode(value),
+    responseSerialize: (value: ListSubscriptionPlansResponse): Buffer =>
+      Buffer.from(ListSubscriptionPlansResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListSubscriptionPlansResponse => ListSubscriptionPlansResponse.decode(value),
+  },
+  getSubscription: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetSubscription" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetSubscriptionRequest): Buffer =>
+      Buffer.from(GetSubscriptionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetSubscriptionRequest => GetSubscriptionRequest.decode(value),
+    responseSerialize: (value: GetSubscriptionResponse): Buffer =>
+      Buffer.from(GetSubscriptionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetSubscriptionResponse => GetSubscriptionResponse.decode(value),
+  },
+  purchaseSubscription: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/PurchaseSubscription" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PurchaseSubscriptionRequest): Buffer =>
+      Buffer.from(PurchaseSubscriptionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PurchaseSubscriptionRequest => PurchaseSubscriptionRequest.decode(value),
+    responseSerialize: (value: PurchaseSubscriptionResponse): Buffer =>
+      Buffer.from(PurchaseSubscriptionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PurchaseSubscriptionResponse => PurchaseSubscriptionResponse.decode(value),
+  },
+  renewSubscription: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/RenewSubscription" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RenewSubscriptionRequest): Buffer =>
+      Buffer.from(RenewSubscriptionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RenewSubscriptionRequest => RenewSubscriptionRequest.decode(value),
+    responseSerialize: (value: RenewSubscriptionResponse): Buffer =>
+      Buffer.from(RenewSubscriptionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RenewSubscriptionResponse => RenewSubscriptionResponse.decode(value),
+  },
+  cancelSubscription: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/CancelSubscription" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: CancelSubscriptionRequest): Buffer =>
+      Buffer.from(CancelSubscriptionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CancelSubscriptionRequest => CancelSubscriptionRequest.decode(value),
+    responseSerialize: (value: CancelSubscriptionResponse): Buffer =>
+      Buffer.from(CancelSubscriptionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CancelSubscriptionResponse => CancelSubscriptionResponse.decode(value),
+  },
+  schedulePlanChange: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/SchedulePlanChange" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SchedulePlanChangeRequest): Buffer =>
+      Buffer.from(SchedulePlanChangeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SchedulePlanChangeRequest => SchedulePlanChangeRequest.decode(value),
+    responseSerialize: (value: SchedulePlanChangeResponse): Buffer =>
+      Buffer.from(SchedulePlanChangeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SchedulePlanChangeResponse => SchedulePlanChangeResponse.decode(value),
+  },
+  listInvoices: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListInvoices" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListInvoicesRequest): Buffer => Buffer.from(ListInvoicesRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListInvoicesRequest => ListInvoicesRequest.decode(value),
+    responseSerialize: (value: ListInvoicesResponse): Buffer =>
+      Buffer.from(ListInvoicesResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListInvoicesResponse => ListInvoicesResponse.decode(value),
+  },
+  getInvoice: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetInvoice" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetInvoiceRequest): Buffer => Buffer.from(GetInvoiceRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetInvoiceRequest => GetInvoiceRequest.decode(value),
+    responseSerialize: (value: GetInvoiceResponse): Buffer => Buffer.from(GetInvoiceResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetInvoiceResponse => GetInvoiceResponse.decode(value),
+  },
+  getDepositAddress: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetDepositAddress" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetDepositAddressRequest): Buffer =>
+      Buffer.from(GetDepositAddressRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetDepositAddressRequest => GetDepositAddressRequest.decode(value),
+    responseSerialize: (value: GetDepositAddressResponse): Buffer =>
+      Buffer.from(GetDepositAddressResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetDepositAddressResponse => GetDepositAddressResponse.decode(value),
+  },
+  createTopupOrder: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/CreateTopupOrder" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: CreateTopupOrderRequest): Buffer =>
+      Buffer.from(CreateTopupOrderRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreateTopupOrderRequest => CreateTopupOrderRequest.decode(value),
+    responseSerialize: (value: CreateTopupOrderResponse): Buffer =>
+      Buffer.from(CreateTopupOrderResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CreateTopupOrderResponse => CreateTopupOrderResponse.decode(value),
+  },
+  recordStripePayment: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/RecordStripePayment" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RecordStripePaymentRequest): Buffer =>
+      Buffer.from(RecordStripePaymentRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RecordStripePaymentRequest => RecordStripePaymentRequest.decode(value),
+    responseSerialize: (value: RecordStripePaymentResponse): Buffer =>
+      Buffer.from(RecordStripePaymentResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RecordStripePaymentResponse => RecordStripePaymentResponse.decode(value),
+  },
+  listTopups: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListTopups" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListTopupsRequest): Buffer => Buffer.from(ListTopupsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListTopupsRequest => ListTopupsRequest.decode(value),
+    responseSerialize: (value: ListTopupsResponse): Buffer => Buffer.from(ListTopupsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListTopupsResponse => ListTopupsResponse.decode(value),
+  },
+  linkWallet: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/LinkWallet" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: LinkWalletRequest): Buffer => Buffer.from(LinkWalletRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): LinkWalletRequest => LinkWalletRequest.decode(value),
+    responseSerialize: (value: LinkWalletResponse): Buffer => Buffer.from(LinkWalletResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LinkWalletResponse => LinkWalletResponse.decode(value),
+  },
+  getWalletLink: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetWalletLink" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetWalletLinkRequest): Buffer => Buffer.from(GetWalletLinkRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetWalletLinkRequest => GetWalletLinkRequest.decode(value),
+    responseSerialize: (value: GetWalletLinkResponse): Buffer =>
+      Buffer.from(GetWalletLinkResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetWalletLinkResponse => GetWalletLinkResponse.decode(value),
+  },
+  acceptFundedTerm: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/AcceptFundedTerm" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: AcceptFundedTermRequest): Buffer =>
+      Buffer.from(AcceptFundedTermRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): AcceptFundedTermRequest => AcceptFundedTermRequest.decode(value),
+    responseSerialize: (value: AcceptFundedTermResponse): Buffer =>
+      Buffer.from(AcceptFundedTermResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): AcceptFundedTermResponse => AcceptFundedTermResponse.decode(value),
+  },
+  getCurrentFundedTerm: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetCurrentFundedTerm" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetCurrentFundedTermRequest): Buffer =>
+      Buffer.from(GetCurrentFundedTermRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetCurrentFundedTermRequest => GetCurrentFundedTermRequest.decode(value),
+    responseSerialize: (value: GetCurrentFundedTermResponse): Buffer =>
+      Buffer.from(GetCurrentFundedTermResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetCurrentFundedTermResponse => GetCurrentFundedTermResponse.decode(value),
+  },
+  prepareAccountMerge: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/PrepareAccountMerge" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PrepareAccountMergeRequest): Buffer =>
+      Buffer.from(PrepareAccountMergeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PrepareAccountMergeRequest => PrepareAccountMergeRequest.decode(value),
+    responseSerialize: (value: PrepareAccountMergeResponse): Buffer =>
+      Buffer.from(PrepareAccountMergeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PrepareAccountMergeResponse => PrepareAccountMergeResponse.decode(value),
+  },
+  commitAccountMerge: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/CommitAccountMerge" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: CommitAccountMergeRequest): Buffer =>
+      Buffer.from(CommitAccountMergeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CommitAccountMergeRequest => CommitAccountMergeRequest.decode(value),
+    responseSerialize: (value: CommitAccountMergeResponse): Buffer =>
+      Buffer.from(CommitAccountMergeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CommitAccountMergeResponse => CommitAccountMergeResponse.decode(value),
+  },
+  listUsage: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListUsage" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListUsageRequest): Buffer => Buffer.from(ListUsageRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListUsageRequest => ListUsageRequest.decode(value),
+    responseSerialize: (value: ListUsageResponse): Buffer => Buffer.from(ListUsageResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListUsageResponse => ListUsageResponse.decode(value),
+  },
+  getUsageDetail: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetUsageDetail" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetUsageDetailRequest): Buffer =>
+      Buffer.from(GetUsageDetailRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetUsageDetailRequest => GetUsageDetailRequest.decode(value),
+    responseSerialize: (value: GetUsageDetailResponse): Buffer =>
+      Buffer.from(GetUsageDetailResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetUsageDetailResponse => GetUsageDetailResponse.decode(value),
+  },
+  listAccountNotices: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/ListAccountNotices" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListAccountNoticesRequest): Buffer =>
+      Buffer.from(ListAccountNoticesRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListAccountNoticesRequest => ListAccountNoticesRequest.decode(value),
+    responseSerialize: (value: ListAccountNoticesResponse): Buffer =>
+      Buffer.from(ListAccountNoticesResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListAccountNoticesResponse => ListAccountNoticesResponse.decode(value),
+  },
+  ackAccountNotice: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/AckAccountNotice" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: AckAccountNoticeRequest): Buffer =>
+      Buffer.from(AckAccountNoticeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): AckAccountNoticeRequest => AckAccountNoticeRequest.decode(value),
+    responseSerialize: (value: AckAccountNoticeResponse): Buffer =>
+      Buffer.from(AckAccountNoticeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): AckAccountNoticeResponse => AckAccountNoticeResponse.decode(value),
+  },
+  getReferralSummary: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/GetReferralSummary" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetReferralSummaryRequest): Buffer =>
+      Buffer.from(GetReferralSummaryRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetReferralSummaryRequest => GetReferralSummaryRequest.decode(value),
+    responseSerialize: (value: GetReferralSummaryResponse): Buffer =>
+      Buffer.from(GetReferralSummaryResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetReferralSummaryResponse => GetReferralSummaryResponse.decode(value),
+  },
+  setReferralAttribution: {
+    path: "/maxshot.gateway_internal.v1.AccountManagementService/SetReferralAttribution" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SetReferralAttributionRequest): Buffer =>
+      Buffer.from(SetReferralAttributionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetReferralAttributionRequest => SetReferralAttributionRequest.decode(value),
+    responseSerialize: (value: SetReferralAttributionResponse): Buffer =>
+      Buffer.from(SetReferralAttributionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetReferralAttributionResponse =>
+      SetReferralAttributionResponse.decode(value),
+  },
+} as const;
+
+export interface AccountManagementServiceServer extends UntypedServiceImplementation {
+  registerAccount: handleUnaryCall<RegisterAccountRequest, RegisterAccountResponse>;
+  createApiKey: handleUnaryCall<CreateApiKeyRequest, CreateApiKeyResponse>;
+  updateApiKey: handleUnaryCall<UpdateApiKeyRequest, UpdateApiKeyResponse>;
+  revokeApiKey: handleUnaryCall<RevokeApiKeyRequest, RevokeApiKeyResponse>;
+  listApiKeys: handleUnaryCall<ListApiKeysRequest, ListApiKeysResponse>;
+  getAccountFunding: handleUnaryCall<GetAccountFundingRequest, GetAccountFundingResponse>;
+  updateAccountSettings: handleUnaryCall<UpdateAccountSettingsRequest, UpdateAccountSettingsResponse>;
+  listSubscriptionPlans: handleUnaryCall<ListSubscriptionPlansRequest, ListSubscriptionPlansResponse>;
+  getSubscription: handleUnaryCall<GetSubscriptionRequest, GetSubscriptionResponse>;
+  purchaseSubscription: handleUnaryCall<PurchaseSubscriptionRequest, PurchaseSubscriptionResponse>;
+  renewSubscription: handleUnaryCall<RenewSubscriptionRequest, RenewSubscriptionResponse>;
+  cancelSubscription: handleUnaryCall<CancelSubscriptionRequest, CancelSubscriptionResponse>;
+  schedulePlanChange: handleUnaryCall<SchedulePlanChangeRequest, SchedulePlanChangeResponse>;
+  listInvoices: handleUnaryCall<ListInvoicesRequest, ListInvoicesResponse>;
+  getInvoice: handleUnaryCall<GetInvoiceRequest, GetInvoiceResponse>;
+  getDepositAddress: handleUnaryCall<GetDepositAddressRequest, GetDepositAddressResponse>;
+  createTopupOrder: handleUnaryCall<CreateTopupOrderRequest, CreateTopupOrderResponse>;
+  recordStripePayment: handleUnaryCall<RecordStripePaymentRequest, RecordStripePaymentResponse>;
+  listTopups: handleUnaryCall<ListTopupsRequest, ListTopupsResponse>;
+  linkWallet: handleUnaryCall<LinkWalletRequest, LinkWalletResponse>;
+  getWalletLink: handleUnaryCall<GetWalletLinkRequest, GetWalletLinkResponse>;
+  acceptFundedTerm: handleUnaryCall<AcceptFundedTermRequest, AcceptFundedTermResponse>;
+  getCurrentFundedTerm: handleUnaryCall<GetCurrentFundedTermRequest, GetCurrentFundedTermResponse>;
+  prepareAccountMerge: handleUnaryCall<PrepareAccountMergeRequest, PrepareAccountMergeResponse>;
+  commitAccountMerge: handleUnaryCall<CommitAccountMergeRequest, CommitAccountMergeResponse>;
+  listUsage: handleUnaryCall<ListUsageRequest, ListUsageResponse>;
+  getUsageDetail: handleUnaryCall<GetUsageDetailRequest, GetUsageDetailResponse>;
+  listAccountNotices: handleUnaryCall<ListAccountNoticesRequest, ListAccountNoticesResponse>;
+  ackAccountNotice: handleUnaryCall<AckAccountNoticeRequest, AckAccountNoticeResponse>;
+  getReferralSummary: handleUnaryCall<GetReferralSummaryRequest, GetReferralSummaryResponse>;
+  setReferralAttribution: handleUnaryCall<SetReferralAttributionRequest, SetReferralAttributionResponse>;
+}
+
+export interface AccountManagementServiceClient extends Client {
+  registerAccount(
+    request: RegisterAccountRequest,
+    callback: (error: ServiceError | null, response: RegisterAccountResponse) => void,
+  ): ClientUnaryCall;
+  registerAccount(
+    request: RegisterAccountRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RegisterAccountResponse) => void,
+  ): ClientUnaryCall;
+  registerAccount(
+    request: RegisterAccountRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RegisterAccountResponse) => void,
+  ): ClientUnaryCall;
+  createApiKey(
+    request: CreateApiKeyRequest,
+    callback: (error: ServiceError | null, response: CreateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  createApiKey(
+    request: CreateApiKeyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CreateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  createApiKey(
+    request: CreateApiKeyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CreateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  updateApiKey(
+    request: UpdateApiKeyRequest,
+    callback: (error: ServiceError | null, response: UpdateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  updateApiKey(
+    request: UpdateApiKeyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UpdateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  updateApiKey(
+    request: UpdateApiKeyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UpdateApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  revokeApiKey(
+    request: RevokeApiKeyRequest,
+    callback: (error: ServiceError | null, response: RevokeApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  revokeApiKey(
+    request: RevokeApiKeyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RevokeApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  revokeApiKey(
+    request: RevokeApiKeyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RevokeApiKeyResponse) => void,
+  ): ClientUnaryCall;
+  listApiKeys(
+    request: ListApiKeysRequest,
+    callback: (error: ServiceError | null, response: ListApiKeysResponse) => void,
+  ): ClientUnaryCall;
+  listApiKeys(
+    request: ListApiKeysRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListApiKeysResponse) => void,
+  ): ClientUnaryCall;
+  listApiKeys(
+    request: ListApiKeysRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListApiKeysResponse) => void,
+  ): ClientUnaryCall;
+  getAccountFunding(
+    request: GetAccountFundingRequest,
+    callback: (error: ServiceError | null, response: GetAccountFundingResponse) => void,
+  ): ClientUnaryCall;
+  getAccountFunding(
+    request: GetAccountFundingRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetAccountFundingResponse) => void,
+  ): ClientUnaryCall;
+  getAccountFunding(
+    request: GetAccountFundingRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetAccountFundingResponse) => void,
+  ): ClientUnaryCall;
+  updateAccountSettings(
+    request: UpdateAccountSettingsRequest,
+    callback: (error: ServiceError | null, response: UpdateAccountSettingsResponse) => void,
+  ): ClientUnaryCall;
+  updateAccountSettings(
+    request: UpdateAccountSettingsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UpdateAccountSettingsResponse) => void,
+  ): ClientUnaryCall;
+  updateAccountSettings(
+    request: UpdateAccountSettingsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UpdateAccountSettingsResponse) => void,
+  ): ClientUnaryCall;
+  listSubscriptionPlans(
+    request: ListSubscriptionPlansRequest,
+    callback: (error: ServiceError | null, response: ListSubscriptionPlansResponse) => void,
+  ): ClientUnaryCall;
+  listSubscriptionPlans(
+    request: ListSubscriptionPlansRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListSubscriptionPlansResponse) => void,
+  ): ClientUnaryCall;
+  listSubscriptionPlans(
+    request: ListSubscriptionPlansRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListSubscriptionPlansResponse) => void,
+  ): ClientUnaryCall;
+  getSubscription(
+    request: GetSubscriptionRequest,
+    callback: (error: ServiceError | null, response: GetSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  getSubscription(
+    request: GetSubscriptionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  getSubscription(
+    request: GetSubscriptionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  purchaseSubscription(
+    request: PurchaseSubscriptionRequest,
+    callback: (error: ServiceError | null, response: PurchaseSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  purchaseSubscription(
+    request: PurchaseSubscriptionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PurchaseSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  purchaseSubscription(
+    request: PurchaseSubscriptionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PurchaseSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  renewSubscription(
+    request: RenewSubscriptionRequest,
+    callback: (error: ServiceError | null, response: RenewSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  renewSubscription(
+    request: RenewSubscriptionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RenewSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  renewSubscription(
+    request: RenewSubscriptionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RenewSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  cancelSubscription(
+    request: CancelSubscriptionRequest,
+    callback: (error: ServiceError | null, response: CancelSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  cancelSubscription(
+    request: CancelSubscriptionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CancelSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  cancelSubscription(
+    request: CancelSubscriptionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CancelSubscriptionResponse) => void,
+  ): ClientUnaryCall;
+  schedulePlanChange(
+    request: SchedulePlanChangeRequest,
+    callback: (error: ServiceError | null, response: SchedulePlanChangeResponse) => void,
+  ): ClientUnaryCall;
+  schedulePlanChange(
+    request: SchedulePlanChangeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SchedulePlanChangeResponse) => void,
+  ): ClientUnaryCall;
+  schedulePlanChange(
+    request: SchedulePlanChangeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SchedulePlanChangeResponse) => void,
+  ): ClientUnaryCall;
+  listInvoices(
+    request: ListInvoicesRequest,
+    callback: (error: ServiceError | null, response: ListInvoicesResponse) => void,
+  ): ClientUnaryCall;
+  listInvoices(
+    request: ListInvoicesRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListInvoicesResponse) => void,
+  ): ClientUnaryCall;
+  listInvoices(
+    request: ListInvoicesRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListInvoicesResponse) => void,
+  ): ClientUnaryCall;
+  getInvoice(
+    request: GetInvoiceRequest,
+    callback: (error: ServiceError | null, response: GetInvoiceResponse) => void,
+  ): ClientUnaryCall;
+  getInvoice(
+    request: GetInvoiceRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetInvoiceResponse) => void,
+  ): ClientUnaryCall;
+  getInvoice(
+    request: GetInvoiceRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetInvoiceResponse) => void,
+  ): ClientUnaryCall;
+  getDepositAddress(
+    request: GetDepositAddressRequest,
+    callback: (error: ServiceError | null, response: GetDepositAddressResponse) => void,
+  ): ClientUnaryCall;
+  getDepositAddress(
+    request: GetDepositAddressRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetDepositAddressResponse) => void,
+  ): ClientUnaryCall;
+  getDepositAddress(
+    request: GetDepositAddressRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetDepositAddressResponse) => void,
+  ): ClientUnaryCall;
+  createTopupOrder(
+    request: CreateTopupOrderRequest,
+    callback: (error: ServiceError | null, response: CreateTopupOrderResponse) => void,
+  ): ClientUnaryCall;
+  createTopupOrder(
+    request: CreateTopupOrderRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CreateTopupOrderResponse) => void,
+  ): ClientUnaryCall;
+  createTopupOrder(
+    request: CreateTopupOrderRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CreateTopupOrderResponse) => void,
+  ): ClientUnaryCall;
+  recordStripePayment(
+    request: RecordStripePaymentRequest,
+    callback: (error: ServiceError | null, response: RecordStripePaymentResponse) => void,
+  ): ClientUnaryCall;
+  recordStripePayment(
+    request: RecordStripePaymentRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RecordStripePaymentResponse) => void,
+  ): ClientUnaryCall;
+  recordStripePayment(
+    request: RecordStripePaymentRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RecordStripePaymentResponse) => void,
+  ): ClientUnaryCall;
+  listTopups(
+    request: ListTopupsRequest,
+    callback: (error: ServiceError | null, response: ListTopupsResponse) => void,
+  ): ClientUnaryCall;
+  listTopups(
+    request: ListTopupsRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListTopupsResponse) => void,
+  ): ClientUnaryCall;
+  listTopups(
+    request: ListTopupsRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListTopupsResponse) => void,
+  ): ClientUnaryCall;
+  linkWallet(
+    request: LinkWalletRequest,
+    callback: (error: ServiceError | null, response: LinkWalletResponse) => void,
+  ): ClientUnaryCall;
+  linkWallet(
+    request: LinkWalletRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LinkWalletResponse) => void,
+  ): ClientUnaryCall;
+  linkWallet(
+    request: LinkWalletRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LinkWalletResponse) => void,
+  ): ClientUnaryCall;
+  getWalletLink(
+    request: GetWalletLinkRequest,
+    callback: (error: ServiceError | null, response: GetWalletLinkResponse) => void,
+  ): ClientUnaryCall;
+  getWalletLink(
+    request: GetWalletLinkRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetWalletLinkResponse) => void,
+  ): ClientUnaryCall;
+  getWalletLink(
+    request: GetWalletLinkRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetWalletLinkResponse) => void,
+  ): ClientUnaryCall;
+  acceptFundedTerm(
+    request: AcceptFundedTermRequest,
+    callback: (error: ServiceError | null, response: AcceptFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  acceptFundedTerm(
+    request: AcceptFundedTermRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: AcceptFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  acceptFundedTerm(
+    request: AcceptFundedTermRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: AcceptFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  getCurrentFundedTerm(
+    request: GetCurrentFundedTermRequest,
+    callback: (error: ServiceError | null, response: GetCurrentFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  getCurrentFundedTerm(
+    request: GetCurrentFundedTermRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetCurrentFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  getCurrentFundedTerm(
+    request: GetCurrentFundedTermRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetCurrentFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  prepareAccountMerge(
+    request: PrepareAccountMergeRequest,
+    callback: (error: ServiceError | null, response: PrepareAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  prepareAccountMerge(
+    request: PrepareAccountMergeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PrepareAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  prepareAccountMerge(
+    request: PrepareAccountMergeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PrepareAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  commitAccountMerge(
+    request: CommitAccountMergeRequest,
+    callback: (error: ServiceError | null, response: CommitAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  commitAccountMerge(
+    request: CommitAccountMergeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CommitAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  commitAccountMerge(
+    request: CommitAccountMergeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CommitAccountMergeResponse) => void,
+  ): ClientUnaryCall;
+  listUsage(
+    request: ListUsageRequest,
+    callback: (error: ServiceError | null, response: ListUsageResponse) => void,
+  ): ClientUnaryCall;
+  listUsage(
+    request: ListUsageRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListUsageResponse) => void,
+  ): ClientUnaryCall;
+  listUsage(
+    request: ListUsageRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListUsageResponse) => void,
+  ): ClientUnaryCall;
+  getUsageDetail(
+    request: GetUsageDetailRequest,
+    callback: (error: ServiceError | null, response: GetUsageDetailResponse) => void,
+  ): ClientUnaryCall;
+  getUsageDetail(
+    request: GetUsageDetailRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetUsageDetailResponse) => void,
+  ): ClientUnaryCall;
+  getUsageDetail(
+    request: GetUsageDetailRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetUsageDetailResponse) => void,
+  ): ClientUnaryCall;
+  listAccountNotices(
+    request: ListAccountNoticesRequest,
+    callback: (error: ServiceError | null, response: ListAccountNoticesResponse) => void,
+  ): ClientUnaryCall;
+  listAccountNotices(
+    request: ListAccountNoticesRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ListAccountNoticesResponse) => void,
+  ): ClientUnaryCall;
+  listAccountNotices(
+    request: ListAccountNoticesRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ListAccountNoticesResponse) => void,
+  ): ClientUnaryCall;
+  ackAccountNotice(
+    request: AckAccountNoticeRequest,
+    callback: (error: ServiceError | null, response: AckAccountNoticeResponse) => void,
+  ): ClientUnaryCall;
+  ackAccountNotice(
+    request: AckAccountNoticeRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: AckAccountNoticeResponse) => void,
+  ): ClientUnaryCall;
+  ackAccountNotice(
+    request: AckAccountNoticeRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: AckAccountNoticeResponse) => void,
+  ): ClientUnaryCall;
+  getReferralSummary(
+    request: GetReferralSummaryRequest,
+    callback: (error: ServiceError | null, response: GetReferralSummaryResponse) => void,
+  ): ClientUnaryCall;
+  getReferralSummary(
+    request: GetReferralSummaryRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetReferralSummaryResponse) => void,
+  ): ClientUnaryCall;
+  getReferralSummary(
+    request: GetReferralSummaryRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetReferralSummaryResponse) => void,
+  ): ClientUnaryCall;
+  setReferralAttribution(
+    request: SetReferralAttributionRequest,
+    callback: (error: ServiceError | null, response: SetReferralAttributionResponse) => void,
+  ): ClientUnaryCall;
+  setReferralAttribution(
+    request: SetReferralAttributionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SetReferralAttributionResponse) => void,
+  ): ClientUnaryCall;
+  setReferralAttribution(
+    request: SetReferralAttributionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SetReferralAttributionResponse) => void,
+  ): ClientUnaryCall;
+}
+
+export const AccountManagementServiceClient = makeGenericClientConstructor(
+  AccountManagementServiceService,
+  "maxshot.gateway_internal.v1.AccountManagementService",
+) as unknown as {
+  new (
+    address: string,
+    credentials: ChannelCredentials,
+    options?: Partial<ClientOptions>,
+  ): AccountManagementServiceClient;
+  service: typeof AccountManagementServiceService;
+  serviceName: string;
+};
+
+export type BillingAdminServiceService = typeof BillingAdminServiceService;
+export const BillingAdminServiceService = {
+  createPlanDraft: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/CreatePlanDraft" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: CreatePlanDraftRequest): Buffer =>
+      Buffer.from(CreatePlanDraftRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreatePlanDraftRequest => CreatePlanDraftRequest.decode(value),
+    responseSerialize: (value: CreatePlanDraftResponse): Buffer =>
+      Buffer.from(CreatePlanDraftResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): CreatePlanDraftResponse => CreatePlanDraftResponse.decode(value),
+  },
+  validatePlanVersion: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/ValidatePlanVersion" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ValidatePlanVersionRequest): Buffer =>
+      Buffer.from(ValidatePlanVersionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ValidatePlanVersionRequest => ValidatePlanVersionRequest.decode(value),
+    responseSerialize: (value: ValidatePlanVersionResponse): Buffer =>
+      Buffer.from(ValidatePlanVersionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ValidatePlanVersionResponse => ValidatePlanVersionResponse.decode(value),
+  },
+  previewPlanImpact: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/PreviewPlanImpact" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PreviewPlanImpactRequest): Buffer =>
+      Buffer.from(PreviewPlanImpactRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PreviewPlanImpactRequest => PreviewPlanImpactRequest.decode(value),
+    responseSerialize: (value: PreviewPlanImpactResponse): Buffer =>
+      Buffer.from(PreviewPlanImpactResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PreviewPlanImpactResponse => PreviewPlanImpactResponse.decode(value),
+  },
+  publishPlanVersion: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/PublishPlanVersion" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PublishPlanVersionRequest): Buffer =>
+      Buffer.from(PublishPlanVersionRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PublishPlanVersionRequest => PublishPlanVersionRequest.decode(value),
+    responseSerialize: (value: PublishPlanVersionResponse): Buffer =>
+      Buffer.from(PublishPlanVersionResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PublishPlanVersionResponse => PublishPlanVersionResponse.decode(value),
+  },
+  setPlanSalesStatus: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/SetPlanSalesStatus" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SetPlanSalesStatusRequest): Buffer =>
+      Buffer.from(SetPlanSalesStatusRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetPlanSalesStatusRequest => SetPlanSalesStatusRequest.decode(value),
+    responseSerialize: (value: SetPlanSalesStatusResponse): Buffer =>
+      Buffer.from(SetPlanSalesStatusResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetPlanSalesStatusResponse => SetPlanSalesStatusResponse.decode(value),
+  },
+  setSpendingLock: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/SetSpendingLock" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SetSpendingLockRequest): Buffer =>
+      Buffer.from(SetSpendingLockRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetSpendingLockRequest => SetSpendingLockRequest.decode(value),
+    responseSerialize: (value: SetSpendingLockResponse): Buffer =>
+      Buffer.from(SetSpendingLockResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetSpendingLockResponse => SetSpendingLockResponse.decode(value),
+  },
+  manualLedgerAdjustment: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/ManualLedgerAdjustment" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ManualLedgerAdjustmentRequest): Buffer =>
+      Buffer.from(ManualLedgerAdjustmentRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ManualLedgerAdjustmentRequest => ManualLedgerAdjustmentRequest.decode(value),
+    responseSerialize: (value: ManualLedgerAdjustmentResponse): Buffer =>
+      Buffer.from(ManualLedgerAdjustmentResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ManualLedgerAdjustmentResponse =>
+      ManualLedgerAdjustmentResponse.decode(value),
+  },
+  resolveDepositReorgHold: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/ResolveDepositReorgHold" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolveDepositReorgHoldRequest): Buffer =>
+      Buffer.from(ResolveDepositReorgHoldRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveDepositReorgHoldRequest => ResolveDepositReorgHoldRequest.decode(value),
+    responseSerialize: (value: ResolveDepositReorgHoldResponse): Buffer =>
+      Buffer.from(ResolveDepositReorgHoldResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveDepositReorgHoldResponse =>
+      ResolveDepositReorgHoldResponse.decode(value),
+  },
+  reviewTopup: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/ReviewTopup" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ReviewTopupRequest): Buffer => Buffer.from(ReviewTopupRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ReviewTopupRequest => ReviewTopupRequest.decode(value),
+    responseSerialize: (value: ReviewTopupResponse): Buffer => Buffer.from(ReviewTopupResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ReviewTopupResponse => ReviewTopupResponse.decode(value),
+  },
+  revokeReferralReward: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/RevokeReferralReward" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RevokeReferralRewardRequest): Buffer =>
+      Buffer.from(RevokeReferralRewardRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RevokeReferralRewardRequest => RevokeReferralRewardRequest.decode(value),
+    responseSerialize: (value: RevokeReferralRewardResponse): Buffer =>
+      Buffer.from(RevokeReferralRewardResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RevokeReferralRewardResponse => RevokeReferralRewardResponse.decode(value),
+  },
+  resolveDiscrepancy: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/ResolveDiscrepancy" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolveDiscrepancyRequest): Buffer =>
+      Buffer.from(ResolveDiscrepancyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveDiscrepancyRequest => ResolveDiscrepancyRequest.decode(value),
+    responseSerialize: (value: ResolveDiscrepancyResponse): Buffer =>
+      Buffer.from(ResolveDiscrepancyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveDiscrepancyResponse => ResolveDiscrepancyResponse.decode(value),
+  },
+  refundSettledRequest: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/RefundSettledRequest" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: RefundSettledRequestRequest): Buffer =>
+      Buffer.from(RefundSettledRequestRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): RefundSettledRequestRequest => RefundSettledRequestRequest.decode(value),
+    responseSerialize: (value: RefundSettledRequestResponse): Buffer =>
+      Buffer.from(RefundSettledRequestResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): RefundSettledRequestResponse => RefundSettledRequestResponse.decode(value),
+  },
+  upsertFundedTerm: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/UpsertFundedTerm" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpsertFundedTermRequest): Buffer =>
+      Buffer.from(UpsertFundedTermRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpsertFundedTermRequest => UpsertFundedTermRequest.decode(value),
+    responseSerialize: (value: UpsertFundedTermResponse): Buffer =>
+      Buffer.from(UpsertFundedTermResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpsertFundedTermResponse => UpsertFundedTermResponse.decode(value),
+  },
+  lockFundedTerm: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/LockFundedTerm" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: LockFundedTermRequest): Buffer =>
+      Buffer.from(LockFundedTermRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): LockFundedTermRequest => LockFundedTermRequest.decode(value),
+    responseSerialize: (value: LockFundedTermResponse): Buffer =>
+      Buffer.from(LockFundedTermResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): LockFundedTermResponse => LockFundedTermResponse.decode(value),
+  },
+  setCoverageThrottlePolicy: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/SetCoverageThrottlePolicy" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SetCoverageThrottlePolicyRequest): Buffer =>
+      Buffer.from(SetCoverageThrottlePolicyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetCoverageThrottlePolicyRequest =>
+      SetCoverageThrottlePolicyRequest.decode(value),
+    responseSerialize: (value: SetCoverageThrottlePolicyResponse): Buffer =>
+      Buffer.from(SetCoverageThrottlePolicyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): SetCoverageThrottlePolicyResponse =>
+      SetCoverageThrottlePolicyResponse.decode(value),
+  },
+  updateSystemSetting: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/UpdateSystemSetting" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpdateSystemSettingRequest): Buffer =>
+      Buffer.from(UpdateSystemSettingRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateSystemSettingRequest => UpdateSystemSettingRequest.decode(value),
+    responseSerialize: (value: UpdateSystemSettingResponse): Buffer =>
+      Buffer.from(UpdateSystemSettingResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpdateSystemSettingResponse => UpdateSystemSettingResponse.decode(value),
+  },
+  updateFreeModelQuotaPolicy: {
+    path: "/maxshot.gateway_internal.v1.BillingAdminService/UpdateFreeModelQuotaPolicy" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpdateFreeModelQuotaPolicyRequest): Buffer =>
+      Buffer.from(UpdateFreeModelQuotaPolicyRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdateFreeModelQuotaPolicyRequest =>
+      UpdateFreeModelQuotaPolicyRequest.decode(value),
+    responseSerialize: (value: UpdateFreeModelQuotaPolicyResponse): Buffer =>
+      Buffer.from(UpdateFreeModelQuotaPolicyResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): UpdateFreeModelQuotaPolicyResponse =>
+      UpdateFreeModelQuotaPolicyResponse.decode(value),
+  },
+} as const;
+
+export interface BillingAdminServiceServer extends UntypedServiceImplementation {
+  createPlanDraft: handleUnaryCall<CreatePlanDraftRequest, CreatePlanDraftResponse>;
+  validatePlanVersion: handleUnaryCall<ValidatePlanVersionRequest, ValidatePlanVersionResponse>;
+  previewPlanImpact: handleUnaryCall<PreviewPlanImpactRequest, PreviewPlanImpactResponse>;
+  publishPlanVersion: handleUnaryCall<PublishPlanVersionRequest, PublishPlanVersionResponse>;
+  setPlanSalesStatus: handleUnaryCall<SetPlanSalesStatusRequest, SetPlanSalesStatusResponse>;
+  setSpendingLock: handleUnaryCall<SetSpendingLockRequest, SetSpendingLockResponse>;
+  manualLedgerAdjustment: handleUnaryCall<ManualLedgerAdjustmentRequest, ManualLedgerAdjustmentResponse>;
+  resolveDepositReorgHold: handleUnaryCall<ResolveDepositReorgHoldRequest, ResolveDepositReorgHoldResponse>;
+  reviewTopup: handleUnaryCall<ReviewTopupRequest, ReviewTopupResponse>;
+  revokeReferralReward: handleUnaryCall<RevokeReferralRewardRequest, RevokeReferralRewardResponse>;
+  resolveDiscrepancy: handleUnaryCall<ResolveDiscrepancyRequest, ResolveDiscrepancyResponse>;
+  refundSettledRequest: handleUnaryCall<RefundSettledRequestRequest, RefundSettledRequestResponse>;
+  upsertFundedTerm: handleUnaryCall<UpsertFundedTermRequest, UpsertFundedTermResponse>;
+  lockFundedTerm: handleUnaryCall<LockFundedTermRequest, LockFundedTermResponse>;
+  setCoverageThrottlePolicy: handleUnaryCall<SetCoverageThrottlePolicyRequest, SetCoverageThrottlePolicyResponse>;
+  updateSystemSetting: handleUnaryCall<UpdateSystemSettingRequest, UpdateSystemSettingResponse>;
+  updateFreeModelQuotaPolicy: handleUnaryCall<UpdateFreeModelQuotaPolicyRequest, UpdateFreeModelQuotaPolicyResponse>;
+}
+
+export interface BillingAdminServiceClient extends Client {
+  createPlanDraft(
+    request: CreatePlanDraftRequest,
+    callback: (error: ServiceError | null, response: CreatePlanDraftResponse) => void,
+  ): ClientUnaryCall;
+  createPlanDraft(
+    request: CreatePlanDraftRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: CreatePlanDraftResponse) => void,
+  ): ClientUnaryCall;
+  createPlanDraft(
+    request: CreatePlanDraftRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: CreatePlanDraftResponse) => void,
+  ): ClientUnaryCall;
+  validatePlanVersion(
+    request: ValidatePlanVersionRequest,
+    callback: (error: ServiceError | null, response: ValidatePlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  validatePlanVersion(
+    request: ValidatePlanVersionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ValidatePlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  validatePlanVersion(
+    request: ValidatePlanVersionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ValidatePlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  previewPlanImpact(
+    request: PreviewPlanImpactRequest,
+    callback: (error: ServiceError | null, response: PreviewPlanImpactResponse) => void,
+  ): ClientUnaryCall;
+  previewPlanImpact(
+    request: PreviewPlanImpactRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PreviewPlanImpactResponse) => void,
+  ): ClientUnaryCall;
+  previewPlanImpact(
+    request: PreviewPlanImpactRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PreviewPlanImpactResponse) => void,
+  ): ClientUnaryCall;
+  publishPlanVersion(
+    request: PublishPlanVersionRequest,
+    callback: (error: ServiceError | null, response: PublishPlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  publishPlanVersion(
+    request: PublishPlanVersionRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: PublishPlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  publishPlanVersion(
+    request: PublishPlanVersionRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: PublishPlanVersionResponse) => void,
+  ): ClientUnaryCall;
+  setPlanSalesStatus(
+    request: SetPlanSalesStatusRequest,
+    callback: (error: ServiceError | null, response: SetPlanSalesStatusResponse) => void,
+  ): ClientUnaryCall;
+  setPlanSalesStatus(
+    request: SetPlanSalesStatusRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SetPlanSalesStatusResponse) => void,
+  ): ClientUnaryCall;
+  setPlanSalesStatus(
+    request: SetPlanSalesStatusRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SetPlanSalesStatusResponse) => void,
+  ): ClientUnaryCall;
+  setSpendingLock(
+    request: SetSpendingLockRequest,
+    callback: (error: ServiceError | null, response: SetSpendingLockResponse) => void,
+  ): ClientUnaryCall;
+  setSpendingLock(
+    request: SetSpendingLockRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SetSpendingLockResponse) => void,
+  ): ClientUnaryCall;
+  setSpendingLock(
+    request: SetSpendingLockRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SetSpendingLockResponse) => void,
+  ): ClientUnaryCall;
+  manualLedgerAdjustment(
+    request: ManualLedgerAdjustmentRequest,
+    callback: (error: ServiceError | null, response: ManualLedgerAdjustmentResponse) => void,
+  ): ClientUnaryCall;
+  manualLedgerAdjustment(
+    request: ManualLedgerAdjustmentRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ManualLedgerAdjustmentResponse) => void,
+  ): ClientUnaryCall;
+  manualLedgerAdjustment(
+    request: ManualLedgerAdjustmentRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ManualLedgerAdjustmentResponse) => void,
+  ): ClientUnaryCall;
+  resolveDepositReorgHold(
+    request: ResolveDepositReorgHoldRequest,
+    callback: (error: ServiceError | null, response: ResolveDepositReorgHoldResponse) => void,
+  ): ClientUnaryCall;
+  resolveDepositReorgHold(
+    request: ResolveDepositReorgHoldRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveDepositReorgHoldResponse) => void,
+  ): ClientUnaryCall;
+  resolveDepositReorgHold(
+    request: ResolveDepositReorgHoldRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveDepositReorgHoldResponse) => void,
+  ): ClientUnaryCall;
+  reviewTopup(
+    request: ReviewTopupRequest,
+    callback: (error: ServiceError | null, response: ReviewTopupResponse) => void,
+  ): ClientUnaryCall;
+  reviewTopup(
+    request: ReviewTopupRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ReviewTopupResponse) => void,
+  ): ClientUnaryCall;
+  reviewTopup(
+    request: ReviewTopupRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ReviewTopupResponse) => void,
+  ): ClientUnaryCall;
+  revokeReferralReward(
+    request: RevokeReferralRewardRequest,
+    callback: (error: ServiceError | null, response: RevokeReferralRewardResponse) => void,
+  ): ClientUnaryCall;
+  revokeReferralReward(
+    request: RevokeReferralRewardRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RevokeReferralRewardResponse) => void,
+  ): ClientUnaryCall;
+  revokeReferralReward(
+    request: RevokeReferralRewardRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RevokeReferralRewardResponse) => void,
+  ): ClientUnaryCall;
+  resolveDiscrepancy(
+    request: ResolveDiscrepancyRequest,
+    callback: (error: ServiceError | null, response: ResolveDiscrepancyResponse) => void,
+  ): ClientUnaryCall;
+  resolveDiscrepancy(
+    request: ResolveDiscrepancyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveDiscrepancyResponse) => void,
+  ): ClientUnaryCall;
+  resolveDiscrepancy(
+    request: ResolveDiscrepancyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveDiscrepancyResponse) => void,
+  ): ClientUnaryCall;
+  refundSettledRequest(
+    request: RefundSettledRequestRequest,
+    callback: (error: ServiceError | null, response: RefundSettledRequestResponse) => void,
+  ): ClientUnaryCall;
+  refundSettledRequest(
+    request: RefundSettledRequestRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: RefundSettledRequestResponse) => void,
+  ): ClientUnaryCall;
+  refundSettledRequest(
+    request: RefundSettledRequestRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: RefundSettledRequestResponse) => void,
+  ): ClientUnaryCall;
+  upsertFundedTerm(
+    request: UpsertFundedTermRequest,
+    callback: (error: ServiceError | null, response: UpsertFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  upsertFundedTerm(
+    request: UpsertFundedTermRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UpsertFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  upsertFundedTerm(
+    request: UpsertFundedTermRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UpsertFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  lockFundedTerm(
+    request: LockFundedTermRequest,
+    callback: (error: ServiceError | null, response: LockFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  lockFundedTerm(
+    request: LockFundedTermRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: LockFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  lockFundedTerm(
+    request: LockFundedTermRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: LockFundedTermResponse) => void,
+  ): ClientUnaryCall;
+  setCoverageThrottlePolicy(
+    request: SetCoverageThrottlePolicyRequest,
+    callback: (error: ServiceError | null, response: SetCoverageThrottlePolicyResponse) => void,
+  ): ClientUnaryCall;
+  setCoverageThrottlePolicy(
+    request: SetCoverageThrottlePolicyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: SetCoverageThrottlePolicyResponse) => void,
+  ): ClientUnaryCall;
+  setCoverageThrottlePolicy(
+    request: SetCoverageThrottlePolicyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: SetCoverageThrottlePolicyResponse) => void,
+  ): ClientUnaryCall;
+  updateSystemSetting(
+    request: UpdateSystemSettingRequest,
+    callback: (error: ServiceError | null, response: UpdateSystemSettingResponse) => void,
+  ): ClientUnaryCall;
+  updateSystemSetting(
+    request: UpdateSystemSettingRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UpdateSystemSettingResponse) => void,
+  ): ClientUnaryCall;
+  updateSystemSetting(
+    request: UpdateSystemSettingRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UpdateSystemSettingResponse) => void,
+  ): ClientUnaryCall;
+  updateFreeModelQuotaPolicy(
+    request: UpdateFreeModelQuotaPolicyRequest,
+    callback: (error: ServiceError | null, response: UpdateFreeModelQuotaPolicyResponse) => void,
+  ): ClientUnaryCall;
+  updateFreeModelQuotaPolicy(
+    request: UpdateFreeModelQuotaPolicyRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: UpdateFreeModelQuotaPolicyResponse) => void,
+  ): ClientUnaryCall;
+  updateFreeModelQuotaPolicy(
+    request: UpdateFreeModelQuotaPolicyRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: UpdateFreeModelQuotaPolicyResponse) => void,
+  ): ClientUnaryCall;
+}
+
+export const BillingAdminServiceClient = makeGenericClientConstructor(
+  BillingAdminServiceService,
+  "maxshot.gateway_internal.v1.BillingAdminService",
+) as unknown as {
+  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): BillingAdminServiceClient;
+  service: typeof BillingAdminServiceService;
+  serviceName: string;
+};
+
+export type StudioAdminServiceService = typeof StudioAdminServiceService;
+export const StudioAdminServiceService = {
+  resolveUncertainJob: {
+    path: "/maxshot.gateway_internal.v1.StudioAdminService/ResolveUncertainJob" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolveUncertainJobRequest): Buffer =>
+      Buffer.from(ResolveUncertainJobRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveUncertainJobRequest => ResolveUncertainJobRequest.decode(value),
+    responseSerialize: (value: ResolveUncertainJobResponse): Buffer =>
+      Buffer.from(ResolveUncertainJobResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveUncertainJobResponse => ResolveUncertainJobResponse.decode(value),
+  },
+  moderateMaterial: {
+    path: "/maxshot.gateway_internal.v1.StudioAdminService/ModerateMaterial" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ModerateMaterialRequest): Buffer =>
+      Buffer.from(ModerateMaterialRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ModerateMaterialRequest => ModerateMaterialRequest.decode(value),
+    responseSerialize: (value: ModerateMaterialResponse): Buffer =>
+      Buffer.from(ModerateMaterialResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ModerateMaterialResponse => ModerateMaterialResponse.decode(value),
+  },
+  resolveAppeal: {
+    path: "/maxshot.gateway_internal.v1.StudioAdminService/ResolveAppeal" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ResolveAppealRequest): Buffer => Buffer.from(ResolveAppealRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ResolveAppealRequest => ResolveAppealRequest.decode(value),
+    responseSerialize: (value: ResolveAppealResponse): Buffer =>
+      Buffer.from(ResolveAppealResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ResolveAppealResponse => ResolveAppealResponse.decode(value),
+  },
+} as const;
+
+export interface StudioAdminServiceServer extends UntypedServiceImplementation {
+  resolveUncertainJob: handleUnaryCall<ResolveUncertainJobRequest, ResolveUncertainJobResponse>;
+  moderateMaterial: handleUnaryCall<ModerateMaterialRequest, ModerateMaterialResponse>;
+  resolveAppeal: handleUnaryCall<ResolveAppealRequest, ResolveAppealResponse>;
+}
+
+export interface StudioAdminServiceClient extends Client {
+  resolveUncertainJob(
+    request: ResolveUncertainJobRequest,
+    callback: (error: ServiceError | null, response: ResolveUncertainJobResponse) => void,
+  ): ClientUnaryCall;
+  resolveUncertainJob(
+    request: ResolveUncertainJobRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveUncertainJobResponse) => void,
+  ): ClientUnaryCall;
+  resolveUncertainJob(
+    request: ResolveUncertainJobRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveUncertainJobResponse) => void,
+  ): ClientUnaryCall;
+  moderateMaterial(
+    request: ModerateMaterialRequest,
+    callback: (error: ServiceError | null, response: ModerateMaterialResponse) => void,
+  ): ClientUnaryCall;
+  moderateMaterial(
+    request: ModerateMaterialRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ModerateMaterialResponse) => void,
+  ): ClientUnaryCall;
+  moderateMaterial(
+    request: ModerateMaterialRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ModerateMaterialResponse) => void,
+  ): ClientUnaryCall;
+  resolveAppeal(
+    request: ResolveAppealRequest,
+    callback: (error: ServiceError | null, response: ResolveAppealResponse) => void,
+  ): ClientUnaryCall;
+  resolveAppeal(
+    request: ResolveAppealRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: ResolveAppealResponse) => void,
+  ): ClientUnaryCall;
+  resolveAppeal(
+    request: ResolveAppealRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: ResolveAppealResponse) => void,
+  ): ClientUnaryCall;
+}
+
+export const StudioAdminServiceClient = makeGenericClientConstructor(
+  StudioAdminServiceService,
+  "maxshot.gateway_internal.v1.StudioAdminService",
+) as unknown as {
+  new (address: string, credentials: ChannelCredentials, options?: Partial<ClientOptions>): StudioAdminServiceClient;
+  service: typeof StudioAdminServiceService;
+  serviceName: string;
+};
+
+function bytesFromBase64(b64: string): Uint8Array {
+  return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  return globalThis.Buffer.from(arr).toString("base64");
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | bigint | undefined;
 

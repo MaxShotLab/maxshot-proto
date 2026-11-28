@@ -87,6 +87,7 @@ export enum GrantItemStatus {
   GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6,
   GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7,
   GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH = 8,
+  GRANT_ITEM_STATUS_STAGED = 9,
   UNRECOGNIZED = -1,
 }
 
@@ -119,6 +120,9 @@ export function grantItemStatusFromJSON(object: any): GrantItemStatus {
     case 8:
     case "GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH":
       return GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH;
+    case 9:
+    case "GRANT_ITEM_STATUS_STAGED":
+      return GrantItemStatus.GRANT_ITEM_STATUS_STAGED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -146,7 +150,60 @@ export function grantItemStatusToJSON(object: GrantItemStatus): string {
       return "GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET";
     case GrantItemStatus.GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH:
       return "GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH";
+    case GrantItemStatus.GRANT_ITEM_STATUS_STAGED:
+      return "GRANT_ITEM_STATUS_STAGED";
     case GrantItemStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum GrantBoundaryStatus {
+  GRANT_BOUNDARY_STATUS_UNSPECIFIED = 0,
+  GRANT_BOUNDARY_STATUS_AWAITING_BATCHES = 1,
+  GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION = 2,
+  GRANT_BOUNDARY_STATUS_DEFERRED = 3,
+  GRANT_BOUNDARY_STATUS_CREDITED = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function grantBoundaryStatusFromJSON(object: any): GrantBoundaryStatus {
+  switch (object) {
+    case 0:
+    case "GRANT_BOUNDARY_STATUS_UNSPECIFIED":
+      return GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_UNSPECIFIED;
+    case 1:
+    case "GRANT_BOUNDARY_STATUS_AWAITING_BATCHES":
+      return GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_AWAITING_BATCHES;
+    case 2:
+    case "GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION":
+      return GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION;
+    case 3:
+    case "GRANT_BOUNDARY_STATUS_DEFERRED":
+      return GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_DEFERRED;
+    case 4:
+    case "GRANT_BOUNDARY_STATUS_CREDITED":
+      return GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_CREDITED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return GrantBoundaryStatus.UNRECOGNIZED;
+  }
+}
+
+export function grantBoundaryStatusToJSON(object: GrantBoundaryStatus): string {
+  switch (object) {
+    case GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_UNSPECIFIED:
+      return "GRANT_BOUNDARY_STATUS_UNSPECIFIED";
+    case GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_AWAITING_BATCHES:
+      return "GRANT_BOUNDARY_STATUS_AWAITING_BATCHES";
+    case GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION:
+      return "GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION";
+    case GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_DEFERRED:
+      return "GRANT_BOUNDARY_STATUS_DEFERRED";
+    case GrantBoundaryStatus.GRANT_BOUNDARY_STATUS_CREDITED:
+      return "GRANT_BOUNDARY_STATUS_CREDITED";
+    case GrantBoundaryStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -162,6 +219,7 @@ export interface AitCoverageThrottlePolicy {
   maxAllowedModelRateUsdDec: string;
   reason: string;
   updatedAtUnixSec: bigint;
+  restrictedOfferingIds: string[];
 }
 
 /**
@@ -312,12 +370,17 @@ export interface BoundaryBatchSummary {
   totalBatches: number;
   boundaryTotalGrantCredits: bigint;
   boundaryTotalEligibleAitWeiSecondsDec: string;
-  /** feeds 7-day boundary read-only RPC invariant check (§3.3.4) */
+  /** informational only; never used as an independent upper bound */
   onchainTotalStakedAitWeiDec: string;
   finalizedBlockNumber: bigint;
   finalizedBlockHash: string;
   boundaryStartUnixSec: bigint;
   boundaryEndUnixSec: bigint;
+  /**
+   * Positive, monotonic submission revision within this boundary. A higher revision can supersede a
+   * deferred, uncredited revision; items are immutable within each revision. Absent means revision 1.
+   */
+  boundaryRevision?: number | undefined;
 }
 
 export interface AitGrantItem {
@@ -360,6 +423,25 @@ export interface AitGrantItemResult {
 
 export interface IssueAitCreditGrantsResponse {
   results: AitGrantItemResult[];
+  /** Must be present on a v0.2.0 server response. */
+  boundaryStatus?: GrantBoundaryStatus | undefined;
+  boundaryRevision?: number | undefined;
+}
+
+export interface GetGrantBoundaryStatusRequest {
+  termId: string;
+  boundaryIndex: number;
+  /** Optional; when supplied, return only this batch's results. */
+  batchId: string;
+  /** Absent selects the latest known revision. */
+  boundaryRevision?: number | undefined;
+}
+
+export interface GetGrantBoundaryStatusResponse {
+  status: GrantBoundaryStatus;
+  results: AitGrantItemResult[];
+  reasonCode: string;
+  boundaryRevision: number;
 }
 
 function createBaseAitCoverageThrottlePolicy(): AitCoverageThrottlePolicy {
@@ -369,6 +451,7 @@ function createBaseAitCoverageThrottlePolicy(): AitCoverageThrottlePolicy {
     maxAllowedModelRateUsdDec: "",
     reason: "",
     updatedAtUnixSec: 0n,
+    restrictedOfferingIds: [],
   };
 }
 
@@ -391,6 +474,9 @@ export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = 
         throw new globalThis.Error("value provided for field message.updatedAtUnixSec of type int64 too large");
       }
       writer.uint32(40).int64(message.updatedAtUnixSec);
+    }
+    for (const v of message.restrictedOfferingIds) {
+      writer.uint32(50).string(v!);
     }
     return writer;
   },
@@ -448,6 +534,14 @@ export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = 
             message.updatedAtUnixSec = reader.int64() as bigint;
             continue;
           }
+          case 6: {
+            if (tag !== 50) {
+              break;
+            }
+
+            message.restrictedOfferingIds.push(reader.string());
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -483,6 +577,11 @@ export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = 
         : isSet(object.updated_at_unix_sec)
         ? BigInt(object.updated_at_unix_sec)
         : 0n,
+      restrictedOfferingIds: globalThis.Array.isArray(object?.restrictedOfferingIds)
+        ? object.restrictedOfferingIds.map((e: any) => globalThis.String(e))
+        : globalThis.Array.isArray(object?.restricted_offering_ids)
+        ? object.restricted_offering_ids.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -503,6 +602,9 @@ export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = 
     if (message.updatedAtUnixSec !== 0n) {
       obj.updatedAtUnixSec = message.updatedAtUnixSec.toString();
     }
+    if (message.restrictedOfferingIds?.length) {
+      obj.restrictedOfferingIds = message.restrictedOfferingIds;
+    }
     return obj;
   },
 
@@ -518,6 +620,7 @@ export const AitCoverageThrottlePolicy: MessageFns<AitCoverageThrottlePolicy> = 
     message.updatedAtUnixSec = (object.updatedAtUnixSec !== undefined && object.updatedAtUnixSec !== null)
       ? BigInt(object.updatedAtUnixSec)
       : 0n;
+    message.restrictedOfferingIds = object.restrictedOfferingIds?.map((e) => e) || [];
     return message;
   },
 };
@@ -3121,6 +3224,7 @@ function createBaseBoundaryBatchSummary(): BoundaryBatchSummary {
     finalizedBlockHash: "",
     boundaryStartUnixSec: 0n,
     boundaryEndUnixSec: 0n,
+    boundaryRevision: undefined,
   };
 }
 
@@ -3166,6 +3270,9 @@ export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
         throw new globalThis.Error("value provided for field message.boundaryEndUnixSec of type int64 too large");
       }
       writer.uint32(72).int64(message.boundaryEndUnixSec);
+    }
+    if (message.boundaryRevision !== undefined) {
+      writer.uint32(80).uint32(message.boundaryRevision);
     }
     return writer;
   },
@@ -3255,6 +3362,14 @@ export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
             message.boundaryEndUnixSec = reader.int64() as bigint;
             continue;
           }
+          case 10: {
+            if (tag !== 80) {
+              break;
+            }
+
+            message.boundaryRevision = reader.uint32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -3314,6 +3429,11 @@ export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
         : isSet(object.boundary_end_unix_sec)
         ? BigInt(object.boundary_end_unix_sec)
         : 0n,
+      boundaryRevision: isSet(object.boundaryRevision)
+        ? globalThis.Number(object.boundaryRevision)
+        : isSet(object.boundary_revision)
+        ? globalThis.Number(object.boundary_revision)
+        : undefined,
     };
   },
 
@@ -3346,6 +3466,9 @@ export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
     if (message.boundaryEndUnixSec !== 0n) {
       obj.boundaryEndUnixSec = message.boundaryEndUnixSec.toString();
     }
+    if (message.boundaryRevision !== undefined) {
+      obj.boundaryRevision = Math.round(message.boundaryRevision);
+    }
     return obj;
   },
 
@@ -3372,6 +3495,7 @@ export const BoundaryBatchSummary: MessageFns<BoundaryBatchSummary> = {
     message.boundaryEndUnixSec = (object.boundaryEndUnixSec !== undefined && object.boundaryEndUnixSec !== null)
       ? BigInt(object.boundaryEndUnixSec)
       : 0n;
+    message.boundaryRevision = object.boundaryRevision ?? undefined;
     return message;
   },
 };
@@ -4107,13 +4231,19 @@ export const AitGrantItemResult: MessageFns<AitGrantItemResult> = {
 };
 
 function createBaseIssueAitCreditGrantsResponse(): IssueAitCreditGrantsResponse {
-  return { results: [] };
+  return { results: [], boundaryStatus: undefined, boundaryRevision: undefined };
 }
 
 export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsResponse> = {
   encode(message: IssueAitCreditGrantsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.results) {
       AitGrantItemResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.boundaryStatus !== undefined) {
+      writer.uint32(16).int32(message.boundaryStatus);
+    }
+    if (message.boundaryRevision !== undefined) {
+      writer.uint32(24).uint32(message.boundaryRevision);
     }
     return writer;
   },
@@ -4139,6 +4269,22 @@ export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsRespon
             message.results.push(AitGrantItemResult.decode(reader, reader.uint32()));
             continue;
           }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.boundaryStatus = reader.int32() as any;
+            continue;
+          }
+          case 3: {
+            if (tag !== 24) {
+              break;
+            }
+
+            message.boundaryRevision = reader.uint32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -4156,6 +4302,16 @@ export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsRespon
       results: globalThis.Array.isArray(object?.results)
         ? object.results.map((e: any) => AitGrantItemResult.fromJSON(e))
         : [],
+      boundaryStatus: isSet(object.boundaryStatus)
+        ? grantBoundaryStatusFromJSON(object.boundaryStatus)
+        : isSet(object.boundary_status)
+        ? grantBoundaryStatusFromJSON(object.boundary_status)
+        : undefined,
+      boundaryRevision: isSet(object.boundaryRevision)
+        ? globalThis.Number(object.boundaryRevision)
+        : isSet(object.boundary_revision)
+        ? globalThis.Number(object.boundary_revision)
+        : undefined,
     };
   },
 
@@ -4163,6 +4319,12 @@ export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsRespon
     const obj: any = {};
     if (message.results?.length) {
       obj.results = message.results.map((e) => AitGrantItemResult.toJSON(e));
+    }
+    if (message.boundaryStatus !== undefined) {
+      obj.boundaryStatus = grantBoundaryStatusToJSON(message.boundaryStatus);
+    }
+    if (message.boundaryRevision !== undefined) {
+      obj.boundaryRevision = Math.round(message.boundaryRevision);
     }
     return obj;
   },
@@ -4173,6 +4335,272 @@ export const IssueAitCreditGrantsResponse: MessageFns<IssueAitCreditGrantsRespon
   fromPartial<I extends Exact<DeepPartial<IssueAitCreditGrantsResponse>, I>>(object: I): IssueAitCreditGrantsResponse {
     const message = createBaseIssueAitCreditGrantsResponse();
     message.results = object.results?.map((e) => AitGrantItemResult.fromPartial(e)) || [];
+    message.boundaryStatus = object.boundaryStatus ?? undefined;
+    message.boundaryRevision = object.boundaryRevision ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGetGrantBoundaryStatusRequest(): GetGrantBoundaryStatusRequest {
+  return { termId: "", boundaryIndex: 0, batchId: "", boundaryRevision: undefined };
+}
+
+export const GetGrantBoundaryStatusRequest: MessageFns<GetGrantBoundaryStatusRequest> = {
+  encode(message: GetGrantBoundaryStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.termId !== "") {
+      writer.uint32(10).string(message.termId);
+    }
+    if (message.boundaryIndex !== 0) {
+      writer.uint32(16).int32(message.boundaryIndex);
+    }
+    if (message.batchId !== "") {
+      writer.uint32(26).string(message.batchId);
+    }
+    if (message.boundaryRevision !== undefined) {
+      writer.uint32(32).uint32(message.boundaryRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetGrantBoundaryStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetGrantBoundaryStatusRequest();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 10) {
+              break;
+            }
+
+            message.termId = reader.string();
+            continue;
+          }
+          case 2: {
+            if (tag !== 16) {
+              break;
+            }
+
+            message.boundaryIndex = reader.int32();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.batchId = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.boundaryRevision = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetGrantBoundaryStatusRequest {
+    return {
+      termId: isSet(object.termId)
+        ? globalThis.String(object.termId)
+        : isSet(object.term_id)
+        ? globalThis.String(object.term_id)
+        : "",
+      boundaryIndex: isSet(object.boundaryIndex)
+        ? globalThis.Number(object.boundaryIndex)
+        : isSet(object.boundary_index)
+        ? globalThis.Number(object.boundary_index)
+        : 0,
+      batchId: isSet(object.batchId)
+        ? globalThis.String(object.batchId)
+        : isSet(object.batch_id)
+        ? globalThis.String(object.batch_id)
+        : "",
+      boundaryRevision: isSet(object.boundaryRevision)
+        ? globalThis.Number(object.boundaryRevision)
+        : isSet(object.boundary_revision)
+        ? globalThis.Number(object.boundary_revision)
+        : undefined,
+    };
+  },
+
+  toJSON(message: GetGrantBoundaryStatusRequest): unknown {
+    const obj: any = {};
+    if (message.termId !== "") {
+      obj.termId = message.termId;
+    }
+    if (message.boundaryIndex !== 0) {
+      obj.boundaryIndex = Math.round(message.boundaryIndex);
+    }
+    if (message.batchId !== "") {
+      obj.batchId = message.batchId;
+    }
+    if (message.boundaryRevision !== undefined) {
+      obj.boundaryRevision = Math.round(message.boundaryRevision);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetGrantBoundaryStatusRequest>, I>>(base?: I): GetGrantBoundaryStatusRequest {
+    return GetGrantBoundaryStatusRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetGrantBoundaryStatusRequest>, I>>(
+    object: I,
+  ): GetGrantBoundaryStatusRequest {
+    const message = createBaseGetGrantBoundaryStatusRequest();
+    message.termId = object.termId ?? "";
+    message.boundaryIndex = object.boundaryIndex ?? 0;
+    message.batchId = object.batchId ?? "";
+    message.boundaryRevision = object.boundaryRevision ?? undefined;
+    return message;
+  },
+};
+
+function createBaseGetGrantBoundaryStatusResponse(): GetGrantBoundaryStatusResponse {
+  return { status: 0, results: [], reasonCode: "", boundaryRevision: 0 };
+}
+
+export const GetGrantBoundaryStatusResponse: MessageFns<GetGrantBoundaryStatusResponse> = {
+  encode(message: GetGrantBoundaryStatusResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.status !== 0) {
+      writer.uint32(8).int32(message.status);
+    }
+    for (const v of message.results) {
+      AitGrantItemResult.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.reasonCode !== "") {
+      writer.uint32(26).string(message.reasonCode);
+    }
+    if (message.boundaryRevision !== 0) {
+      writer.uint32(32).uint32(message.boundaryRevision);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetGrantBoundaryStatusResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const previousRecursionDepth = (reader as any).__tsProtoDecodeDepth ?? 0;
+    if (previousRecursionDepth >= 100) {
+      throw new globalThis.Error("protobuf decode recursion limit exceeded");
+    }
+    (reader as any).__tsProtoDecodeDepth = previousRecursionDepth + 1;
+    try {
+      const end = length === undefined ? reader.len : reader.pos + length;
+      const message = createBaseGetGrantBoundaryStatusResponse();
+      while (reader.pos < end) {
+        const tag = reader.uint32();
+        switch (tag >>> 3) {
+          case 1: {
+            if (tag !== 8) {
+              break;
+            }
+
+            message.status = reader.int32() as any;
+            continue;
+          }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.results.push(AitGrantItemResult.decode(reader, reader.uint32()));
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.reasonCode = reader.string();
+            continue;
+          }
+          case 4: {
+            if (tag !== 32) {
+              break;
+            }
+
+            message.boundaryRevision = reader.uint32();
+            continue;
+          }
+        }
+        if ((tag & 7) === 4 || tag === 0) {
+          break;
+        }
+        reader.skip(tag & 7);
+      }
+      return message;
+    } finally {
+      (reader as any).__tsProtoDecodeDepth = previousRecursionDepth;
+    }
+  },
+
+  fromJSON(object: any): GetGrantBoundaryStatusResponse {
+    return {
+      status: isSet(object.status) ? grantBoundaryStatusFromJSON(object.status) : 0,
+      results: globalThis.Array.isArray(object?.results)
+        ? object.results.map((e: any) => AitGrantItemResult.fromJSON(e))
+        : [],
+      reasonCode: isSet(object.reasonCode)
+        ? globalThis.String(object.reasonCode)
+        : isSet(object.reason_code)
+        ? globalThis.String(object.reason_code)
+        : "",
+      boundaryRevision: isSet(object.boundaryRevision)
+        ? globalThis.Number(object.boundaryRevision)
+        : isSet(object.boundary_revision)
+        ? globalThis.Number(object.boundary_revision)
+        : 0,
+    };
+  },
+
+  toJSON(message: GetGrantBoundaryStatusResponse): unknown {
+    const obj: any = {};
+    if (message.status !== 0) {
+      obj.status = grantBoundaryStatusToJSON(message.status);
+    }
+    if (message.results?.length) {
+      obj.results = message.results.map((e) => AitGrantItemResult.toJSON(e));
+    }
+    if (message.reasonCode !== "") {
+      obj.reasonCode = message.reasonCode;
+    }
+    if (message.boundaryRevision !== 0) {
+      obj.boundaryRevision = Math.round(message.boundaryRevision);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<GetGrantBoundaryStatusResponse>, I>>(base?: I): GetGrantBoundaryStatusResponse {
+    return GetGrantBoundaryStatusResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<GetGrantBoundaryStatusResponse>, I>>(
+    object: I,
+  ): GetGrantBoundaryStatusResponse {
+    const message = createBaseGetGrantBoundaryStatusResponse();
+    message.status = object.status ?? 0;
+    message.results = object.results?.map((e) => AitGrantItemResult.fromPartial(e)) || [];
+    message.reasonCode = object.reasonCode ?? "";
+    message.boundaryRevision = object.boundaryRevision ?? 0;
     return message;
   },
 };
@@ -4364,7 +4792,8 @@ export const AitCreditGrantServiceService = {
       PullWalletEligibilityUpdatesResponse.decode(value),
   },
   /**
-   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+   * Credits become spendable only after all batches and Gateway independent chain verification pass.
    * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
    * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
    */
@@ -4379,6 +4808,19 @@ export const AitCreditGrantServiceService = {
       Buffer.from(IssueAitCreditGrantsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): IssueAitCreditGrantsResponse => IssueAitCreditGrantsResponse.decode(value),
   },
+  /** Poll the independently verified boundary and the final disposition of one submitted batch. */
+  getGrantBoundaryStatus: {
+    path: "/maxshot.contract_grant.v1.AitCreditGrantService/GetGrantBoundaryStatus" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetGrantBoundaryStatusRequest): Buffer =>
+      Buffer.from(GetGrantBoundaryStatusRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetGrantBoundaryStatusRequest => GetGrantBoundaryStatusRequest.decode(value),
+    responseSerialize: (value: GetGrantBoundaryStatusResponse): Buffer =>
+      Buffer.from(GetGrantBoundaryStatusResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetGrantBoundaryStatusResponse =>
+      GetGrantBoundaryStatusResponse.decode(value),
+  },
 } as const;
 
 export interface AitCreditGrantServiceServer extends UntypedServiceImplementation {
@@ -4390,11 +4832,14 @@ export interface AitCreditGrantServiceServer extends UntypedServiceImplementatio
     PullWalletEligibilityUpdatesResponse
   >;
   /**
-   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+   * Credits become spendable only after all batches and Gateway independent chain verification pass.
    * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
    * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
    */
   issueAitCreditGrants: handleUnaryCall<IssueAitCreditGrantsRequest, IssueAitCreditGrantsResponse>;
+  /** Poll the independently verified boundary and the final disposition of one submitted batch. */
+  getGrantBoundaryStatus: handleUnaryCall<GetGrantBoundaryStatusRequest, GetGrantBoundaryStatusResponse>;
 }
 
 export interface AitCreditGrantServiceClient extends Client {
@@ -4431,7 +4876,8 @@ export interface AitCreditGrantServiceClient extends Client {
     callback: (error: ServiceError | null, response: PullWalletEligibilityUpdatesResponse) => void,
   ): ClientUnaryCall;
   /**
-   * IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+   * IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+   * Credits become spendable only after all batches and Gateway independent chain verification pass.
    * Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
    * and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
    */
@@ -4449,6 +4895,22 @@ export interface AitCreditGrantServiceClient extends Client {
     metadata: Metadata,
     options: Partial<CallOptions>,
     callback: (error: ServiceError | null, response: IssueAitCreditGrantsResponse) => void,
+  ): ClientUnaryCall;
+  /** Poll the independently verified boundary and the final disposition of one submitted batch. */
+  getGrantBoundaryStatus(
+    request: GetGrantBoundaryStatusRequest,
+    callback: (error: ServiceError | null, response: GetGrantBoundaryStatusResponse) => void,
+  ): ClientUnaryCall;
+  getGrantBoundaryStatus(
+    request: GetGrantBoundaryStatusRequest,
+    metadata: Metadata,
+    callback: (error: ServiceError | null, response: GetGrantBoundaryStatusResponse) => void,
+  ): ClientUnaryCall;
+  getGrantBoundaryStatus(
+    request: GetGrantBoundaryStatusRequest,
+    metadata: Metadata,
+    options: Partial<CallOptions>,
+    callback: (error: ServiceError | null, response: GetGrantBoundaryStatusResponse) => void,
   ): ClientUnaryCall;
 }
 

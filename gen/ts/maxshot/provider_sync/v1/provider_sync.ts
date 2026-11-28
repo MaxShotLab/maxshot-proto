@@ -891,7 +891,11 @@ export interface OfferingRecord {
   /** unsupported sampling params (e.g. temperature, top_p) stripped silently (#154-4) */
   omittableParameters: string[];
   serverTools: ServerToolConfig[];
-  mediaOfferingSpec?: MediaOfferingSpec | undefined;
+  mediaOfferingSpec?:
+    | MediaOfferingSpec
+    | undefined;
+  /** A positive value at most 86400 tightens the Gateway control-plane outage limit. Absent uses 86400. */
+  maxControlPlaneOutageSeconds?: number | undefined;
 }
 
 /**
@@ -981,7 +985,7 @@ export interface CatalogSnapshot {
 
 export interface WatchSyncEventsRequest {
   gatewayNodeId: string;
-  /** "dataplane" | "billing" | "studio" | "finance" */
+  /** "dataplane" | "billing" | "studio" | "finance" | "bff" */
   nodeRole: string;
   lastSeenCatalogVersion: string;
   lastSeenCredentialRevision: string;
@@ -1004,6 +1008,12 @@ export interface ReportNodeSyncStateRequest {
 
 export interface ReportNodeSyncStateResponse {
   acknowledged: boolean;
+  /** Return authoritative heads even if the catalogs have not changed. */
+  latestCatalogVersion?:
+    | string
+    | undefined;
+  /** Returned only to identities authorized to receive credential revisions. */
+  latestCredentialRevision?: string | undefined;
 }
 
 export interface GetCatalogSnapshotRequest {
@@ -1061,6 +1071,8 @@ export interface EncryptedCredentialItem {
   updatedAtUnixMs: bigint;
   /** e.g. ["dataplane", "studio", "finance"] */
   targetNodeRoles: string[];
+  /** Optional expiry can shorten, but cannot extend, the Offering outage limit. */
+  expiresAtUnixMs?: bigint | undefined;
 }
 
 export interface SyncEncryptedCredentialsRequest {
@@ -4756,6 +4768,7 @@ function createBaseOfferingRecord(): OfferingRecord {
     omittableParameters: [],
     serverTools: [],
     mediaOfferingSpec: undefined,
+    maxControlPlaneOutageSeconds: undefined,
   };
 }
 
@@ -4901,6 +4914,9 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     }
     if (message.mediaOfferingSpec !== undefined) {
       MediaOfferingSpec.encode(message.mediaOfferingSpec, writer.uint32(330).fork()).join();
+    }
+    if (message.maxControlPlaneOutageSeconds !== undefined) {
+      writer.uint32(336).uint32(message.maxControlPlaneOutageSeconds);
     }
     return writer;
   },
@@ -5246,6 +5262,14 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
             message.mediaOfferingSpec = MediaOfferingSpec.decode(reader, reader.uint32());
             continue;
           }
+          case 42: {
+            if (tag !== 336) {
+              break;
+            }
+
+            message.maxControlPlaneOutageSeconds = reader.uint32();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -5463,6 +5487,11 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
         : isSet(object.media_offering_spec)
         ? MediaOfferingSpec.fromJSON(object.media_offering_spec)
         : undefined,
+      maxControlPlaneOutageSeconds: isSet(object.maxControlPlaneOutageSeconds)
+        ? globalThis.Number(object.maxControlPlaneOutageSeconds)
+        : isSet(object.max_control_plane_outage_seconds)
+        ? globalThis.Number(object.max_control_plane_outage_seconds)
+        : undefined,
     };
   },
 
@@ -5591,6 +5620,9 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     if (message.mediaOfferingSpec !== undefined) {
       obj.mediaOfferingSpec = MediaOfferingSpec.toJSON(message.mediaOfferingSpec);
     }
+    if (message.maxControlPlaneOutageSeconds !== undefined) {
+      obj.maxControlPlaneOutageSeconds = Math.round(message.maxControlPlaneOutageSeconds);
+    }
     return obj;
   },
 
@@ -5664,6 +5696,7 @@ export const OfferingRecord: MessageFns<OfferingRecord> = {
     message.mediaOfferingSpec = (object.mediaOfferingSpec !== undefined && object.mediaOfferingSpec !== null)
       ? MediaOfferingSpec.fromPartial(object.mediaOfferingSpec)
       : undefined;
+    message.maxControlPlaneOutageSeconds = object.maxControlPlaneOutageSeconds ?? undefined;
     return message;
   },
 };
@@ -7665,13 +7698,19 @@ export const ReportNodeSyncStateRequest: MessageFns<ReportNodeSyncStateRequest> 
 };
 
 function createBaseReportNodeSyncStateResponse(): ReportNodeSyncStateResponse {
-  return { acknowledged: false };
+  return { acknowledged: false, latestCatalogVersion: undefined, latestCredentialRevision: undefined };
 }
 
 export const ReportNodeSyncStateResponse: MessageFns<ReportNodeSyncStateResponse> = {
   encode(message: ReportNodeSyncStateResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.acknowledged !== false) {
       writer.uint32(8).bool(message.acknowledged);
+    }
+    if (message.latestCatalogVersion !== undefined) {
+      writer.uint32(18).string(message.latestCatalogVersion);
+    }
+    if (message.latestCredentialRevision !== undefined) {
+      writer.uint32(26).string(message.latestCredentialRevision);
     }
     return writer;
   },
@@ -7697,6 +7736,22 @@ export const ReportNodeSyncStateResponse: MessageFns<ReportNodeSyncStateResponse
             message.acknowledged = reader.bool();
             continue;
           }
+          case 2: {
+            if (tag !== 18) {
+              break;
+            }
+
+            message.latestCatalogVersion = reader.string();
+            continue;
+          }
+          case 3: {
+            if (tag !== 26) {
+              break;
+            }
+
+            message.latestCredentialRevision = reader.string();
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -7710,13 +7765,31 @@ export const ReportNodeSyncStateResponse: MessageFns<ReportNodeSyncStateResponse
   },
 
   fromJSON(object: any): ReportNodeSyncStateResponse {
-    return { acknowledged: isSet(object.acknowledged) ? globalThis.Boolean(object.acknowledged) : false };
+    return {
+      acknowledged: isSet(object.acknowledged) ? globalThis.Boolean(object.acknowledged) : false,
+      latestCatalogVersion: isSet(object.latestCatalogVersion)
+        ? globalThis.String(object.latestCatalogVersion)
+        : isSet(object.latest_catalog_version)
+        ? globalThis.String(object.latest_catalog_version)
+        : undefined,
+      latestCredentialRevision: isSet(object.latestCredentialRevision)
+        ? globalThis.String(object.latestCredentialRevision)
+        : isSet(object.latest_credential_revision)
+        ? globalThis.String(object.latest_credential_revision)
+        : undefined,
+    };
   },
 
   toJSON(message: ReportNodeSyncStateResponse): unknown {
     const obj: any = {};
     if (message.acknowledged !== false) {
       obj.acknowledged = message.acknowledged;
+    }
+    if (message.latestCatalogVersion !== undefined) {
+      obj.latestCatalogVersion = message.latestCatalogVersion;
+    }
+    if (message.latestCredentialRevision !== undefined) {
+      obj.latestCredentialRevision = message.latestCredentialRevision;
     }
     return obj;
   },
@@ -7727,6 +7800,8 @@ export const ReportNodeSyncStateResponse: MessageFns<ReportNodeSyncStateResponse
   fromPartial<I extends Exact<DeepPartial<ReportNodeSyncStateResponse>, I>>(object: I): ReportNodeSyncStateResponse {
     const message = createBaseReportNodeSyncStateResponse();
     message.acknowledged = object.acknowledged ?? false;
+    message.latestCatalogVersion = object.latestCatalogVersion ?? undefined;
+    message.latestCredentialRevision = object.latestCredentialRevision ?? undefined;
     return message;
   },
 };
@@ -8465,6 +8540,7 @@ function createBaseEncryptedCredentialItem(): EncryptedCredentialItem {
     ciphertext: Buffer.alloc(0),
     updatedAtUnixMs: 0n,
     targetNodeRoles: [],
+    expiresAtUnixMs: undefined,
   };
 }
 
@@ -8502,6 +8578,12 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
     }
     for (const v of message.targetNodeRoles) {
       writer.uint32(82).string(v!);
+    }
+    if (message.expiresAtUnixMs !== undefined) {
+      if (BigInt.asIntN(64, message.expiresAtUnixMs) !== message.expiresAtUnixMs) {
+        throw new globalThis.Error("value provided for field message.expiresAtUnixMs of type int64 too large");
+      }
+      writer.uint32(88).int64(message.expiresAtUnixMs);
     }
     return writer;
   },
@@ -8599,6 +8681,14 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
             message.targetNodeRoles.push(reader.string());
             continue;
           }
+          case 11: {
+            if (tag !== 88) {
+              break;
+            }
+
+            message.expiresAtUnixMs = reader.int64() as bigint;
+            continue;
+          }
         }
         if ((tag & 7) === 4 || tag === 0) {
           break;
@@ -8651,6 +8741,11 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
         : globalThis.Array.isArray(object?.target_node_roles)
         ? object.target_node_roles.map((e: any) => globalThis.String(e))
         : [],
+      expiresAtUnixMs: isSet(object.expiresAtUnixMs)
+        ? BigInt(object.expiresAtUnixMs)
+        : isSet(object.expires_at_unix_ms)
+        ? BigInt(object.expires_at_unix_ms)
+        : undefined,
     };
   },
 
@@ -8686,6 +8781,9 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
     if (message.targetNodeRoles?.length) {
       obj.targetNodeRoles = message.targetNodeRoles;
     }
+    if (message.expiresAtUnixMs !== undefined) {
+      obj.expiresAtUnixMs = message.expiresAtUnixMs.toString();
+    }
     return obj;
   },
 
@@ -8706,6 +8804,9 @@ export const EncryptedCredentialItem: MessageFns<EncryptedCredentialItem> = {
       ? BigInt(object.updatedAtUnixMs)
       : 0n;
     message.targetNodeRoles = object.targetNodeRoles?.map((e) => e) || [];
+    message.expiresAtUnixMs = (object.expiresAtUnixMs !== undefined && object.expiresAtUnixMs !== null)
+      ? BigInt(object.expiresAtUnixMs)
+      : undefined;
     return message;
   },
 };

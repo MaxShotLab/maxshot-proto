@@ -3,14 +3,11 @@ syntax = "proto3";
 package maxshot.gateway_internal.v1;
 
 import "maxshot/common/v1/types.proto";
+import "maxshot/contract_grant/v1/contract_grant.proto";
 
 option go_package = "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1;gatewayinternalv1";
 
-// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
-// hosted by TypeScript billing-account-service and called by:
-// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
-// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
-// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
+// BillingExecutionService is the intra-datacenter execution and ledger contract hosted by Go billing-service.
 service BillingExecutionService {
   // ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
   // so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
@@ -36,14 +33,23 @@ service BillingExecutionService {
   rpc ExtendExecutionLease(ExtendExecutionLeaseRequest) returns (ExtendExecutionLeaseResponse);
 
   // Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-  // records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+  // records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
   rpc Settle(SettleRequest) returns (SettleResponse);
 
   // MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
   rpc MarkUncertain(MarkUncertainRequest) returns (MarkUncertainResponse);
 
-  // ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+  // ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline.
   rpc ResolveUncertain(ResolveUncertainRequest) returns (ResolveUncertainResponse);
+
+  // A durable, fenced observation written as soon as the upstream status or identifiers are known.
+  rpc RecordAttemptObservation(RecordAttemptObservationRequest) returns (RecordAttemptObservationResponse);
+
+  // Claims expired execution work without authorizing a new upstream dispatch.
+  rpc ClaimExecutionRecovery(ClaimExecutionRecoveryRequest) returns (ClaimExecutionRecoveryResponse);
+
+  // Reports the active, durably imported admission snapshot on the authoritative billing instance.
+  rpc GetBillingCatalogState(GetBillingCatalogStateRequest) returns (GetBillingCatalogStateResponse);
 }
 
 enum ExecutionChannel {
@@ -74,8 +80,8 @@ enum SettlementOutcome {
   SETTLEMENT_OUTCOME_PARTIALLY_DELIVERED = 2; // Studio partial outputs / completed preprocessing (BIL-R33)
   SETTLEMENT_OUTCOME_NOT_ACCEPTED = 3;
   SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT = 4;
-  SETTLEMENT_OUTCOME_CANCELLED = 5;           // charges completed outputs/components, releases remainder
-  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 6; // missing final usage; 24h auto-release applies
+  SETTLEMENT_OUTCOME_CANCELLED = 5; // charges completed outputs/components, releases remainder
+  SETTLEMENT_OUTCOME_PENDING_RECONCILIATION = 6; // missing final usage; the persisted release deadline applies
 }
 
 enum AttemptErrorClass {
@@ -96,7 +102,8 @@ enum UncertainResolutionAction {
   UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED = 0;
   UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED = 1;
   UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST = 2;
-  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3;
+  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H = 3 [deprecated = true];
+  UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD = 4;
 }
 
 // MediaPricingDimensions carries structured request/result dimensions so BillingExecutionService
@@ -160,7 +167,7 @@ message BucketAllocationLine {
 message SpendingLimitDiagnostic {
   string scope = 1; // "account" | "api_key"
   maxshot.common.v1.BudgetPeriodKind period = 2;
-  string unit = 3;  // "credits" | "gross"
+  string unit = 3; // "credits" | "gross"
   int64 limit = 4;
   int64 used = 5;
   int64 pending_reserved = 6;
@@ -231,8 +238,8 @@ message ResolvePrincipalScopeResponse {
   string api_key_id = 5;
   maxshot.common.v1.KeyFundingStrategy key_funding_strategy = 6;
   bool allow_ait_earned_credit = 7; // independent key toggle (default true)
-  bool dollar_relay_enabled = 8;    // when subscription active, false blocks Free + Referral + Dollar; #154 falls back when no active subscription
-  bool allow_basic_to_premium = 9;  // account setting "Continue with Premium when Basic is not enough"
+  bool dollar_relay_enabled = 8; // when subscription active, false blocks Free + Referral + Dollar; #154 falls back when no active subscription
+  bool allow_basic_to_premium = 9; // account setting "Continue with Premium when Basic is not enough"
   repeated string allowed_catalog_ids = 10;
   repeated string model_allowlist = 11;
   string active_plan_id = 12;
@@ -292,8 +299,10 @@ message PreviewQuoteRequest {
   bool zero_retention = 13;
   string client_region = 14;
   bool issue_quote_lock = 15; // true issues a 5-minute TTL locked quote_id for two-step Studio submission (BIL-R22)
-  string request_hash = 16;   // normalized generation parameter digest bound to quote_id
+  string request_hash = 16; // normalized generation parameter digest bound to quote_id
   string effective_channel = 17;
+  // Trusted HTTP principal flows bind the quote to this canonical request fingerprint.
+  string request_body_sha256 = 18;
 }
 
 message PreviewQuoteResponse {
@@ -305,7 +314,7 @@ message PreviewQuoteResponse {
   int64 hard_max_micro_usd = 6;
   bool uses_free_model_quota = 7;
   bool free_model_quota_exhausted_fallback = 8; // F-model free quota exhausted; quote reflects regular 6-bucket fallback
-  bool requires_dollar_confirmation = 9;        // BIL-R23: Studio UI must prompt user to confirm max Dollar debit
+  bool requires_dollar_confirmation = 9; // Studio and applicable Web Chat flows must confirm the maximum Dollar debit
   int64 max_dollar_debit_micro_usd = 10;
   bool basic_to_premium_projected = 11;
   repeated QuoteComponentLine breakdown = 12;
@@ -329,13 +338,13 @@ message AuthorizeAndHoldRequest {
   string idempotency_scope = 2;
   string idempotency_key = 3;
   string request_body_sha256 = 4;
-  string api_key_sha256 = 5;          // populated when channel == EXECUTION_CHANNEL_API or API Studio
-  string internal_account_id = 6;     // populated when authenticated via Web session JWT
+  string api_key_sha256 = 5; // populated when channel == EXECUTION_CHANNEL_API or API Studio
+  string internal_account_id = 6; // populated when authenticated via Web session JWT
   ExecutionChannel channel = 7;
   maxshot.common.v1.Modality modality = 8;
   RouteSelectionMode selection_mode = 9;
-  string requested_model_id = 10;     // e.g. "maxshot/auto" or concrete model_id
-  string model_id = 11;               // resolved concrete customer model_id
+  string requested_model_id = 10; // e.g. "maxshot/auto" or concrete model_id
+  string model_id = 11; // resolved concrete customer model_id
   string auto_task_label = 12;
   string catalog_version = 13;
   string primary_offering_id = 14;
@@ -346,10 +355,10 @@ message AuthorizeAndHoldRequest {
   bool dollar_confirmed = 19;
   bool zero_retention = 20;
   string client_region = 21;
-  string studio_operation_id = 22;    // links Studio async job record (BIL-R41)
+  string studio_operation_id = 22; // links Studio async job record (BIL-R41)
   int64 initial_lease_ttl_ms = 23;
-  string quote_id = 24;               // optional 5-minute locked quote from PreviewQuote
-  string request_hash = 25;           // verified against locked quote when quote_id is supplied
+  string quote_id = 24; // optional 5-minute locked quote from PreviewQuote
+  string request_hash = 25; // verified against locked quote when quote_id is supplied
   maxshot.common.v1.CustomerChargeMode customer_charge_mode_override = 26;
   string effective_channel = 27;
 }
@@ -375,6 +384,14 @@ message AuthorizeAndHoldResponse {
   SpendingLimitDiagnostic budget_diagnostic = 18;
   CreditShortfallDiagnostic credit_diagnostic = 19;
   SettleResponse cached_settlement = 20; // populated when status == HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED
+  IdempotentHttpResponse cached_http_response = 21;
+  UsageBound effective_primary_bound = 22;
+  UsageBound effective_backup_bound = 23;
+  optional int64 customer_release_at_unix_ms = 24;
+  // Present when a confirmed Web request exceeds its locked Dollar maximum or needs a first confirmation.
+  PreviewQuoteResponse replacement_quote = 25;
+  repeated FundingNotice funding_notices = 26;
+  optional int64 max_dollar_debit_micro_usd = 27;
 }
 
 message MarkSendingRequest {
@@ -390,6 +407,12 @@ message MarkSendingResponse {
   bool accepted = 1;
   int64 lease_expires_at_unix_ms = 2;
   string reject_reason = 3;
+  // True only for the transaction that created the dispatch intent. A retry after an ambiguous
+  // RPC result never grants permission to send again, even when accepted is true.
+  optional bool newly_authorized = 4;
+  optional int64 dispatched_at_unix_ms = 5;
+  // Reserved atomically for this attempt, including any backup after a definitive primary failure.
+  optional int64 provider_cost_reserved_micro_usd = 6;
 }
 
 message ExtendExecutionLeaseRequest {
@@ -429,6 +452,8 @@ message AttemptCostRecord {
   int32 attempt_number = 12;
   string provider_generation_id = 13; // OpenRouter gen-... or Ark async task ID
   int32 http_status = 14;
+  optional AttemptDispatchState dispatch_state = 15;
+  optional string dispatch_key = 16;
 }
 
 message SettleRequest {
@@ -447,6 +472,8 @@ message SettleRequest {
   repeated AttemptCostRecord attempts = 13;
   maxshot.common.v1.CustomerChargeMode customer_charge_mode = 14;
   string provider_reported_customer_base_cost_usd_dec = 15; // base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies
+  // Only bounded, non-streaming responses eligible for retention. Persist with final result or leave absent.
+  IdempotentHttpResponse http_response = 16;
 }
 
 message SettleResponse {
@@ -455,12 +482,13 @@ message SettleResponse {
   int64 final_customer_charge_micro_usd = 3;
   int64 released_hold_credits = 4;
   int64 released_hold_micro_usd = 5;
-  int64 shortfall_top_up_micro_usd = 6;            // extra unfrozen Dollar charged when double-authorized & not ceiling-capped
-  int64 platform_borne_discrepancy_micro_usd = 7;  // overrun or uncompensated shortfall routed to discrepancy ledger
+  int64 shortfall_top_up_micro_usd = 6; // extra unfrozen Dollar charged when double-authorized & not ceiling-capped
+  int64 platform_borne_discrepancy_micro_usd = 7; // overrun or uncompensated shortfall routed to discrepancy ledger
   int64 settled_provider_payable_micro_usd = 8;
-  int64 auto_release_at_unix_ms = 9;               // set to dispatched_at + 24h when outcome == PENDING_RECONCILIATION
+  int64 auto_release_at_unix_ms = 9; // persisted deadline when customer funds are still held
   repeated BucketAllocationLine settled_buckets = 10;
   repeated BucketAllocationLine released_buckets = 11;
+  optional SettlementDisposition disposition = 12;
 }
 
 message MarkUncertainRequest {
@@ -473,26 +501,741 @@ message MarkUncertainRequest {
 
 message MarkUncertainResponse {
   bool marked = 1;
-  int64 auto_release_at_unix_ms = 2; // dispatched_at + 24h (BIL-R36)
+  int64 auto_release_at_unix_ms = 2; // persisted Studio release deadline
 }
 
 message ResolveUncertainRequest {
   string request_id = 1;
   string resolution_idempotency_key = 2;
   UncertainResolutionAction action = 3;
-  string actor_id = 4; // operator ID or "system:finance-worker-24h" (ADM-R12)
+  string actor_id = 4; // operator ID or "system:finance-worker" (ADM-R12)
   string reason = 5;
   string serving_offering_id = 6;
   string native_request_id = 7;
-  UsageBound verified_usage = 8; // populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery
+  UsageBound verified_usage = 8; // populated for Studio SETTLE_DELIVERED or text PENDING_RECONCILIATION recovery
   repeated MediaOutputSettlementItem media_outputs = 9;
   string late_provider_cost_usd_dec = 10; // recorded into discrepancy ledger if already auto-released (BIL-R36)
   string attempt_id = 11;
   string provider_generation_id = 12;
   string offering_id = 13;
+  // Fenced recovery claim for automatic resolution. Operator paths use an operation-bound audit context.
+  string recovery_lease_token = 14;
+  OperatorContext operator = 15;
 }
 
 message ResolveUncertainResponse {
   bool resolved = 1;
   SettleResponse settlement = 2;
+}
+
+// Execution-side observations never imply permission to resend an upstream request.
+enum AttemptDispatchState {
+  ATTEMPT_DISPATCH_STATE_UNSPECIFIED = 0;
+  ATTEMPT_DISPATCH_STATE_INTENT_RECORDED = 1;
+  ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED = 2;
+  ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL = 3;
+  ATTEMPT_DISPATCH_STATE_ACCEPTED = 4;
+  ATTEMPT_DISPATCH_STATE_UNKNOWN = 5;
+  ATTEMPT_DISPATCH_STATE_COMPLETED = 6;
+}
+
+enum SettlementDisposition {
+  SETTLEMENT_DISPOSITION_UNSPECIFIED = 0;
+  SETTLEMENT_DISPOSITION_APPLIED = 1;
+  SETTLEMENT_DISPOSITION_ALREADY_APPLIED = 2;
+  SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION = 3;
+  SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE = 4;
+  SETTLEMENT_DISPOSITION_LEASE_LOST = 5;
+}
+
+enum FundingNotice {
+  FUNDING_NOTICE_UNSPECIFIED = 0;
+  FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED = 1;
+  FUNDING_NOTICE_AIT_COVERAGE_THROTTLED = 2;
+}
+
+message IdempotentHttpResponse {
+  int32 status_code = 1;
+  // Only allowlisted end-to-end headers. Regenerate tracing headers and never persist credentials.
+  repeated maxshot.common.v1.KeyValueAttribute headers = 2;
+  bytes body = 3; // Maximum 1 MiB. Never store SSE or zero-retention output.
+}
+
+message RecordAttemptObservationRequest {
+  string request_id = 1;
+  string lease_token = 2;
+  string observation_idempotency_key = 3;
+  AttemptCostRecord attempt = 4;
+}
+
+message RecordAttemptObservationResponse {
+  bool recorded = 1;
+  AttemptDispatchState dispatch_state = 2;
+}
+
+message ClaimExecutionRecoveryRequest {
+  uint32 limit = 1;
+}
+
+message ExecutionRecoveryClaim {
+  string request_id = 1;
+  string studio_operation_id = 2;
+  string lease_token = 3;
+  int64 lease_expires_at_unix_ms = 4;
+  int64 customer_release_at_unix_ms = 5;
+  ExecutionChannel channel = 6;
+  string locked_catalog_version = 7;
+  repeated AttemptCostRecord attempts = 8;
+  maxshot.common.v1.CustomerChargeMode customer_charge_mode = 9;
+  bool customer_hold_released = 10;
+}
+
+message ClaimExecutionRecoveryResponse {
+  repeated ExecutionRecoveryClaim claims = 1;
+}
+
+message GetBillingCatalogStateRequest {}
+
+message GetBillingCatalogStateResponse {
+  string active_catalog_version = 1;
+  bool frozen_routing = 2;
+  repeated string frozen_allowed_offering_ids = 3;
+}
+
+// All methods are internal. account_id is derived from the authenticated Web principal,
+// never trusted from a public request body. Writes derive idempotency from the operation and its inputs.
+service AccountManagementService {
+  rpc RegisterAccount(RegisterAccountRequest) returns (RegisterAccountResponse);
+  rpc CreateApiKey(CreateApiKeyRequest) returns (CreateApiKeyResponse);
+  rpc UpdateApiKey(UpdateApiKeyRequest) returns (UpdateApiKeyResponse);
+  rpc RevokeApiKey(RevokeApiKeyRequest) returns (RevokeApiKeyResponse);
+  rpc ListApiKeys(ListApiKeysRequest) returns (ListApiKeysResponse);
+  rpc GetAccountFunding(GetAccountFundingRequest) returns (GetAccountFundingResponse);
+  rpc UpdateAccountSettings(UpdateAccountSettingsRequest) returns (UpdateAccountSettingsResponse);
+  rpc ListSubscriptionPlans(ListSubscriptionPlansRequest) returns (ListSubscriptionPlansResponse);
+  rpc GetSubscription(GetSubscriptionRequest) returns (GetSubscriptionResponse);
+  rpc PurchaseSubscription(PurchaseSubscriptionRequest) returns (PurchaseSubscriptionResponse);
+  rpc RenewSubscription(RenewSubscriptionRequest) returns (RenewSubscriptionResponse);
+  rpc CancelSubscription(CancelSubscriptionRequest) returns (CancelSubscriptionResponse);
+  rpc SchedulePlanChange(SchedulePlanChangeRequest) returns (SchedulePlanChangeResponse);
+  rpc ListInvoices(ListInvoicesRequest) returns (ListInvoicesResponse);
+  rpc GetInvoice(GetInvoiceRequest) returns (GetInvoiceResponse);
+  rpc GetDepositAddress(GetDepositAddressRequest) returns (GetDepositAddressResponse);
+  rpc CreateTopupOrder(CreateTopupOrderRequest) returns (CreateTopupOrderResponse);
+  rpc RecordStripePayment(RecordStripePaymentRequest) returns (RecordStripePaymentResponse);
+  rpc ListTopups(ListTopupsRequest) returns (ListTopupsResponse);
+  rpc LinkWallet(LinkWalletRequest) returns (LinkWalletResponse);
+  rpc GetWalletLink(GetWalletLinkRequest) returns (GetWalletLinkResponse);
+  rpc AcceptFundedTerm(AcceptFundedTermRequest) returns (AcceptFundedTermResponse);
+  rpc GetCurrentFundedTerm(GetCurrentFundedTermRequest) returns (GetCurrentFundedTermResponse);
+  rpc PrepareAccountMerge(PrepareAccountMergeRequest) returns (PrepareAccountMergeResponse);
+  rpc CommitAccountMerge(CommitAccountMergeRequest) returns (CommitAccountMergeResponse);
+  rpc ListUsage(ListUsageRequest) returns (ListUsageResponse);
+  rpc GetUsageDetail(GetUsageDetailRequest) returns (GetUsageDetailResponse);
+  rpc ListAccountNotices(ListAccountNoticesRequest) returns (ListAccountNoticesResponse);
+  rpc AckAccountNotice(AckAccountNoticeRequest) returns (AckAccountNoticeResponse);
+  rpc GetReferralSummary(GetReferralSummaryRequest) returns (GetReferralSummaryResponse);
+  rpc SetReferralAttribution(SetReferralAttributionRequest) returns (SetReferralAttributionResponse);
+}
+
+message RegisterAccountRequest {
+  string registration_id = 1; // Stable BFF-owned identity provisioning reference, never an email or raw OAuth identifier.
+}
+message RegisterAccountResponse {
+  string account_id = 1;
+}
+
+message ApiKeyPolicy {
+  optional maxshot.common.v1.KeyFundingStrategy funding_strategy = 1;
+  optional bool allow_ait_earned_credit = 2;
+  optional bool dollar_relay_enabled = 3;
+  repeated string allowed_catalog_ids = 4;
+  repeated string model_allowlist = 5;
+  optional int64 per_request_ceiling_micro_usd = 6;
+  repeated maxshot.common.v1.BudgetPeriodRule spending_limits = 7;
+  optional int64 expires_at_unix_ms = 8;
+  optional int32 rpm_limit = 9;
+  optional int64 tpm_limit = 10;
+  optional int32 max_concurrent_streams = 11;
+  optional maxshot.common.v1.SearchPolicy search_policy = 12;
+}
+
+message ManagedApiKey {
+  string api_key_id = 1;
+  string label = 2;
+  string masked_key = 3;
+  ApiKeyPolicy policy = 4;
+  int64 created_at_unix_ms = 5;
+  int64 revoked_at_unix_ms = 6;
+}
+
+message CreateApiKeyRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  string label = 3;
+  ApiKeyPolicy policy = 4;
+}
+message CreateApiKeyResponse {
+  ManagedApiKey key = 1;
+  string one_time_secret = 2; // Never returned by reads or logged.
+}
+message UpdateApiKeyRequest {
+  string account_id = 1;
+  string api_key_id = 2;
+  string idempotency_key = 3;
+  optional string label = 4;
+  ApiKeyPolicy policy = 5;
+  // Allowlisted policy field names to replace, including explicit clearing of repeated fields.
+  repeated string policy_update_fields = 6;
+}
+message UpdateApiKeyResponse {
+  ManagedApiKey key = 1;
+}
+message RevokeApiKeyRequest {
+  string account_id = 1;
+  string api_key_id = 2;
+  string idempotency_key = 3;
+}
+message RevokeApiKeyResponse {
+  ManagedApiKey key = 1;
+}
+message ListApiKeysRequest {
+  string account_id = 1;
+  maxshot.common.v1.CursorPageRequest page = 2;
+}
+message ListApiKeysResponse {
+  repeated ManagedApiKey keys = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+
+message AccountFundingSettings {
+  optional bool web_dollar_relay_enabled = 1;
+  optional bool allow_basic_to_premium = 2;
+  optional bool allow_ait_earned_credit = 3;
+  repeated maxshot.common.v1.BudgetPeriodRule spending_limits = 4;
+}
+message GetAccountFundingRequest {
+  string account_id = 1;
+}
+message GetAccountFundingResponse {
+  AccountFundingSettings settings = 1;
+  repeated BucketBalanceView balances = 2;
+  repeated FundingWindowStatus windows = 3;
+  bool spending_locked = 4;
+  int64 free_requests_remaining = 5;
+  int64 free_equivalent_credits_remaining = 6;
+}
+message UpdateAccountSettingsRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  AccountFundingSettings settings = 3;
+  bool replace_spending_limits = 4;
+}
+message UpdateAccountSettingsResponse {
+  AccountFundingSettings settings = 1;
+}
+
+message SubscriptionPlanVersion {
+  string plan_id = 1;
+  string version_id = 2;
+  string sales_status = 3;
+  bool is_mock_commercial = 4;
+  int64 price_cents = 5;
+  string currency = 6;
+  // UTF-8 PRD PlanVersionConfig JSON. The owner parses exact integers and rejects unknown fields.
+  bytes policy_json = 7;
+}
+message AccountSubscription {
+  string subscription_id = 1;
+  string status = 2;
+  SubscriptionPlanVersion current_plan = 3;
+  string period_id = 4;
+  int64 period_start_unix_ms = 5;
+  int64 period_end_unix_ms = 6;
+  bool auto_renew = 7;
+  string pending_plan_version_id = 8;
+  int32 anchor_day_of_month = 9;
+  repeated BucketBalanceView remaining_pools = 10;
+  repeated FundingWindowStatus windows = 11;
+}
+message SubscriptionInvoice {
+  string invoice_id = 1;
+  string plan_version_id = 2;
+  string period_id = 3;
+  string payment_id = 4;
+  int64 dollar_debit_micro_usd = 5;
+  int64 period_start_unix_ms = 6;
+  int64 period_end_unix_ms = 7;
+  int64 paid_at_unix_ms = 8;
+  string status = 9;
+  string currency = 10;
+}
+message ListSubscriptionPlansRequest {}
+message ListSubscriptionPlansResponse {
+  repeated SubscriptionPlanVersion plans = 1;
+}
+message GetSubscriptionRequest {
+  string account_id = 1;
+}
+message GetSubscriptionResponse {
+  AccountSubscription subscription = 1;
+}
+message PurchaseSubscriptionRequest {
+  string account_id = 1;
+  string plan_version_id = 2;
+  string idempotency_key = 3;
+}
+message PurchaseSubscriptionResponse {
+  AccountSubscription subscription = 1;
+  SubscriptionInvoice invoice = 2;
+}
+message RenewSubscriptionRequest {
+  string account_id = 1;
+  string plan_version_id = 2; // Optional requested plan for manual recovery.
+  string idempotency_key = 3;
+}
+message RenewSubscriptionResponse {
+  AccountSubscription subscription = 1;
+  SubscriptionInvoice invoice = 2;
+}
+message CancelSubscriptionRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  bool resume_auto_renew = 3;
+}
+message CancelSubscriptionResponse {
+  AccountSubscription subscription = 1;
+}
+message SchedulePlanChangeRequest {
+  string account_id = 1;
+  string plan_version_id = 2; // Empty clears a user change where allowed.
+  string idempotency_key = 3;
+}
+message SchedulePlanChangeResponse {
+  AccountSubscription subscription = 1;
+}
+message ListInvoicesRequest {
+  string account_id = 1;
+  maxshot.common.v1.CursorPageRequest page = 2;
+}
+message ListInvoicesResponse {
+  repeated SubscriptionInvoice invoices = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+message GetInvoiceRequest {
+  string account_id = 1;
+  string invoice_id = 2;
+}
+message GetInvoiceResponse {
+  SubscriptionInvoice invoice = 1;
+}
+
+message GetDepositAddressRequest {
+  string account_id = 1;
+  string chain_id = 2;
+}
+message GetDepositAddressResponse {
+  string chain_id = 1;
+  string address = 2;
+}
+message TopupOrder {
+  string order_id = 1;
+  string channel = 2;
+  string status = 3;
+  string provider_reference = 4;
+  string destination_chain_id = 5;
+  string destination_address = 6;
+  int64 net_micro_usd = 7;
+  int64 created_at_unix_ms = 8;
+}
+message CreateTopupOrderRequest {
+  string account_id = 1;
+  string idempotency_key = 2;
+  string channel = 3;
+  string source_chain_id = 4;
+  string source_asset_id = 5;
+  string source_amount_atomic_dec = 6;
+  string quote_reference = 7;
+  int64 requested_usd_cents = 8;
+}
+message CreateTopupOrderResponse {
+  TopupOrder order = 1;
+}
+message RecordStripePaymentRequest {
+  string event_id = 1;
+  string payment_id = 2;
+  string checkout_session_id = 3;
+  string currency = 4;
+  int64 paid_minor_units = 5;
+  int64 occurred_at_unix_ms = 6;
+}
+message RecordStripePaymentResponse {
+  TopupOrder order = 1;
+}
+message ListTopupsRequest {
+  string account_id = 1;
+  maxshot.common.v1.CursorPageRequest page = 2;
+  string order_id = 3;
+}
+message ListTopupsResponse {
+  repeated TopupOrder topups = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+
+message LinkedWallet {
+  string account_id = 1;
+  string wallet_address = 2;
+  uint64 chain_id = 3;
+  int64 linked_at_unix_sec = 4;
+  string siwe_proof_ref = 5;
+}
+message LinkWalletRequest {
+  string account_id = 1;
+  string wallet_address = 2;
+  uint64 chain_id = 3;
+  string siwe_message = 4;
+  bytes signature = 5;
+  string siwe_proof_ref = 6;
+  string idempotency_key = 7;
+}
+message LinkWalletResponse {
+  LinkedWallet link = 1;
+}
+message GetWalletLinkRequest {
+  string account_id = 1;
+}
+message GetWalletLinkResponse {
+  LinkedWallet link = 1;
+}
+message AcceptFundedTermRequest {
+  string account_id = 1;
+  string term_id = 2;
+  string terms_version = 3;
+  string idempotency_key = 4;
+}
+message AcceptFundedTermResponse {
+  maxshot.contract_grant.v1.TermAcceptance acceptance = 1;
+}
+message GetCurrentFundedTermRequest {
+  string account_id = 1;
+}
+message GetCurrentFundedTermResponse {
+  maxshot.contract_grant.v1.FundedTermConfig current_term = 1;
+  maxshot.contract_grant.v1.TermAcceptance acceptance = 2;
+}
+
+message PrepareAccountMergeRequest {
+  string account_id = 1;
+  string source_account_id = 2;
+  string idempotency_key = 3;
+  string verified_source_proof_ref = 4;
+}
+message PrepareAccountMergeResponse {
+  string merge_id = 1;
+  repeated string blockers = 2;
+  int64 expires_at_unix_ms = 3;
+}
+message CommitAccountMergeRequest {
+  string account_id = 1;
+  string merge_id = 2;
+  string idempotency_key = 3;
+}
+message CommitAccountMergeResponse {
+  string status = 1;
+}
+
+message AccountUsage {
+  string request_id = 1;
+  string api_key_id = 2;
+  string model_id = 3;
+  string selected_offering_id = 4;
+  string serving_offering_id = 5;
+  bool fallback_used = 6;
+  string fallback_reason = 7;
+  int64 created_at_unix_ms = 8;
+  string status = 9;
+  int64 accepted_hard_max_micro_usd = 10;
+  repeated BucketAllocationLine settled_buckets = 11;
+  UsageBound usage = 12;
+}
+message ListUsageRequest {
+  string account_id = 1;
+  maxshot.common.v1.CursorPageRequest page = 2;
+  string api_key_id = 3;
+  int64 since_unix_ms = 4;
+  int64 until_unix_ms = 5;
+  string model_id = 6;
+}
+message ListUsageResponse {
+  repeated AccountUsage records = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+message GetUsageDetailRequest {
+  string account_id = 1;
+  string request_id = 2;
+}
+message GetUsageDetailResponse {
+  AccountUsage usage = 1;
+}
+
+message AccountNotice {
+  string notice_id = 1;
+  string kind = 2;
+  int64 issued_at_unix_ms = 3;
+  int64 read_at_unix_ms = 4;
+  string from_plan_version_id = 5;
+  string to_plan_version_id = 6;
+}
+message ListAccountNoticesRequest {
+  string account_id = 1;
+  maxshot.common.v1.CursorPageRequest page = 2;
+}
+message ListAccountNoticesResponse {
+  repeated AccountNotice notices = 1;
+  maxshot.common.v1.CursorPageResponse page = 2;
+}
+message AckAccountNoticeRequest {
+  string account_id = 1;
+  string notice_id = 2;
+}
+message AckAccountNoticeResponse {
+  AccountNotice notice = 1;
+}
+message GetReferralSummaryRequest {
+  string account_id = 1;
+}
+message GetReferralSummaryResponse {
+  string referral_code = 1;
+  int64 rewarded_credits = 2;
+  int64 available_credits = 3;
+  int64 referred_accounts = 4;
+}
+message SetReferralAttributionRequest {
+  string account_id = 1;
+  string referral_code = 2;
+  string idempotency_key = 3;
+}
+message SetReferralAttributionResponse {
+  bool attributed = 1;
+}
+
+service BillingAdminService {
+  rpc CreatePlanDraft(CreatePlanDraftRequest) returns (CreatePlanDraftResponse);
+  rpc ValidatePlanVersion(ValidatePlanVersionRequest) returns (ValidatePlanVersionResponse);
+  rpc PreviewPlanImpact(PreviewPlanImpactRequest) returns (PreviewPlanImpactResponse);
+  rpc PublishPlanVersion(PublishPlanVersionRequest) returns (PublishPlanVersionResponse);
+  rpc SetPlanSalesStatus(SetPlanSalesStatusRequest) returns (SetPlanSalesStatusResponse);
+  rpc SetSpendingLock(SetSpendingLockRequest) returns (SetSpendingLockResponse);
+  rpc ManualLedgerAdjustment(ManualLedgerAdjustmentRequest) returns (ManualLedgerAdjustmentResponse);
+  rpc ResolveDepositReorgHold(ResolveDepositReorgHoldRequest) returns (ResolveDepositReorgHoldResponse);
+  rpc ReviewTopup(ReviewTopupRequest) returns (ReviewTopupResponse);
+  rpc RevokeReferralReward(RevokeReferralRewardRequest) returns (RevokeReferralRewardResponse);
+  rpc ResolveDiscrepancy(ResolveDiscrepancyRequest) returns (ResolveDiscrepancyResponse);
+  rpc RefundSettledRequest(RefundSettledRequestRequest) returns (RefundSettledRequestResponse);
+  rpc UpsertFundedTerm(UpsertFundedTermRequest) returns (UpsertFundedTermResponse);
+  rpc LockFundedTerm(LockFundedTermRequest) returns (LockFundedTermResponse);
+  rpc SetCoverageThrottlePolicy(SetCoverageThrottlePolicyRequest) returns (SetCoverageThrottlePolicyResponse);
+  rpc UpdateSystemSetting(UpdateSystemSettingRequest) returns (UpdateSystemSettingResponse);
+  rpc UpdateFreeModelQuotaPolicy(UpdateFreeModelQuotaPolicyRequest) returns (UpdateFreeModelQuotaPolicyResponse);
+}
+
+service StudioAdminService {
+  rpc ResolveUncertainJob(ResolveUncertainJobRequest) returns (ResolveUncertainJobResponse);
+  rpc ModerateMaterial(ModerateMaterialRequest) returns (ModerateMaterialResponse);
+  rpc ResolveAppeal(ResolveAppealRequest) returns (ResolveAppealResponse);
+}
+
+enum OperatorAuthenticationMethod {
+  OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED = 0;
+  OPERATOR_AUTHENTICATION_METHOD_TOTP = 1;
+  OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE = 2;
+}
+
+message OperatorContext {
+  string operator_id = 1;
+  OperatorAuthenticationMethod authentication_method = 2;
+  string reason = 3;
+  string idempotency_key = 4;
+  string source_ip = 5;
+  int64 step_up_verified_at_unix_ms = 6;
+  // Audit reference to the method- and target-bound step-up, never the TOTP code or wallet signature.
+  string step_up_proof_ref = 7;
+}
+
+message AdminMutationResult {
+  string audit_id = 1;
+  string resource_id = 2;
+  string status = 3;
+}
+
+message PlanCostValidation {
+  string catalog_version = 1;
+  int64 basic_worst_cost_micro_usd = 2;
+  int64 premium_worst_cost_micro_usd = 3;
+  int64 minimum_contribution_micro_usd = 4;
+  repeated string violations = 5;
+}
+message CreatePlanDraftRequest {
+  OperatorContext operator = 1;
+  SubscriptionPlanVersion plan = 2;
+}
+message CreatePlanDraftResponse {
+  AdminMutationResult result = 1;
+}
+message ValidatePlanVersionRequest {
+  string version_id = 1;
+}
+message ValidatePlanVersionResponse {
+  PlanCostValidation validation = 1;
+}
+message PreviewPlanImpactRequest {
+  string version_id = 1;
+}
+message PreviewPlanImpactResponse {
+  int64 affected_subscriptions = 1;
+  repeated string adverse_changes = 2;
+  PlanCostValidation validation = 3;
+}
+message PublishPlanVersionRequest {
+  OperatorContext operator = 1;
+  string version_id = 2;
+  string expected_catalog_version = 3;
+}
+message PublishPlanVersionResponse {
+  AdminMutationResult result = 1;
+}
+message SetPlanSalesStatusRequest {
+  OperatorContext operator = 1;
+  string version_id = 2;
+  string sales_status = 3;
+}
+message SetPlanSalesStatusResponse {
+  AdminMutationResult result = 1;
+}
+
+message SetSpendingLockRequest {
+  OperatorContext operator = 1;
+  string account_id = 2;
+  bool locked = 3;
+}
+message SetSpendingLockResponse {
+  AdminMutationResult result = 1;
+}
+message ManualLedgerAdjustmentRequest {
+  OperatorContext operator = 1;
+  string account_id = 2;
+  maxshot.common.v1.FundingBucket funding_bucket = 3;
+  string source_id = 4;
+  int64 credit_delta = 5;
+  int64 dollar_delta_micro_usd = 6;
+}
+message ManualLedgerAdjustmentResponse {
+  AdminMutationResult result = 1;
+}
+message ResolveDepositReorgHoldRequest {
+  OperatorContext operator = 1;
+  string hold_id = 2;
+  string decision = 3;
+}
+message ResolveDepositReorgHoldResponse {
+  AdminMutationResult result = 1;
+}
+message ReviewTopupRequest {
+  OperatorContext operator = 1;
+  string order_id = 2;
+  string decision = 3;
+  string evidence_ref = 4;
+}
+message ReviewTopupResponse {
+  AdminMutationResult result = 1;
+}
+message RevokeReferralRewardRequest {
+  OperatorContext operator = 1;
+  string reward_id = 2;
+}
+message RevokeReferralRewardResponse {
+  AdminMutationResult result = 1;
+}
+message ResolveDiscrepancyRequest {
+  OperatorContext operator = 1;
+  string discrepancy_id = 2;
+  string disposition = 3;
+}
+message ResolveDiscrepancyResponse {
+  AdminMutationResult result = 1;
+}
+message RefundSettledRequestRequest {
+  OperatorContext operator = 1;
+  string request_id = 2;
+}
+message RefundSettledRequestResponse {
+  AdminMutationResult result = 1;
+}
+
+message UpsertFundedTermRequest {
+  OperatorContext operator = 1;
+  maxshot.contract_grant.v1.FundedTermConfig term = 2;
+  optional uint32 refund_reserve_bps = 3;
+}
+message UpsertFundedTermResponse {
+  AdminMutationResult result = 1;
+}
+message LockFundedTermRequest {
+  OperatorContext operator = 1;
+  string term_id = 2;
+  string funding_reservation_id = 3;
+}
+message LockFundedTermResponse {
+  AdminMutationResult result = 1;
+}
+message SetCoverageThrottlePolicyRequest {
+  OperatorContext operator = 1;
+  maxshot.contract_grant.v1.AitCoverageThrottlePolicy policy = 2;
+}
+message SetCoverageThrottlePolicyResponse {
+  AdminMutationResult result = 1;
+}
+message UpdateSystemSettingRequest {
+  OperatorContext operator = 1;
+  string setting_key = 2;
+  bytes value_json = 3; // Schema and eligible keys owned by billing-service.
+}
+message UpdateSystemSettingResponse {
+  AdminMutationResult result = 1;
+}
+message UpdateFreeModelQuotaPolicyRequest {
+  OperatorContext operator = 1;
+  string model_id = 2; // Empty targets the account-wide policy.
+  int64 daily_free_requests_limit = 3;
+  int64 daily_free_equivalent_credits_limit = 4;
+}
+message UpdateFreeModelQuotaPolicyResponse {
+  AdminMutationResult result = 1;
+}
+
+message ResolveUncertainJobRequest {
+  OperatorContext operator = 1;
+  string operation_id = 2;
+  UncertainResolutionAction action = 3;
+  repeated MediaOutputSettlementItem verified_outputs = 4;
+  UsageBound verified_usage = 5;
+}
+message ResolveUncertainJobResponse {
+  AdminMutationResult result = 1;
+}
+message ModerateMaterialRequest {
+  OperatorContext operator = 1;
+  string material_id = 2;
+  string decision = 3;
+}
+message ModerateMaterialResponse {
+  AdminMutationResult result = 1;
+}
+message ResolveAppealRequest {
+  OperatorContext operator = 1;
+  string appeal_id = 2;
+  string decision = 3;
+}
+message ResolveAppealResponse {
+  AdminMutationResult result = 1;
 }

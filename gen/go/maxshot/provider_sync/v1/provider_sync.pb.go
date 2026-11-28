@@ -2324,8 +2324,10 @@ type OfferingRecord struct {
 	OmittableParameters         []string                    `protobuf:"bytes,39,rep,name=omittable_parameters,json=omittableParameters,proto3" json:"omittable_parameters,omitempty"` // unsupported sampling params (e.g. temperature, top_p) stripped silently (#154-4)
 	ServerTools                 []*ServerToolConfig         `protobuf:"bytes,40,rep,name=server_tools,json=serverTools,proto3" json:"server_tools,omitempty"`
 	MediaOfferingSpec           *MediaOfferingSpec          `protobuf:"bytes,41,opt,name=media_offering_spec,json=mediaOfferingSpec,proto3" json:"media_offering_spec,omitempty"`
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	// A positive value at most 86400 tightens the Gateway control-plane outage limit. Absent uses 86400.
+	MaxControlPlaneOutageSeconds *uint32 `protobuf:"varint,42,opt,name=max_control_plane_outage_seconds,json=maxControlPlaneOutageSeconds,proto3,oneof" json:"max_control_plane_outage_seconds,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *OfferingRecord) Reset() {
@@ -2643,6 +2645,13 @@ func (x *OfferingRecord) GetMediaOfferingSpec() *MediaOfferingSpec {
 		return x.MediaOfferingSpec
 	}
 	return nil
+}
+
+func (x *OfferingRecord) GetMaxControlPlaneOutageSeconds() uint32 {
+	if x != nil && x.MaxControlPlaneOutageSeconds != nil {
+		return *x.MaxControlPlaneOutageSeconds
+	}
+	return 0
 }
 
 // TierGroupRecord carries Provider-computed Basic/Premium model tier groups
@@ -3378,7 +3387,7 @@ func (x *CatalogSnapshot) GetModelTierOverrides() []*ModelTierOverrideRecord {
 type WatchSyncEventsRequest struct {
 	state                      protoimpl.MessageState `protogen:"open.v1"`
 	GatewayNodeId              string                 `protobuf:"bytes,1,opt,name=gateway_node_id,json=gatewayNodeId,proto3" json:"gateway_node_id,omitempty"`
-	NodeRole                   string                 `protobuf:"bytes,2,opt,name=node_role,json=nodeRole,proto3" json:"node_role,omitempty"` // "dataplane" | "billing" | "studio" | "finance"
+	NodeRole                   string                 `protobuf:"bytes,2,opt,name=node_role,json=nodeRole,proto3" json:"node_role,omitempty"` // "dataplane" | "billing" | "studio" | "finance" | "bff"
 	LastSeenCatalogVersion     string                 `protobuf:"bytes,3,opt,name=last_seen_catalog_version,json=lastSeenCatalogVersion,proto3" json:"last_seen_catalog_version,omitempty"`
 	LastSeenCredentialRevision string                 `protobuf:"bytes,4,opt,name=last_seen_credential_revision,json=lastSeenCredentialRevision,proto3" json:"last_seen_credential_revision,omitempty"`
 	unknownFields              protoimpl.UnknownFields
@@ -3588,10 +3597,14 @@ func (x *ReportNodeSyncStateRequest) GetReportedAtUnixMs() int64 {
 }
 
 type ReportNodeSyncStateResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Acknowledged  bool                   `protobuf:"varint,1,opt,name=acknowledged,proto3" json:"acknowledged,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Acknowledged bool                   `protobuf:"varint,1,opt,name=acknowledged,proto3" json:"acknowledged,omitempty"`
+	// Return authoritative heads even if the catalogs have not changed.
+	LatestCatalogVersion *string `protobuf:"bytes,2,opt,name=latest_catalog_version,json=latestCatalogVersion,proto3,oneof" json:"latest_catalog_version,omitempty"`
+	// Returned only to identities authorized to receive credential revisions.
+	LatestCredentialRevision *string `protobuf:"bytes,3,opt,name=latest_credential_revision,json=latestCredentialRevision,proto3,oneof" json:"latest_credential_revision,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *ReportNodeSyncStateResponse) Reset() {
@@ -3629,6 +3642,20 @@ func (x *ReportNodeSyncStateResponse) GetAcknowledged() bool {
 		return x.Acknowledged
 	}
 	return false
+}
+
+func (x *ReportNodeSyncStateResponse) GetLatestCatalogVersion() string {
+	if x != nil && x.LatestCatalogVersion != nil {
+		return *x.LatestCatalogVersion
+	}
+	return ""
+}
+
+func (x *ReportNodeSyncStateResponse) GetLatestCredentialRevision() string {
+	if x != nil && x.LatestCredentialRevision != nil {
+		return *x.LatestCredentialRevision
+	}
+	return ""
 }
 
 type GetCatalogSnapshotRequest struct {
@@ -4031,8 +4058,10 @@ type EncryptedCredentialItem struct {
 	Ciphertext         []byte                 `protobuf:"bytes,8,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`                         // AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED)
 	UpdatedAtUnixMs    int64                  `protobuf:"varint,9,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
 	TargetNodeRoles    []string               `protobuf:"bytes,10,rep,name=target_node_roles,json=targetNodeRoles,proto3" json:"target_node_roles,omitempty"` // e.g. ["dataplane", "studio", "finance"]
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Optional expiry can shorten, but cannot extend, the Offering outage limit.
+	ExpiresAtUnixMs *int64 `protobuf:"varint,11,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3,oneof" json:"expires_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *EncryptedCredentialItem) Reset() {
@@ -4133,6 +4162,13 @@ func (x *EncryptedCredentialItem) GetTargetNodeRoles() []string {
 		return x.TargetNodeRoles
 	}
 	return nil
+}
+
+func (x *EncryptedCredentialItem) GetExpiresAtUnixMs() int64 {
+	if x != nil && x.ExpiresAtUnixMs != nil {
+		return *x.ExpiresAtUnixMs
+	}
+	return 0
 }
 
 type SyncEncryptedCredentialsRequest struct {
@@ -5541,7 +5577,7 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\x15is_first_token_metric\x18\x06 \x01(\bR\x12isFirstTokenMetric\x12'\n" +
 	"\x0flatency_samples\x18\a \x01(\x03R\x0elatencySamples\x12\x15\n" +
 	"\x06p50_ms\x18\b \x01(\x03R\x05p50Ms\x12\x15\n" +
-	"\x06p95_ms\x18\t \x01(\x03R\x05p95Ms\"\x92\x12\n" +
+	"\x06p95_ms\x18\t \x01(\x03R\x05p95Ms\"\x84\x13\n" +
 	"\x0eOfferingRecord\x12\x1f\n" +
 	"\voffering_id\x18\x01 \x01(\tR\n" +
 	"offeringId\x12\x1f\n" +
@@ -5586,7 +5622,9 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\x1amandatory_reasoning_policy\x18& \x01(\v22.maxshot.provider_sync.v1.MandatoryReasoningPolicyR\x18mandatoryReasoningPolicy\x121\n" +
 	"\x14omittable_parameters\x18' \x03(\tR\x13omittableParameters\x12M\n" +
 	"\fserver_tools\x18( \x03(\v2*.maxshot.provider_sync.v1.ServerToolConfigR\vserverTools\x12[\n" +
-	"\x13media_offering_spec\x18) \x01(\v2+.maxshot.provider_sync.v1.MediaOfferingSpecR\x11mediaOfferingSpec\"\xaf\x03\n" +
+	"\x13media_offering_spec\x18) \x01(\v2+.maxshot.provider_sync.v1.MediaOfferingSpecR\x11mediaOfferingSpec\x12K\n" +
+	" max_control_plane_outage_seconds\x18* \x01(\rH\x00R\x1cmaxControlPlaneOutageSeconds\x88\x01\x01B#\n" +
+	"!_max_control_plane_outage_seconds\"\xaf\x03\n" +
 	"\x0fTierGroupRecord\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\tR\agroupId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x127\n" +
@@ -5673,9 +5711,13 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\tnode_role\x18\x02 \x01(\tR\bnodeRole\x126\n" +
 	"\x17applied_catalog_version\x18\x03 \x01(\tR\x15appliedCatalogVersion\x12>\n" +
 	"\x1bapplied_credential_revision\x18\x04 \x01(\tR\x19appliedCredentialRevision\x12-\n" +
-	"\x13reported_at_unix_ms\x18\x05 \x01(\x03R\x10reportedAtUnixMs\"A\n" +
+	"\x13reported_at_unix_ms\x18\x05 \x01(\x03R\x10reportedAtUnixMs\"\xf9\x01\n" +
 	"\x1bReportNodeSyncStateResponse\x12\"\n" +
-	"\facknowledged\x18\x01 \x01(\bR\facknowledged\"D\n" +
+	"\facknowledged\x18\x01 \x01(\bR\facknowledged\x129\n" +
+	"\x16latest_catalog_version\x18\x02 \x01(\tH\x00R\x14latestCatalogVersion\x88\x01\x01\x12A\n" +
+	"\x1alatest_credential_revision\x18\x03 \x01(\tH\x01R\x18latestCredentialRevision\x88\x01\x01B\x19\n" +
+	"\x17_latest_catalog_versionB\x1d\n" +
+	"\x1b_latest_credential_revision\"D\n" +
 	"\x19GetCatalogSnapshotRequest\x12'\n" +
 	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\"c\n" +
 	"\x1aGetCatalogSnapshotResponse\x12E\n" +
@@ -5700,7 +5742,7 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"\x04keys\x18\x01 \x03(\v2..maxshot.provider_sync.v1.GatewayPublicKeyItemR\x04keys\"{\n" +
 	"\x1dSyncGatewayPublicKeysResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12>\n" +
-	"\x1cactive_gateway_public_key_id\x18\x02 \x01(\tR\x18activeGatewayPublicKeyId\"\xbb\x03\n" +
+	"\x1cactive_gateway_public_key_id\x18\x02 \x01(\tR\x18activeGatewayPublicKeyId\"\x84\x04\n" +
 	"\x17EncryptedCredentialItem\x12#\n" +
 	"\rcredential_id\x18\x01 \x01(\tR\fcredentialId\x12/\n" +
 	"\x13credential_revision\x18\x02 \x01(\tR\x12credentialRevision\x12\x1f\n" +
@@ -5715,7 +5757,9 @@ const file_maxshot_provider_sync_v1_provider_sync_proto_rawDesc = "" +
 	"ciphertext\x12+\n" +
 	"\x12updated_at_unix_ms\x18\t \x01(\x03R\x0fupdatedAtUnixMs\x12*\n" +
 	"\x11target_node_roles\x18\n" +
-	" \x03(\tR\x0ftargetNodeRoles\"H\n" +
+	" \x03(\tR\x0ftargetNodeRoles\x120\n" +
+	"\x12expires_at_unix_ms\x18\v \x01(\x03H\x00R\x0fexpiresAtUnixMs\x88\x01\x01B\x15\n" +
+	"\x13_expires_at_unix_ms\"H\n" +
 	"\x1fSyncEncryptedCredentialsRequest\x12%\n" +
 	"\x0esince_revision\x18\x01 \x01(\tR\rsinceRevision\"\xa2\x01\n" +
 	" SyncEncryptedCredentialsResponse\x12)\n" +
@@ -6116,6 +6160,9 @@ func file_maxshot_provider_sync_v1_provider_sync_proto_init() {
 	if File_maxshot_provider_sync_v1_provider_sync_proto != nil {
 		return
 	}
+	file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[18].OneofWrappers = []any{}
+	file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[30].OneofWrappers = []any{}
+	file_maxshot_provider_sync_v1_provider_sync_proto_msgTypes[38].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

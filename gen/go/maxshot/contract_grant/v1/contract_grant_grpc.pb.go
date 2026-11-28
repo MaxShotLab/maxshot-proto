@@ -253,6 +253,7 @@ const (
 	AitCreditGrantService_ListFundedTerms_FullMethodName              = "/maxshot.contract_grant.v1.AitCreditGrantService/ListFundedTerms"
 	AitCreditGrantService_PullWalletEligibilityUpdates_FullMethodName = "/maxshot.contract_grant.v1.AitCreditGrantService/PullWalletEligibilityUpdates"
 	AitCreditGrantService_IssueAitCreditGrants_FullMethodName         = "/maxshot.contract_grant.v1.AitCreditGrantService/IssueAitCreditGrants"
+	AitCreditGrantService_GetGrantBoundaryStatus_FullMethodName       = "/maxshot.contract_grant.v1.AitCreditGrantService/GetGrantBoundaryStatus"
 )
 
 // AitCreditGrantServiceClient is the client API for AitCreditGrantService service.
@@ -266,10 +267,13 @@ type AitCreditGrantServiceClient interface {
 	ListFundedTerms(ctx context.Context, in *ListFundedTermsRequest, opts ...grpc.CallOption) (*ListFundedTermsResponse, error)
 	// PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
 	PullWalletEligibilityUpdates(ctx context.Context, in *PullWalletEligibilityUpdatesRequest, opts ...grpc.CallOption) (*PullWalletEligibilityUpdatesResponse, error)
-	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+	// IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+	// Credits become spendable only after all batches and Gateway independent chain verification pass.
 	// Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
 	// and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
 	IssueAitCreditGrants(ctx context.Context, in *IssueAitCreditGrantsRequest, opts ...grpc.CallOption) (*IssueAitCreditGrantsResponse, error)
+	// Poll the independently verified boundary and the final disposition of one submitted batch.
+	GetGrantBoundaryStatus(ctx context.Context, in *GetGrantBoundaryStatusRequest, opts ...grpc.CallOption) (*GetGrantBoundaryStatusResponse, error)
 }
 
 type aitCreditGrantServiceClient struct {
@@ -310,6 +314,16 @@ func (c *aitCreditGrantServiceClient) IssueAitCreditGrants(ctx context.Context, 
 	return out, nil
 }
 
+func (c *aitCreditGrantServiceClient) GetGrantBoundaryStatus(ctx context.Context, in *GetGrantBoundaryStatusRequest, opts ...grpc.CallOption) (*GetGrantBoundaryStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGrantBoundaryStatusResponse)
+	err := c.cc.Invoke(ctx, AitCreditGrantService_GetGrantBoundaryStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AitCreditGrantServiceServer is the server API for AitCreditGrantService service.
 // All implementations must embed UnimplementedAitCreditGrantServiceServer
 // for forward compatibility.
@@ -321,10 +335,13 @@ type AitCreditGrantServiceServer interface {
 	ListFundedTerms(context.Context, *ListFundedTermsRequest) (*ListFundedTermsResponse, error)
 	// PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
 	PullWalletEligibilityUpdates(context.Context, *PullWalletEligibilityUpdatesRequest) (*PullWalletEligibilityUpdatesResponse, error)
-	// IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+	// IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+	// Credits become spendable only after all batches and Gateway independent chain verification pass.
 	// Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
 	// and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
 	IssueAitCreditGrants(context.Context, *IssueAitCreditGrantsRequest) (*IssueAitCreditGrantsResponse, error)
+	// Poll the independently verified boundary and the final disposition of one submitted batch.
+	GetGrantBoundaryStatus(context.Context, *GetGrantBoundaryStatusRequest) (*GetGrantBoundaryStatusResponse, error)
 	mustEmbedUnimplementedAitCreditGrantServiceServer()
 }
 
@@ -343,6 +360,9 @@ func (UnimplementedAitCreditGrantServiceServer) PullWalletEligibilityUpdates(con
 }
 func (UnimplementedAitCreditGrantServiceServer) IssueAitCreditGrants(context.Context, *IssueAitCreditGrantsRequest) (*IssueAitCreditGrantsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method IssueAitCreditGrants not implemented")
+}
+func (UnimplementedAitCreditGrantServiceServer) GetGrantBoundaryStatus(context.Context, *GetGrantBoundaryStatusRequest) (*GetGrantBoundaryStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGrantBoundaryStatus not implemented")
 }
 func (UnimplementedAitCreditGrantServiceServer) mustEmbedUnimplementedAitCreditGrantServiceServer() {}
 func (UnimplementedAitCreditGrantServiceServer) testEmbeddedByValue()                               {}
@@ -419,6 +439,24 @@ func _AitCreditGrantService_IssueAitCreditGrants_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AitCreditGrantService_GetGrantBoundaryStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGrantBoundaryStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AitCreditGrantServiceServer).GetGrantBoundaryStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AitCreditGrantService_GetGrantBoundaryStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AitCreditGrantServiceServer).GetGrantBoundaryStatus(ctx, req.(*GetGrantBoundaryStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AitCreditGrantService_ServiceDesc is the grpc.ServiceDesc for AitCreditGrantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -437,6 +475,10 @@ var AitCreditGrantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IssueAitCreditGrants",
 			Handler:    _AitCreditGrantService_IssueAitCreditGrants_Handler,
+		},
+		{
+			MethodName: "GetGrantBoundaryStatus",
+			Handler:    _AitCreditGrantService_GetGrantBoundaryStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

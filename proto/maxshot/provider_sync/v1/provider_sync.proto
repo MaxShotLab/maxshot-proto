@@ -136,8 +136,8 @@ enum StatementEntryKind {
 enum MediaPricingFormulaKind {
   MEDIA_PRICING_FORMULA_KIND_UNSPECIFIED = 0;
   MEDIA_PRICING_FORMULA_KIND_FLAT_RATE_COMPONENTS = 1;
-  MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS = 2;           // ceil(width * height * duration * fps / divisor) * rate
-  MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS = 3;      // ceil(w*scale)*ceil(h*scale)*duration_ms / 1048576 / 1000 * rate
+  MEDIA_PRICING_FORMULA_KIND_VIDEO_TOKENS = 2; // ceil(width * height * duration * fps / divisor) * rate
+  MEDIA_PRICING_FORMULA_KIND_MEGAPIXEL_SECONDS = 3; // ceil(w*scale)*ceil(h*scale)*duration_ms / 1048576 / 1000 * rate
   MEDIA_PRICING_FORMULA_KIND_RESOLUTION_TOKEN_LOOKUP = 4; // fixed output tokens per resolution + billable reference inputs
 }
 
@@ -164,7 +164,7 @@ message MediaPricingFormula {
 message RateCondition {
   int64 min_prompt_tokens = 1; // applies when prompt_tokens > min_prompt_tokens (0 means unconditional)
   bool has_utc_window = 2;
-  int32 utc_start_hhmm = 3;    // e.g. 0..2359
+  int32 utc_start_hhmm = 3; // e.g. 0..2359
   int32 utc_end_hhmm = 4;
   repeated string utc_days = 5; // lowercase "monday".."sunday"
   repeated maxshot.common.v1.KeyValueAttribute media_attributes = 6; // e.g. resolution=1080p, has_audio=true, path=i2v, edit_tool=inpaint
@@ -186,8 +186,8 @@ message RateCard {
   int64 effective_at_unix_ms = 3;
   repeated RateComponent base_components = 4;
   repeated RateComponent conditional_overrides = 5; // evaluated in source order
-  string minimum_charge_usd_dec = 6;                // minimum USD charge per request/generation (e.g. "0.010000")
-  MediaPricingFormula media_pricing_formula = 7;    // optional nonlinear Studio media pricing formula (decision 2A)
+  string minimum_charge_usd_dec = 6; // minimum USD charge per request/generation (e.g. "0.010000")
+  MediaPricingFormula media_pricing_formula = 7; // optional nonlinear Studio media pricing formula (decision 2A)
 }
 
 message ProviderRecord {
@@ -314,9 +314,9 @@ message ObservedPerformanceSummary {
   int64 window_start_unix_ms = 1;
   int64 window_end_unix_ms = 2;
   int64 dispatched_attempts = 3;
-  bool sample_sufficient = 4;        // true only when dispatched_attempts >= configured minimum (PRV-R34)
+  bool sample_sufficient = 4; // true only when dispatched_attempts >= configured minimum (PRV-R34)
   string delivered_success_pct_dec = 5; // e.g. "99.3", empty when !sample_sufficient
-  bool is_first_token_metric = 6;    // true = first_token (streaming text), false = completion
+  bool is_first_token_metric = 6; // true = first_token (streaming text), false = completion
   int64 latency_samples = 7;
   int64 p50_ms = 8;
   int64 p95_ms = 9;
@@ -349,21 +349,23 @@ message OfferingRecord {
   int64 max_output_tokens = 24;
   int64 ttft_timeout_ms = 25;
   int64 max_job_duration_seconds = 26;
-  int64 grace_window_seconds = 27;          // PRV-R09 / BIL-R37: max_job_duration_seconds + grace_window_seconds < 86400
-  int32 provider_cost_ceiling_bps = 28;     // e.g. 15000 = 1.5x customer rate ceiling (PRV-R21, PRV-R24)
-  int32 health_backoff_failures = 29;       // PRV-R27 consecutive 5xx/timeout threshold
+  int64 grace_window_seconds = 27; // PRV-R09 / BIL-R37: max_job_duration_seconds + grace_window_seconds < 86400
+  int32 provider_cost_ceiling_bps = 28; // e.g. 15000 = 1.5x customer rate ceiling (PRV-R21, PRV-R24)
+  int32 health_backoff_failures = 29; // PRV-R27 consecutive 5xx/timeout threshold
   int32 health_backoff_window_seconds = 30;
   int32 health_reprobe_seconds = 31;
   RateCard provider_cost_card = 32;
   RateCard customer_rate_card = 33;
   ObservedPerformanceSummary observed_performance = 34;
   maxshot.common.v1.CustomerChargeMode customer_charge_mode = 35;
-  int32 hold_buffer_bps = 36;               // e.g. 11500 for 115% pre-hold buffer on provider_actual dynamic quotes
-  string markup_multiplier_dec = 37;        // e.g. "1.000000" when customer_charge_mode == PROVIDER_ACTUAL_COST
+  int32 hold_buffer_bps = 36; // e.g. 11500 for 115% pre-hold buffer on provider_actual dynamic quotes
+  string markup_multiplier_dec = 37; // e.g. "1.000000" when customer_charge_mode == PROVIDER_ACTUAL_COST
   MandatoryReasoningPolicy mandatory_reasoning_policy = 38;
   repeated string omittable_parameters = 39; // unsupported sampling params (e.g. temperature, top_p) stripped silently (#154-4)
   repeated ServerToolConfig server_tools = 40;
   MediaOfferingSpec media_offering_spec = 41;
+  // A positive value at most 86400 tightens the Gateway control-plane outage limit. Absent uses 86400.
+  optional uint32 max_control_plane_outage_seconds = 42;
 }
 
 // TierGroupRecord carries Provider-computed Basic/Premium model tier groups
@@ -449,7 +451,7 @@ message CatalogSnapshot {
 
 message WatchSyncEventsRequest {
   string gateway_node_id = 1;
-  string node_role = 2; // "dataplane" | "billing" | "studio" | "finance"
+  string node_role = 2; // "dataplane" | "billing" | "studio" | "finance" | "bff"
   string last_seen_catalog_version = 3;
   string last_seen_credential_revision = 4;
 }
@@ -471,6 +473,10 @@ message ReportNodeSyncStateRequest {
 
 message ReportNodeSyncStateResponse {
   bool acknowledged = 1;
+  // Return authoritative heads even if the catalogs have not changed.
+  optional string latest_catalog_version = 2;
+  // Returned only to identities authorized to receive credential revisions.
+  optional string latest_credential_revision = 3;
 }
 
 message GetCatalogSnapshotRequest {
@@ -518,10 +524,12 @@ message EncryptedCredentialItem {
   CredentialStatus status = 4;
   string gateway_public_key_id = 5;
   bytes encrypted_dek = 6; // DEK encrypted with Gateway public key
-  bytes nonce = 7;         // AES-256-GCM 12-byte nonce
-  bytes ciphertext = 8;    // AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED)
+  bytes nonce = 7; // AES-256-GCM 12-byte nonce
+  bytes ciphertext = 8; // AES-256-GCM encrypted upstream secret + auth tag (empty when REVOKED)
   int64 updated_at_unix_ms = 9;
   repeated string target_node_roles = 10; // e.g. ["dataplane", "studio", "finance"]
+  // Optional expiry can shorten, but cannot extend, the Offering outage limit.
+  optional int64 expires_at_unix_ms = 11;
 }
 
 message SyncEncryptedCredentialsRequest {
@@ -548,10 +556,10 @@ message OfferingWindowMetric {
   int64 http_5xx_count = 7;
   int64 timeout_count = 8;
   int64 mid_stream_or_malformed_count = 9;
-  int64 user_input_error_count = 10;    // PRV-R35: excluded from delivered-success denominator
-  int64 customer_cancelled_count = 11;  // PRV-R35: excluded from delivered-success denominator
+  int64 user_input_error_count = 10; // PRV-R35: excluded from delivered-success denominator
+  int64 customer_cancelled_count = 11; // PRV-R35: excluded from delivered-success denominator
   int64 terminal_attempts = 12;
-  int64 verified_usage_attempts = 13;   // PRV-R35: metering completeness numerator
+  int64 verified_usage_attempts = 13; // PRV-R35: metering completeness numerator
   int64 missing_usage_count = 14;
   bool is_first_token_metric = 15;
   int64 latency_sample_count = 16;
@@ -643,10 +651,10 @@ message ApplyProviderDisputeAdjustmentRequest {
   string provider_id = 3;
   string offering_id = 4;
   string period_start_date = 5; // YYYY-MM-DD
-  string period_end_date = 6;   // YYYY-MM-DD
+  string period_end_date = 6; // YYYY-MM-DD
   string invoiced_cost_usd_dec = 7;
   string adjustment_delta_usd_dec = 8; // signed decimal USD delta written to discrepancy ledger
-  string resolution_status = 9;        // "disputed" | "adjusted" | "resolved"
+  string resolution_status = 9; // "disputed" | "adjusted" | "resolved"
   string reason = 10;
   string operator_id = 11;
   int64 resolved_at_unix_ms = 12;

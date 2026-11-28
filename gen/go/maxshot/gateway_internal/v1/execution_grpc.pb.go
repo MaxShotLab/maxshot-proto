@@ -28,17 +28,16 @@ const (
 	BillingExecutionService_Settle_FullMethodName                   = "/maxshot.gateway_internal.v1.BillingExecutionService/Settle"
 	BillingExecutionService_MarkUncertain_FullMethodName            = "/maxshot.gateway_internal.v1.BillingExecutionService/MarkUncertain"
 	BillingExecutionService_ResolveUncertain_FullMethodName         = "/maxshot.gateway_internal.v1.BillingExecutionService/ResolveUncertain"
+	BillingExecutionService_RecordAttemptObservation_FullMethodName = "/maxshot.gateway_internal.v1.BillingExecutionService/RecordAttemptObservation"
+	BillingExecutionService_ClaimExecutionRecovery_FullMethodName   = "/maxshot.gateway_internal.v1.BillingExecutionService/ClaimExecutionRecovery"
+	BillingExecutionService_GetBillingCatalogState_FullMethodName   = "/maxshot.gateway_internal.v1.BillingExecutionService/GetBillingCatalogState"
 )
 
 // BillingExecutionServiceClient is the client API for BillingExecutionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
-// hosted by TypeScript billing-account-service and called by:
-// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
-// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
-// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
+// BillingExecutionService is the intra-datacenter execution and ledger contract hosted by Go billing-service.
 type BillingExecutionServiceClient interface {
 	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
 	// so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
@@ -58,12 +57,18 @@ type BillingExecutionServiceClient interface {
 	// ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs.
 	ExtendExecutionLease(ctx context.Context, in *ExtendExecutionLeaseRequest, opts ...grpc.CallOption) (*ExtendExecutionLeaseResponse, error)
 	// Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-	// records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+	// records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
 	Settle(ctx context.Context, in *SettleRequest, opts ...grpc.CallOption) (*SettleResponse, error)
 	// MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
 	MarkUncertain(ctx context.Context, in *MarkUncertainRequest, opts ...grpc.CallOption) (*MarkUncertainResponse, error)
-	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline.
 	ResolveUncertain(ctx context.Context, in *ResolveUncertainRequest, opts ...grpc.CallOption) (*ResolveUncertainResponse, error)
+	// A durable, fenced observation written as soon as the upstream status or identifiers are known.
+	RecordAttemptObservation(ctx context.Context, in *RecordAttemptObservationRequest, opts ...grpc.CallOption) (*RecordAttemptObservationResponse, error)
+	// Claims expired execution work without authorizing a new upstream dispatch.
+	ClaimExecutionRecovery(ctx context.Context, in *ClaimExecutionRecoveryRequest, opts ...grpc.CallOption) (*ClaimExecutionRecoveryResponse, error)
+	// Reports the active, durably imported admission snapshot on the authoritative billing instance.
+	GetBillingCatalogState(ctx context.Context, in *GetBillingCatalogStateRequest, opts ...grpc.CallOption) (*GetBillingCatalogStateResponse, error)
 }
 
 type billingExecutionServiceClient struct {
@@ -164,15 +169,41 @@ func (c *billingExecutionServiceClient) ResolveUncertain(ctx context.Context, in
 	return out, nil
 }
 
+func (c *billingExecutionServiceClient) RecordAttemptObservation(ctx context.Context, in *RecordAttemptObservationRequest, opts ...grpc.CallOption) (*RecordAttemptObservationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordAttemptObservationResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_RecordAttemptObservation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingExecutionServiceClient) ClaimExecutionRecovery(ctx context.Context, in *ClaimExecutionRecoveryRequest, opts ...grpc.CallOption) (*ClaimExecutionRecoveryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ClaimExecutionRecoveryResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_ClaimExecutionRecovery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingExecutionServiceClient) GetBillingCatalogState(ctx context.Context, in *GetBillingCatalogStateRequest, opts ...grpc.CallOption) (*GetBillingCatalogStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBillingCatalogStateResponse)
+	err := c.cc.Invoke(ctx, BillingExecutionService_GetBillingCatalogState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BillingExecutionServiceServer is the server API for BillingExecutionService service.
 // All implementations must embed UnimplementedBillingExecutionServiceServer
 // for forward compatibility.
 //
-// BillingExecutionService is the unified intra-datacenter synchronous gRPC ledger contract
-// hosted by TypeScript billing-account-service and called by:
-// 1. Go gateway-dataplane (API & Chat inference, /v1/models discovery)
-// 2. TypeScript studio-service & studio-worker (Studio quotes, async image/video jobs, uncertain queue)
-// 3. TypeScript app-adapter BFF (pre-submit Web Chat quotes)
+// BillingExecutionService is the intra-datacenter execution and ledger contract hosted by Go billing-service.
 type BillingExecutionServiceServer interface {
 	// ResolvePrincipalScope authenticates an API key or account principal and returns catalog/model/plan/rate-limit scopes
 	// so Go gateway-dataplane can serve viewer-filtered /v1/models and enforce Redis concurrency/RPM/TPM limits (AGT-R03) without connecting to PostgreSQL.
@@ -192,12 +223,18 @@ type BillingExecutionServiceServer interface {
 	// ExtendExecutionLease renews an active execution lease for long-running streaming or async Studio media jobs.
 	ExtendExecutionLease(context.Context, *ExtendExecutionLeaseRequest) (*ExtendExecutionLeaseResponse, error)
 	// Settle finalizes verified text or media usage once, supports double-authorized Dollar shortfall top-up,
-	// records platform/provider discrepancies, or parks missing-usage requests for 24h auto-release recovery.
+	// records platform/provider discrepancies, or parks missing-usage requests until the persisted customer release deadline.
 	Settle(context.Context, *SettleRequest) (*SettleResponse, error)
 	// MarkUncertain moves an accepted async media job that exceeded max_job_duration + grace into the ADM-R16 uncertain queue.
 	MarkUncertain(context.Context, *MarkUncertainRequest) (*MarkUncertainResponse, error)
-	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or 24h auto-release (BIL-R36).
+	// ResolveUncertain resolves an uncertain or pending-reconciliation hold via operator action (ADM-R16) or the persisted automatic release deadline.
 	ResolveUncertain(context.Context, *ResolveUncertainRequest) (*ResolveUncertainResponse, error)
+	// A durable, fenced observation written as soon as the upstream status or identifiers are known.
+	RecordAttemptObservation(context.Context, *RecordAttemptObservationRequest) (*RecordAttemptObservationResponse, error)
+	// Claims expired execution work without authorizing a new upstream dispatch.
+	ClaimExecutionRecovery(context.Context, *ClaimExecutionRecoveryRequest) (*ClaimExecutionRecoveryResponse, error)
+	// Reports the active, durably imported admission snapshot on the authoritative billing instance.
+	GetBillingCatalogState(context.Context, *GetBillingCatalogStateRequest) (*GetBillingCatalogStateResponse, error)
 	mustEmbedUnimplementedBillingExecutionServiceServer()
 }
 
@@ -234,6 +271,15 @@ func (UnimplementedBillingExecutionServiceServer) MarkUncertain(context.Context,
 }
 func (UnimplementedBillingExecutionServiceServer) ResolveUncertain(context.Context, *ResolveUncertainRequest) (*ResolveUncertainResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveUncertain not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) RecordAttemptObservation(context.Context, *RecordAttemptObservationRequest) (*RecordAttemptObservationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordAttemptObservation not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) ClaimExecutionRecovery(context.Context, *ClaimExecutionRecoveryRequest) (*ClaimExecutionRecoveryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ClaimExecutionRecovery not implemented")
+}
+func (UnimplementedBillingExecutionServiceServer) GetBillingCatalogState(context.Context, *GetBillingCatalogStateRequest) (*GetBillingCatalogStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBillingCatalogState not implemented")
 }
 func (UnimplementedBillingExecutionServiceServer) mustEmbedUnimplementedBillingExecutionServiceServer() {
 }
@@ -419,6 +465,60 @@ func _BillingExecutionService_ResolveUncertain_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BillingExecutionService_RecordAttemptObservation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordAttemptObservationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).RecordAttemptObservation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_RecordAttemptObservation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).RecordAttemptObservation(ctx, req.(*RecordAttemptObservationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingExecutionService_ClaimExecutionRecovery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClaimExecutionRecoveryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).ClaimExecutionRecovery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_ClaimExecutionRecovery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).ClaimExecutionRecovery(ctx, req.(*ClaimExecutionRecoveryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingExecutionService_GetBillingCatalogState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBillingCatalogStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingExecutionServiceServer).GetBillingCatalogState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingExecutionService_GetBillingCatalogState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingExecutionServiceServer).GetBillingCatalogState(ctx, req.(*GetBillingCatalogStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // BillingExecutionService_ServiceDesc is the grpc.ServiceDesc for BillingExecutionService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -461,6 +561,2155 @@ var BillingExecutionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolveUncertain",
 			Handler:    _BillingExecutionService_ResolveUncertain_Handler,
+		},
+		{
+			MethodName: "RecordAttemptObservation",
+			Handler:    _BillingExecutionService_RecordAttemptObservation_Handler,
+		},
+		{
+			MethodName: "ClaimExecutionRecovery",
+			Handler:    _BillingExecutionService_ClaimExecutionRecovery_Handler,
+		},
+		{
+			MethodName: "GetBillingCatalogState",
+			Handler:    _BillingExecutionService_GetBillingCatalogState_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "maxshot/gateway_internal/v1/execution.proto",
+}
+
+const (
+	AccountManagementService_RegisterAccount_FullMethodName        = "/maxshot.gateway_internal.v1.AccountManagementService/RegisterAccount"
+	AccountManagementService_CreateApiKey_FullMethodName           = "/maxshot.gateway_internal.v1.AccountManagementService/CreateApiKey"
+	AccountManagementService_UpdateApiKey_FullMethodName           = "/maxshot.gateway_internal.v1.AccountManagementService/UpdateApiKey"
+	AccountManagementService_RevokeApiKey_FullMethodName           = "/maxshot.gateway_internal.v1.AccountManagementService/RevokeApiKey"
+	AccountManagementService_ListApiKeys_FullMethodName            = "/maxshot.gateway_internal.v1.AccountManagementService/ListApiKeys"
+	AccountManagementService_GetAccountFunding_FullMethodName      = "/maxshot.gateway_internal.v1.AccountManagementService/GetAccountFunding"
+	AccountManagementService_UpdateAccountSettings_FullMethodName  = "/maxshot.gateway_internal.v1.AccountManagementService/UpdateAccountSettings"
+	AccountManagementService_ListSubscriptionPlans_FullMethodName  = "/maxshot.gateway_internal.v1.AccountManagementService/ListSubscriptionPlans"
+	AccountManagementService_GetSubscription_FullMethodName        = "/maxshot.gateway_internal.v1.AccountManagementService/GetSubscription"
+	AccountManagementService_PurchaseSubscription_FullMethodName   = "/maxshot.gateway_internal.v1.AccountManagementService/PurchaseSubscription"
+	AccountManagementService_RenewSubscription_FullMethodName      = "/maxshot.gateway_internal.v1.AccountManagementService/RenewSubscription"
+	AccountManagementService_CancelSubscription_FullMethodName     = "/maxshot.gateway_internal.v1.AccountManagementService/CancelSubscription"
+	AccountManagementService_SchedulePlanChange_FullMethodName     = "/maxshot.gateway_internal.v1.AccountManagementService/SchedulePlanChange"
+	AccountManagementService_ListInvoices_FullMethodName           = "/maxshot.gateway_internal.v1.AccountManagementService/ListInvoices"
+	AccountManagementService_GetInvoice_FullMethodName             = "/maxshot.gateway_internal.v1.AccountManagementService/GetInvoice"
+	AccountManagementService_GetDepositAddress_FullMethodName      = "/maxshot.gateway_internal.v1.AccountManagementService/GetDepositAddress"
+	AccountManagementService_CreateTopupOrder_FullMethodName       = "/maxshot.gateway_internal.v1.AccountManagementService/CreateTopupOrder"
+	AccountManagementService_RecordStripePayment_FullMethodName    = "/maxshot.gateway_internal.v1.AccountManagementService/RecordStripePayment"
+	AccountManagementService_ListTopups_FullMethodName             = "/maxshot.gateway_internal.v1.AccountManagementService/ListTopups"
+	AccountManagementService_LinkWallet_FullMethodName             = "/maxshot.gateway_internal.v1.AccountManagementService/LinkWallet"
+	AccountManagementService_GetWalletLink_FullMethodName          = "/maxshot.gateway_internal.v1.AccountManagementService/GetWalletLink"
+	AccountManagementService_AcceptFundedTerm_FullMethodName       = "/maxshot.gateway_internal.v1.AccountManagementService/AcceptFundedTerm"
+	AccountManagementService_GetCurrentFundedTerm_FullMethodName   = "/maxshot.gateway_internal.v1.AccountManagementService/GetCurrentFundedTerm"
+	AccountManagementService_PrepareAccountMerge_FullMethodName    = "/maxshot.gateway_internal.v1.AccountManagementService/PrepareAccountMerge"
+	AccountManagementService_CommitAccountMerge_FullMethodName     = "/maxshot.gateway_internal.v1.AccountManagementService/CommitAccountMerge"
+	AccountManagementService_ListUsage_FullMethodName              = "/maxshot.gateway_internal.v1.AccountManagementService/ListUsage"
+	AccountManagementService_GetUsageDetail_FullMethodName         = "/maxshot.gateway_internal.v1.AccountManagementService/GetUsageDetail"
+	AccountManagementService_ListAccountNotices_FullMethodName     = "/maxshot.gateway_internal.v1.AccountManagementService/ListAccountNotices"
+	AccountManagementService_AckAccountNotice_FullMethodName       = "/maxshot.gateway_internal.v1.AccountManagementService/AckAccountNotice"
+	AccountManagementService_GetReferralSummary_FullMethodName     = "/maxshot.gateway_internal.v1.AccountManagementService/GetReferralSummary"
+	AccountManagementService_SetReferralAttribution_FullMethodName = "/maxshot.gateway_internal.v1.AccountManagementService/SetReferralAttribution"
+)
+
+// AccountManagementServiceClient is the client API for AccountManagementService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// All methods are internal. account_id is derived from the authenticated Web principal,
+// never trusted from a public request body. Writes derive idempotency from the operation and its inputs.
+type AccountManagementServiceClient interface {
+	RegisterAccount(ctx context.Context, in *RegisterAccountRequest, opts ...grpc.CallOption) (*RegisterAccountResponse, error)
+	CreateApiKey(ctx context.Context, in *CreateApiKeyRequest, opts ...grpc.CallOption) (*CreateApiKeyResponse, error)
+	UpdateApiKey(ctx context.Context, in *UpdateApiKeyRequest, opts ...grpc.CallOption) (*UpdateApiKeyResponse, error)
+	RevokeApiKey(ctx context.Context, in *RevokeApiKeyRequest, opts ...grpc.CallOption) (*RevokeApiKeyResponse, error)
+	ListApiKeys(ctx context.Context, in *ListApiKeysRequest, opts ...grpc.CallOption) (*ListApiKeysResponse, error)
+	GetAccountFunding(ctx context.Context, in *GetAccountFundingRequest, opts ...grpc.CallOption) (*GetAccountFundingResponse, error)
+	UpdateAccountSettings(ctx context.Context, in *UpdateAccountSettingsRequest, opts ...grpc.CallOption) (*UpdateAccountSettingsResponse, error)
+	ListSubscriptionPlans(ctx context.Context, in *ListSubscriptionPlansRequest, opts ...grpc.CallOption) (*ListSubscriptionPlansResponse, error)
+	GetSubscription(ctx context.Context, in *GetSubscriptionRequest, opts ...grpc.CallOption) (*GetSubscriptionResponse, error)
+	PurchaseSubscription(ctx context.Context, in *PurchaseSubscriptionRequest, opts ...grpc.CallOption) (*PurchaseSubscriptionResponse, error)
+	RenewSubscription(ctx context.Context, in *RenewSubscriptionRequest, opts ...grpc.CallOption) (*RenewSubscriptionResponse, error)
+	CancelSubscription(ctx context.Context, in *CancelSubscriptionRequest, opts ...grpc.CallOption) (*CancelSubscriptionResponse, error)
+	SchedulePlanChange(ctx context.Context, in *SchedulePlanChangeRequest, opts ...grpc.CallOption) (*SchedulePlanChangeResponse, error)
+	ListInvoices(ctx context.Context, in *ListInvoicesRequest, opts ...grpc.CallOption) (*ListInvoicesResponse, error)
+	GetInvoice(ctx context.Context, in *GetInvoiceRequest, opts ...grpc.CallOption) (*GetInvoiceResponse, error)
+	GetDepositAddress(ctx context.Context, in *GetDepositAddressRequest, opts ...grpc.CallOption) (*GetDepositAddressResponse, error)
+	CreateTopupOrder(ctx context.Context, in *CreateTopupOrderRequest, opts ...grpc.CallOption) (*CreateTopupOrderResponse, error)
+	RecordStripePayment(ctx context.Context, in *RecordStripePaymentRequest, opts ...grpc.CallOption) (*RecordStripePaymentResponse, error)
+	ListTopups(ctx context.Context, in *ListTopupsRequest, opts ...grpc.CallOption) (*ListTopupsResponse, error)
+	LinkWallet(ctx context.Context, in *LinkWalletRequest, opts ...grpc.CallOption) (*LinkWalletResponse, error)
+	GetWalletLink(ctx context.Context, in *GetWalletLinkRequest, opts ...grpc.CallOption) (*GetWalletLinkResponse, error)
+	AcceptFundedTerm(ctx context.Context, in *AcceptFundedTermRequest, opts ...grpc.CallOption) (*AcceptFundedTermResponse, error)
+	GetCurrentFundedTerm(ctx context.Context, in *GetCurrentFundedTermRequest, opts ...grpc.CallOption) (*GetCurrentFundedTermResponse, error)
+	PrepareAccountMerge(ctx context.Context, in *PrepareAccountMergeRequest, opts ...grpc.CallOption) (*PrepareAccountMergeResponse, error)
+	CommitAccountMerge(ctx context.Context, in *CommitAccountMergeRequest, opts ...grpc.CallOption) (*CommitAccountMergeResponse, error)
+	ListUsage(ctx context.Context, in *ListUsageRequest, opts ...grpc.CallOption) (*ListUsageResponse, error)
+	GetUsageDetail(ctx context.Context, in *GetUsageDetailRequest, opts ...grpc.CallOption) (*GetUsageDetailResponse, error)
+	ListAccountNotices(ctx context.Context, in *ListAccountNoticesRequest, opts ...grpc.CallOption) (*ListAccountNoticesResponse, error)
+	AckAccountNotice(ctx context.Context, in *AckAccountNoticeRequest, opts ...grpc.CallOption) (*AckAccountNoticeResponse, error)
+	GetReferralSummary(ctx context.Context, in *GetReferralSummaryRequest, opts ...grpc.CallOption) (*GetReferralSummaryResponse, error)
+	SetReferralAttribution(ctx context.Context, in *SetReferralAttributionRequest, opts ...grpc.CallOption) (*SetReferralAttributionResponse, error)
+}
+
+type accountManagementServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAccountManagementServiceClient(cc grpc.ClientConnInterface) AccountManagementServiceClient {
+	return &accountManagementServiceClient{cc}
+}
+
+func (c *accountManagementServiceClient) RegisterAccount(ctx context.Context, in *RegisterAccountRequest, opts ...grpc.CallOption) (*RegisterAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterAccountResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_RegisterAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) CreateApiKey(ctx context.Context, in *CreateApiKeyRequest, opts ...grpc.CallOption) (*CreateApiKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateApiKeyResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_CreateApiKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) UpdateApiKey(ctx context.Context, in *UpdateApiKeyRequest, opts ...grpc.CallOption) (*UpdateApiKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateApiKeyResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_UpdateApiKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) RevokeApiKey(ctx context.Context, in *RevokeApiKeyRequest, opts ...grpc.CallOption) (*RevokeApiKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeApiKeyResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_RevokeApiKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListApiKeys(ctx context.Context, in *ListApiKeysRequest, opts ...grpc.CallOption) (*ListApiKeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListApiKeysResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListApiKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetAccountFunding(ctx context.Context, in *GetAccountFundingRequest, opts ...grpc.CallOption) (*GetAccountFundingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAccountFundingResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetAccountFunding_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) UpdateAccountSettings(ctx context.Context, in *UpdateAccountSettingsRequest, opts ...grpc.CallOption) (*UpdateAccountSettingsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateAccountSettingsResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_UpdateAccountSettings_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListSubscriptionPlans(ctx context.Context, in *ListSubscriptionPlansRequest, opts ...grpc.CallOption) (*ListSubscriptionPlansResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSubscriptionPlansResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListSubscriptionPlans_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetSubscription(ctx context.Context, in *GetSubscriptionRequest, opts ...grpc.CallOption) (*GetSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubscriptionResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) PurchaseSubscription(ctx context.Context, in *PurchaseSubscriptionRequest, opts ...grpc.CallOption) (*PurchaseSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PurchaseSubscriptionResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_PurchaseSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) RenewSubscription(ctx context.Context, in *RenewSubscriptionRequest, opts ...grpc.CallOption) (*RenewSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RenewSubscriptionResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_RenewSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) CancelSubscription(ctx context.Context, in *CancelSubscriptionRequest, opts ...grpc.CallOption) (*CancelSubscriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelSubscriptionResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_CancelSubscription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) SchedulePlanChange(ctx context.Context, in *SchedulePlanChangeRequest, opts ...grpc.CallOption) (*SchedulePlanChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SchedulePlanChangeResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_SchedulePlanChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListInvoices(ctx context.Context, in *ListInvoicesRequest, opts ...grpc.CallOption) (*ListInvoicesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListInvoicesResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListInvoices_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetInvoice(ctx context.Context, in *GetInvoiceRequest, opts ...grpc.CallOption) (*GetInvoiceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetInvoiceResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetInvoice_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetDepositAddress(ctx context.Context, in *GetDepositAddressRequest, opts ...grpc.CallOption) (*GetDepositAddressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDepositAddressResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetDepositAddress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) CreateTopupOrder(ctx context.Context, in *CreateTopupOrderRequest, opts ...grpc.CallOption) (*CreateTopupOrderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTopupOrderResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_CreateTopupOrder_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) RecordStripePayment(ctx context.Context, in *RecordStripePaymentRequest, opts ...grpc.CallOption) (*RecordStripePaymentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordStripePaymentResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_RecordStripePayment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListTopups(ctx context.Context, in *ListTopupsRequest, opts ...grpc.CallOption) (*ListTopupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTopupsResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListTopups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) LinkWallet(ctx context.Context, in *LinkWalletRequest, opts ...grpc.CallOption) (*LinkWalletResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LinkWalletResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_LinkWallet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetWalletLink(ctx context.Context, in *GetWalletLinkRequest, opts ...grpc.CallOption) (*GetWalletLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWalletLinkResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetWalletLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) AcceptFundedTerm(ctx context.Context, in *AcceptFundedTermRequest, opts ...grpc.CallOption) (*AcceptFundedTermResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AcceptFundedTermResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_AcceptFundedTerm_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetCurrentFundedTerm(ctx context.Context, in *GetCurrentFundedTermRequest, opts ...grpc.CallOption) (*GetCurrentFundedTermResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCurrentFundedTermResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetCurrentFundedTerm_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) PrepareAccountMerge(ctx context.Context, in *PrepareAccountMergeRequest, opts ...grpc.CallOption) (*PrepareAccountMergeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PrepareAccountMergeResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_PrepareAccountMerge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) CommitAccountMerge(ctx context.Context, in *CommitAccountMergeRequest, opts ...grpc.CallOption) (*CommitAccountMergeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitAccountMergeResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_CommitAccountMerge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListUsage(ctx context.Context, in *ListUsageRequest, opts ...grpc.CallOption) (*ListUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListUsageResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetUsageDetail(ctx context.Context, in *GetUsageDetailRequest, opts ...grpc.CallOption) (*GetUsageDetailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUsageDetailResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetUsageDetail_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) ListAccountNotices(ctx context.Context, in *ListAccountNoticesRequest, opts ...grpc.CallOption) (*ListAccountNoticesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAccountNoticesResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_ListAccountNotices_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) AckAccountNotice(ctx context.Context, in *AckAccountNoticeRequest, opts ...grpc.CallOption) (*AckAccountNoticeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AckAccountNoticeResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_AckAccountNotice_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) GetReferralSummary(ctx context.Context, in *GetReferralSummaryRequest, opts ...grpc.CallOption) (*GetReferralSummaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReferralSummaryResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_GetReferralSummary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountManagementServiceClient) SetReferralAttribution(ctx context.Context, in *SetReferralAttributionRequest, opts ...grpc.CallOption) (*SetReferralAttributionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetReferralAttributionResponse)
+	err := c.cc.Invoke(ctx, AccountManagementService_SetReferralAttribution_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AccountManagementServiceServer is the server API for AccountManagementService service.
+// All implementations must embed UnimplementedAccountManagementServiceServer
+// for forward compatibility.
+//
+// All methods are internal. account_id is derived from the authenticated Web principal,
+// never trusted from a public request body. Writes derive idempotency from the operation and its inputs.
+type AccountManagementServiceServer interface {
+	RegisterAccount(context.Context, *RegisterAccountRequest) (*RegisterAccountResponse, error)
+	CreateApiKey(context.Context, *CreateApiKeyRequest) (*CreateApiKeyResponse, error)
+	UpdateApiKey(context.Context, *UpdateApiKeyRequest) (*UpdateApiKeyResponse, error)
+	RevokeApiKey(context.Context, *RevokeApiKeyRequest) (*RevokeApiKeyResponse, error)
+	ListApiKeys(context.Context, *ListApiKeysRequest) (*ListApiKeysResponse, error)
+	GetAccountFunding(context.Context, *GetAccountFundingRequest) (*GetAccountFundingResponse, error)
+	UpdateAccountSettings(context.Context, *UpdateAccountSettingsRequest) (*UpdateAccountSettingsResponse, error)
+	ListSubscriptionPlans(context.Context, *ListSubscriptionPlansRequest) (*ListSubscriptionPlansResponse, error)
+	GetSubscription(context.Context, *GetSubscriptionRequest) (*GetSubscriptionResponse, error)
+	PurchaseSubscription(context.Context, *PurchaseSubscriptionRequest) (*PurchaseSubscriptionResponse, error)
+	RenewSubscription(context.Context, *RenewSubscriptionRequest) (*RenewSubscriptionResponse, error)
+	CancelSubscription(context.Context, *CancelSubscriptionRequest) (*CancelSubscriptionResponse, error)
+	SchedulePlanChange(context.Context, *SchedulePlanChangeRequest) (*SchedulePlanChangeResponse, error)
+	ListInvoices(context.Context, *ListInvoicesRequest) (*ListInvoicesResponse, error)
+	GetInvoice(context.Context, *GetInvoiceRequest) (*GetInvoiceResponse, error)
+	GetDepositAddress(context.Context, *GetDepositAddressRequest) (*GetDepositAddressResponse, error)
+	CreateTopupOrder(context.Context, *CreateTopupOrderRequest) (*CreateTopupOrderResponse, error)
+	RecordStripePayment(context.Context, *RecordStripePaymentRequest) (*RecordStripePaymentResponse, error)
+	ListTopups(context.Context, *ListTopupsRequest) (*ListTopupsResponse, error)
+	LinkWallet(context.Context, *LinkWalletRequest) (*LinkWalletResponse, error)
+	GetWalletLink(context.Context, *GetWalletLinkRequest) (*GetWalletLinkResponse, error)
+	AcceptFundedTerm(context.Context, *AcceptFundedTermRequest) (*AcceptFundedTermResponse, error)
+	GetCurrentFundedTerm(context.Context, *GetCurrentFundedTermRequest) (*GetCurrentFundedTermResponse, error)
+	PrepareAccountMerge(context.Context, *PrepareAccountMergeRequest) (*PrepareAccountMergeResponse, error)
+	CommitAccountMerge(context.Context, *CommitAccountMergeRequest) (*CommitAccountMergeResponse, error)
+	ListUsage(context.Context, *ListUsageRequest) (*ListUsageResponse, error)
+	GetUsageDetail(context.Context, *GetUsageDetailRequest) (*GetUsageDetailResponse, error)
+	ListAccountNotices(context.Context, *ListAccountNoticesRequest) (*ListAccountNoticesResponse, error)
+	AckAccountNotice(context.Context, *AckAccountNoticeRequest) (*AckAccountNoticeResponse, error)
+	GetReferralSummary(context.Context, *GetReferralSummaryRequest) (*GetReferralSummaryResponse, error)
+	SetReferralAttribution(context.Context, *SetReferralAttributionRequest) (*SetReferralAttributionResponse, error)
+	mustEmbedUnimplementedAccountManagementServiceServer()
+}
+
+// UnimplementedAccountManagementServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAccountManagementServiceServer struct{}
+
+func (UnimplementedAccountManagementServiceServer) RegisterAccount(context.Context, *RegisterAccountRequest) (*RegisterAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterAccount not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) CreateApiKey(context.Context, *CreateApiKeyRequest) (*CreateApiKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateApiKey not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) UpdateApiKey(context.Context, *UpdateApiKeyRequest) (*UpdateApiKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateApiKey not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) RevokeApiKey(context.Context, *RevokeApiKeyRequest) (*RevokeApiKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeApiKey not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListApiKeys(context.Context, *ListApiKeysRequest) (*ListApiKeysResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListApiKeys not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetAccountFunding(context.Context, *GetAccountFundingRequest) (*GetAccountFundingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAccountFunding not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) UpdateAccountSettings(context.Context, *UpdateAccountSettingsRequest) (*UpdateAccountSettingsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAccountSettings not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListSubscriptionPlans(context.Context, *ListSubscriptionPlansRequest) (*ListSubscriptionPlansResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSubscriptionPlans not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetSubscription(context.Context, *GetSubscriptionRequest) (*GetSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubscription not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) PurchaseSubscription(context.Context, *PurchaseSubscriptionRequest) (*PurchaseSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PurchaseSubscription not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) RenewSubscription(context.Context, *RenewSubscriptionRequest) (*RenewSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RenewSubscription not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) CancelSubscription(context.Context, *CancelSubscriptionRequest) (*CancelSubscriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelSubscription not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) SchedulePlanChange(context.Context, *SchedulePlanChangeRequest) (*SchedulePlanChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SchedulePlanChange not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListInvoices(context.Context, *ListInvoicesRequest) (*ListInvoicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListInvoices not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetInvoice(context.Context, *GetInvoiceRequest) (*GetInvoiceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetInvoice not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetDepositAddress(context.Context, *GetDepositAddressRequest) (*GetDepositAddressResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDepositAddress not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) CreateTopupOrder(context.Context, *CreateTopupOrderRequest) (*CreateTopupOrderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateTopupOrder not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) RecordStripePayment(context.Context, *RecordStripePaymentRequest) (*RecordStripePaymentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordStripePayment not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListTopups(context.Context, *ListTopupsRequest) (*ListTopupsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTopups not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) LinkWallet(context.Context, *LinkWalletRequest) (*LinkWalletResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LinkWallet not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetWalletLink(context.Context, *GetWalletLinkRequest) (*GetWalletLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWalletLink not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) AcceptFundedTerm(context.Context, *AcceptFundedTermRequest) (*AcceptFundedTermResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AcceptFundedTerm not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetCurrentFundedTerm(context.Context, *GetCurrentFundedTermRequest) (*GetCurrentFundedTermResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCurrentFundedTerm not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) PrepareAccountMerge(context.Context, *PrepareAccountMergeRequest) (*PrepareAccountMergeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PrepareAccountMerge not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) CommitAccountMerge(context.Context, *CommitAccountMergeRequest) (*CommitAccountMergeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CommitAccountMerge not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListUsage(context.Context, *ListUsageRequest) (*ListUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUsage not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetUsageDetail(context.Context, *GetUsageDetailRequest) (*GetUsageDetailResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetUsageDetail not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) ListAccountNotices(context.Context, *ListAccountNoticesRequest) (*ListAccountNoticesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAccountNotices not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) AckAccountNotice(context.Context, *AckAccountNoticeRequest) (*AckAccountNoticeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AckAccountNotice not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) GetReferralSummary(context.Context, *GetReferralSummaryRequest) (*GetReferralSummaryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReferralSummary not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) SetReferralAttribution(context.Context, *SetReferralAttributionRequest) (*SetReferralAttributionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetReferralAttribution not implemented")
+}
+func (UnimplementedAccountManagementServiceServer) mustEmbedUnimplementedAccountManagementServiceServer() {
+}
+func (UnimplementedAccountManagementServiceServer) testEmbeddedByValue() {}
+
+// UnsafeAccountManagementServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AccountManagementServiceServer will
+// result in compilation errors.
+type UnsafeAccountManagementServiceServer interface {
+	mustEmbedUnimplementedAccountManagementServiceServer()
+}
+
+func RegisterAccountManagementServiceServer(s grpc.ServiceRegistrar, srv AccountManagementServiceServer) {
+	// If the following call panics, it indicates UnimplementedAccountManagementServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AccountManagementService_ServiceDesc, srv)
+}
+
+func _AccountManagementService_RegisterAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).RegisterAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_RegisterAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).RegisterAccount(ctx, req.(*RegisterAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_CreateApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).CreateApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_CreateApiKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).CreateApiKey(ctx, req.(*CreateApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_UpdateApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).UpdateApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_UpdateApiKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).UpdateApiKey(ctx, req.(*UpdateApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_RevokeApiKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeApiKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).RevokeApiKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_RevokeApiKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).RevokeApiKey(ctx, req.(*RevokeApiKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListApiKeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListApiKeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListApiKeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListApiKeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListApiKeys(ctx, req.(*ListApiKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetAccountFunding_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAccountFundingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetAccountFunding(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetAccountFunding_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetAccountFunding(ctx, req.(*GetAccountFundingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_UpdateAccountSettings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAccountSettingsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).UpdateAccountSettings(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_UpdateAccountSettings_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).UpdateAccountSettings(ctx, req.(*UpdateAccountSettingsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListSubscriptionPlans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSubscriptionPlansRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListSubscriptionPlans(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListSubscriptionPlans_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListSubscriptionPlans(ctx, req.(*ListSubscriptionPlansRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetSubscription(ctx, req.(*GetSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_PurchaseSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PurchaseSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).PurchaseSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_PurchaseSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).PurchaseSubscription(ctx, req.(*PurchaseSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_RenewSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenewSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).RenewSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_RenewSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).RenewSubscription(ctx, req.(*RenewSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_CancelSubscription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelSubscriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).CancelSubscription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_CancelSubscription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).CancelSubscription(ctx, req.(*CancelSubscriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_SchedulePlanChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SchedulePlanChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).SchedulePlanChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_SchedulePlanChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).SchedulePlanChange(ctx, req.(*SchedulePlanChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListInvoices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInvoicesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListInvoices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListInvoices_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListInvoices(ctx, req.(*ListInvoicesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetInvoice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInvoiceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetInvoice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetInvoice_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetInvoice(ctx, req.(*GetInvoiceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetDepositAddress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDepositAddressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetDepositAddress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetDepositAddress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetDepositAddress(ctx, req.(*GetDepositAddressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_CreateTopupOrder_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTopupOrderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).CreateTopupOrder(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_CreateTopupOrder_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).CreateTopupOrder(ctx, req.(*CreateTopupOrderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_RecordStripePayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordStripePaymentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).RecordStripePayment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_RecordStripePayment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).RecordStripePayment(ctx, req.(*RecordStripePaymentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListTopups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTopupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListTopups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListTopups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListTopups(ctx, req.(*ListTopupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_LinkWallet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LinkWalletRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).LinkWallet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_LinkWallet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).LinkWallet(ctx, req.(*LinkWalletRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetWalletLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWalletLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetWalletLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetWalletLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetWalletLink(ctx, req.(*GetWalletLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_AcceptFundedTerm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcceptFundedTermRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).AcceptFundedTerm(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_AcceptFundedTerm_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).AcceptFundedTerm(ctx, req.(*AcceptFundedTermRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetCurrentFundedTerm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCurrentFundedTermRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetCurrentFundedTerm(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetCurrentFundedTerm_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetCurrentFundedTerm(ctx, req.(*GetCurrentFundedTermRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_PrepareAccountMerge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrepareAccountMergeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).PrepareAccountMerge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_PrepareAccountMerge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).PrepareAccountMerge(ctx, req.(*PrepareAccountMergeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_CommitAccountMerge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CommitAccountMergeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).CommitAccountMerge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_CommitAccountMerge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).CommitAccountMerge(ctx, req.(*CommitAccountMergeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListUsage(ctx, req.(*ListUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetUsageDetail_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUsageDetailRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetUsageDetail(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetUsageDetail_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetUsageDetail(ctx, req.(*GetUsageDetailRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_ListAccountNotices_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAccountNoticesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).ListAccountNotices(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_ListAccountNotices_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).ListAccountNotices(ctx, req.(*ListAccountNoticesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_AckAccountNotice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AckAccountNoticeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).AckAccountNotice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_AckAccountNotice_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).AckAccountNotice(ctx, req.(*AckAccountNoticeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_GetReferralSummary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReferralSummaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).GetReferralSummary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_GetReferralSummary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).GetReferralSummary(ctx, req.(*GetReferralSummaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountManagementService_SetReferralAttribution_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetReferralAttributionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountManagementServiceServer).SetReferralAttribution(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountManagementService_SetReferralAttribution_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountManagementServiceServer).SetReferralAttribution(ctx, req.(*SetReferralAttributionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AccountManagementService_ServiceDesc is the grpc.ServiceDesc for AccountManagementService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AccountManagementService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "maxshot.gateway_internal.v1.AccountManagementService",
+	HandlerType: (*AccountManagementServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterAccount",
+			Handler:    _AccountManagementService_RegisterAccount_Handler,
+		},
+		{
+			MethodName: "CreateApiKey",
+			Handler:    _AccountManagementService_CreateApiKey_Handler,
+		},
+		{
+			MethodName: "UpdateApiKey",
+			Handler:    _AccountManagementService_UpdateApiKey_Handler,
+		},
+		{
+			MethodName: "RevokeApiKey",
+			Handler:    _AccountManagementService_RevokeApiKey_Handler,
+		},
+		{
+			MethodName: "ListApiKeys",
+			Handler:    _AccountManagementService_ListApiKeys_Handler,
+		},
+		{
+			MethodName: "GetAccountFunding",
+			Handler:    _AccountManagementService_GetAccountFunding_Handler,
+		},
+		{
+			MethodName: "UpdateAccountSettings",
+			Handler:    _AccountManagementService_UpdateAccountSettings_Handler,
+		},
+		{
+			MethodName: "ListSubscriptionPlans",
+			Handler:    _AccountManagementService_ListSubscriptionPlans_Handler,
+		},
+		{
+			MethodName: "GetSubscription",
+			Handler:    _AccountManagementService_GetSubscription_Handler,
+		},
+		{
+			MethodName: "PurchaseSubscription",
+			Handler:    _AccountManagementService_PurchaseSubscription_Handler,
+		},
+		{
+			MethodName: "RenewSubscription",
+			Handler:    _AccountManagementService_RenewSubscription_Handler,
+		},
+		{
+			MethodName: "CancelSubscription",
+			Handler:    _AccountManagementService_CancelSubscription_Handler,
+		},
+		{
+			MethodName: "SchedulePlanChange",
+			Handler:    _AccountManagementService_SchedulePlanChange_Handler,
+		},
+		{
+			MethodName: "ListInvoices",
+			Handler:    _AccountManagementService_ListInvoices_Handler,
+		},
+		{
+			MethodName: "GetInvoice",
+			Handler:    _AccountManagementService_GetInvoice_Handler,
+		},
+		{
+			MethodName: "GetDepositAddress",
+			Handler:    _AccountManagementService_GetDepositAddress_Handler,
+		},
+		{
+			MethodName: "CreateTopupOrder",
+			Handler:    _AccountManagementService_CreateTopupOrder_Handler,
+		},
+		{
+			MethodName: "RecordStripePayment",
+			Handler:    _AccountManagementService_RecordStripePayment_Handler,
+		},
+		{
+			MethodName: "ListTopups",
+			Handler:    _AccountManagementService_ListTopups_Handler,
+		},
+		{
+			MethodName: "LinkWallet",
+			Handler:    _AccountManagementService_LinkWallet_Handler,
+		},
+		{
+			MethodName: "GetWalletLink",
+			Handler:    _AccountManagementService_GetWalletLink_Handler,
+		},
+		{
+			MethodName: "AcceptFundedTerm",
+			Handler:    _AccountManagementService_AcceptFundedTerm_Handler,
+		},
+		{
+			MethodName: "GetCurrentFundedTerm",
+			Handler:    _AccountManagementService_GetCurrentFundedTerm_Handler,
+		},
+		{
+			MethodName: "PrepareAccountMerge",
+			Handler:    _AccountManagementService_PrepareAccountMerge_Handler,
+		},
+		{
+			MethodName: "CommitAccountMerge",
+			Handler:    _AccountManagementService_CommitAccountMerge_Handler,
+		},
+		{
+			MethodName: "ListUsage",
+			Handler:    _AccountManagementService_ListUsage_Handler,
+		},
+		{
+			MethodName: "GetUsageDetail",
+			Handler:    _AccountManagementService_GetUsageDetail_Handler,
+		},
+		{
+			MethodName: "ListAccountNotices",
+			Handler:    _AccountManagementService_ListAccountNotices_Handler,
+		},
+		{
+			MethodName: "AckAccountNotice",
+			Handler:    _AccountManagementService_AckAccountNotice_Handler,
+		},
+		{
+			MethodName: "GetReferralSummary",
+			Handler:    _AccountManagementService_GetReferralSummary_Handler,
+		},
+		{
+			MethodName: "SetReferralAttribution",
+			Handler:    _AccountManagementService_SetReferralAttribution_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "maxshot/gateway_internal/v1/execution.proto",
+}
+
+const (
+	BillingAdminService_CreatePlanDraft_FullMethodName            = "/maxshot.gateway_internal.v1.BillingAdminService/CreatePlanDraft"
+	BillingAdminService_ValidatePlanVersion_FullMethodName        = "/maxshot.gateway_internal.v1.BillingAdminService/ValidatePlanVersion"
+	BillingAdminService_PreviewPlanImpact_FullMethodName          = "/maxshot.gateway_internal.v1.BillingAdminService/PreviewPlanImpact"
+	BillingAdminService_PublishPlanVersion_FullMethodName         = "/maxshot.gateway_internal.v1.BillingAdminService/PublishPlanVersion"
+	BillingAdminService_SetPlanSalesStatus_FullMethodName         = "/maxshot.gateway_internal.v1.BillingAdminService/SetPlanSalesStatus"
+	BillingAdminService_SetSpendingLock_FullMethodName            = "/maxshot.gateway_internal.v1.BillingAdminService/SetSpendingLock"
+	BillingAdminService_ManualLedgerAdjustment_FullMethodName     = "/maxshot.gateway_internal.v1.BillingAdminService/ManualLedgerAdjustment"
+	BillingAdminService_ResolveDepositReorgHold_FullMethodName    = "/maxshot.gateway_internal.v1.BillingAdminService/ResolveDepositReorgHold"
+	BillingAdminService_ReviewTopup_FullMethodName                = "/maxshot.gateway_internal.v1.BillingAdminService/ReviewTopup"
+	BillingAdminService_RevokeReferralReward_FullMethodName       = "/maxshot.gateway_internal.v1.BillingAdminService/RevokeReferralReward"
+	BillingAdminService_ResolveDiscrepancy_FullMethodName         = "/maxshot.gateway_internal.v1.BillingAdminService/ResolveDiscrepancy"
+	BillingAdminService_RefundSettledRequest_FullMethodName       = "/maxshot.gateway_internal.v1.BillingAdminService/RefundSettledRequest"
+	BillingAdminService_UpsertFundedTerm_FullMethodName           = "/maxshot.gateway_internal.v1.BillingAdminService/UpsertFundedTerm"
+	BillingAdminService_LockFundedTerm_FullMethodName             = "/maxshot.gateway_internal.v1.BillingAdminService/LockFundedTerm"
+	BillingAdminService_SetCoverageThrottlePolicy_FullMethodName  = "/maxshot.gateway_internal.v1.BillingAdminService/SetCoverageThrottlePolicy"
+	BillingAdminService_UpdateSystemSetting_FullMethodName        = "/maxshot.gateway_internal.v1.BillingAdminService/UpdateSystemSetting"
+	BillingAdminService_UpdateFreeModelQuotaPolicy_FullMethodName = "/maxshot.gateway_internal.v1.BillingAdminService/UpdateFreeModelQuotaPolicy"
+)
+
+// BillingAdminServiceClient is the client API for BillingAdminService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type BillingAdminServiceClient interface {
+	CreatePlanDraft(ctx context.Context, in *CreatePlanDraftRequest, opts ...grpc.CallOption) (*CreatePlanDraftResponse, error)
+	ValidatePlanVersion(ctx context.Context, in *ValidatePlanVersionRequest, opts ...grpc.CallOption) (*ValidatePlanVersionResponse, error)
+	PreviewPlanImpact(ctx context.Context, in *PreviewPlanImpactRequest, opts ...grpc.CallOption) (*PreviewPlanImpactResponse, error)
+	PublishPlanVersion(ctx context.Context, in *PublishPlanVersionRequest, opts ...grpc.CallOption) (*PublishPlanVersionResponse, error)
+	SetPlanSalesStatus(ctx context.Context, in *SetPlanSalesStatusRequest, opts ...grpc.CallOption) (*SetPlanSalesStatusResponse, error)
+	SetSpendingLock(ctx context.Context, in *SetSpendingLockRequest, opts ...grpc.CallOption) (*SetSpendingLockResponse, error)
+	ManualLedgerAdjustment(ctx context.Context, in *ManualLedgerAdjustmentRequest, opts ...grpc.CallOption) (*ManualLedgerAdjustmentResponse, error)
+	ResolveDepositReorgHold(ctx context.Context, in *ResolveDepositReorgHoldRequest, opts ...grpc.CallOption) (*ResolveDepositReorgHoldResponse, error)
+	ReviewTopup(ctx context.Context, in *ReviewTopupRequest, opts ...grpc.CallOption) (*ReviewTopupResponse, error)
+	RevokeReferralReward(ctx context.Context, in *RevokeReferralRewardRequest, opts ...grpc.CallOption) (*RevokeReferralRewardResponse, error)
+	ResolveDiscrepancy(ctx context.Context, in *ResolveDiscrepancyRequest, opts ...grpc.CallOption) (*ResolveDiscrepancyResponse, error)
+	RefundSettledRequest(ctx context.Context, in *RefundSettledRequestRequest, opts ...grpc.CallOption) (*RefundSettledRequestResponse, error)
+	UpsertFundedTerm(ctx context.Context, in *UpsertFundedTermRequest, opts ...grpc.CallOption) (*UpsertFundedTermResponse, error)
+	LockFundedTerm(ctx context.Context, in *LockFundedTermRequest, opts ...grpc.CallOption) (*LockFundedTermResponse, error)
+	SetCoverageThrottlePolicy(ctx context.Context, in *SetCoverageThrottlePolicyRequest, opts ...grpc.CallOption) (*SetCoverageThrottlePolicyResponse, error)
+	UpdateSystemSetting(ctx context.Context, in *UpdateSystemSettingRequest, opts ...grpc.CallOption) (*UpdateSystemSettingResponse, error)
+	UpdateFreeModelQuotaPolicy(ctx context.Context, in *UpdateFreeModelQuotaPolicyRequest, opts ...grpc.CallOption) (*UpdateFreeModelQuotaPolicyResponse, error)
+}
+
+type billingAdminServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewBillingAdminServiceClient(cc grpc.ClientConnInterface) BillingAdminServiceClient {
+	return &billingAdminServiceClient{cc}
+}
+
+func (c *billingAdminServiceClient) CreatePlanDraft(ctx context.Context, in *CreatePlanDraftRequest, opts ...grpc.CallOption) (*CreatePlanDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreatePlanDraftResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_CreatePlanDraft_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) ValidatePlanVersion(ctx context.Context, in *ValidatePlanVersionRequest, opts ...grpc.CallOption) (*ValidatePlanVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ValidatePlanVersionResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_ValidatePlanVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) PreviewPlanImpact(ctx context.Context, in *PreviewPlanImpactRequest, opts ...grpc.CallOption) (*PreviewPlanImpactResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PreviewPlanImpactResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_PreviewPlanImpact_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) PublishPlanVersion(ctx context.Context, in *PublishPlanVersionRequest, opts ...grpc.CallOption) (*PublishPlanVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishPlanVersionResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_PublishPlanVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) SetPlanSalesStatus(ctx context.Context, in *SetPlanSalesStatusRequest, opts ...grpc.CallOption) (*SetPlanSalesStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetPlanSalesStatusResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_SetPlanSalesStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) SetSpendingLock(ctx context.Context, in *SetSpendingLockRequest, opts ...grpc.CallOption) (*SetSpendingLockResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetSpendingLockResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_SetSpendingLock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) ManualLedgerAdjustment(ctx context.Context, in *ManualLedgerAdjustmentRequest, opts ...grpc.CallOption) (*ManualLedgerAdjustmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ManualLedgerAdjustmentResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_ManualLedgerAdjustment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) ResolveDepositReorgHold(ctx context.Context, in *ResolveDepositReorgHoldRequest, opts ...grpc.CallOption) (*ResolveDepositReorgHoldResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveDepositReorgHoldResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_ResolveDepositReorgHold_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) ReviewTopup(ctx context.Context, in *ReviewTopupRequest, opts ...grpc.CallOption) (*ReviewTopupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewTopupResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_ReviewTopup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) RevokeReferralReward(ctx context.Context, in *RevokeReferralRewardRequest, opts ...grpc.CallOption) (*RevokeReferralRewardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeReferralRewardResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_RevokeReferralReward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) ResolveDiscrepancy(ctx context.Context, in *ResolveDiscrepancyRequest, opts ...grpc.CallOption) (*ResolveDiscrepancyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveDiscrepancyResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_ResolveDiscrepancy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) RefundSettledRequest(ctx context.Context, in *RefundSettledRequestRequest, opts ...grpc.CallOption) (*RefundSettledRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefundSettledRequestResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_RefundSettledRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) UpsertFundedTerm(ctx context.Context, in *UpsertFundedTermRequest, opts ...grpc.CallOption) (*UpsertFundedTermResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpsertFundedTermResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_UpsertFundedTerm_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) LockFundedTerm(ctx context.Context, in *LockFundedTermRequest, opts ...grpc.CallOption) (*LockFundedTermResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LockFundedTermResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_LockFundedTerm_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) SetCoverageThrottlePolicy(ctx context.Context, in *SetCoverageThrottlePolicyRequest, opts ...grpc.CallOption) (*SetCoverageThrottlePolicyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetCoverageThrottlePolicyResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_SetCoverageThrottlePolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) UpdateSystemSetting(ctx context.Context, in *UpdateSystemSettingRequest, opts ...grpc.CallOption) (*UpdateSystemSettingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSystemSettingResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_UpdateSystemSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *billingAdminServiceClient) UpdateFreeModelQuotaPolicy(ctx context.Context, in *UpdateFreeModelQuotaPolicyRequest, opts ...grpc.CallOption) (*UpdateFreeModelQuotaPolicyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateFreeModelQuotaPolicyResponse)
+	err := c.cc.Invoke(ctx, BillingAdminService_UpdateFreeModelQuotaPolicy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// BillingAdminServiceServer is the server API for BillingAdminService service.
+// All implementations must embed UnimplementedBillingAdminServiceServer
+// for forward compatibility.
+type BillingAdminServiceServer interface {
+	CreatePlanDraft(context.Context, *CreatePlanDraftRequest) (*CreatePlanDraftResponse, error)
+	ValidatePlanVersion(context.Context, *ValidatePlanVersionRequest) (*ValidatePlanVersionResponse, error)
+	PreviewPlanImpact(context.Context, *PreviewPlanImpactRequest) (*PreviewPlanImpactResponse, error)
+	PublishPlanVersion(context.Context, *PublishPlanVersionRequest) (*PublishPlanVersionResponse, error)
+	SetPlanSalesStatus(context.Context, *SetPlanSalesStatusRequest) (*SetPlanSalesStatusResponse, error)
+	SetSpendingLock(context.Context, *SetSpendingLockRequest) (*SetSpendingLockResponse, error)
+	ManualLedgerAdjustment(context.Context, *ManualLedgerAdjustmentRequest) (*ManualLedgerAdjustmentResponse, error)
+	ResolveDepositReorgHold(context.Context, *ResolveDepositReorgHoldRequest) (*ResolveDepositReorgHoldResponse, error)
+	ReviewTopup(context.Context, *ReviewTopupRequest) (*ReviewTopupResponse, error)
+	RevokeReferralReward(context.Context, *RevokeReferralRewardRequest) (*RevokeReferralRewardResponse, error)
+	ResolveDiscrepancy(context.Context, *ResolveDiscrepancyRequest) (*ResolveDiscrepancyResponse, error)
+	RefundSettledRequest(context.Context, *RefundSettledRequestRequest) (*RefundSettledRequestResponse, error)
+	UpsertFundedTerm(context.Context, *UpsertFundedTermRequest) (*UpsertFundedTermResponse, error)
+	LockFundedTerm(context.Context, *LockFundedTermRequest) (*LockFundedTermResponse, error)
+	SetCoverageThrottlePolicy(context.Context, *SetCoverageThrottlePolicyRequest) (*SetCoverageThrottlePolicyResponse, error)
+	UpdateSystemSetting(context.Context, *UpdateSystemSettingRequest) (*UpdateSystemSettingResponse, error)
+	UpdateFreeModelQuotaPolicy(context.Context, *UpdateFreeModelQuotaPolicyRequest) (*UpdateFreeModelQuotaPolicyResponse, error)
+	mustEmbedUnimplementedBillingAdminServiceServer()
+}
+
+// UnimplementedBillingAdminServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedBillingAdminServiceServer struct{}
+
+func (UnimplementedBillingAdminServiceServer) CreatePlanDraft(context.Context, *CreatePlanDraftRequest) (*CreatePlanDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePlanDraft not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) ValidatePlanVersion(context.Context, *ValidatePlanVersionRequest) (*ValidatePlanVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ValidatePlanVersion not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) PreviewPlanImpact(context.Context, *PreviewPlanImpactRequest) (*PreviewPlanImpactResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PreviewPlanImpact not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) PublishPlanVersion(context.Context, *PublishPlanVersionRequest) (*PublishPlanVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PublishPlanVersion not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) SetPlanSalesStatus(context.Context, *SetPlanSalesStatusRequest) (*SetPlanSalesStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetPlanSalesStatus not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) SetSpendingLock(context.Context, *SetSpendingLockRequest) (*SetSpendingLockResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetSpendingLock not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) ManualLedgerAdjustment(context.Context, *ManualLedgerAdjustmentRequest) (*ManualLedgerAdjustmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ManualLedgerAdjustment not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) ResolveDepositReorgHold(context.Context, *ResolveDepositReorgHoldRequest) (*ResolveDepositReorgHoldResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveDepositReorgHold not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) ReviewTopup(context.Context, *ReviewTopupRequest) (*ReviewTopupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReviewTopup not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) RevokeReferralReward(context.Context, *RevokeReferralRewardRequest) (*RevokeReferralRewardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeReferralReward not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) ResolveDiscrepancy(context.Context, *ResolveDiscrepancyRequest) (*ResolveDiscrepancyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveDiscrepancy not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) RefundSettledRequest(context.Context, *RefundSettledRequestRequest) (*RefundSettledRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefundSettledRequest not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) UpsertFundedTerm(context.Context, *UpsertFundedTermRequest) (*UpsertFundedTermResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpsertFundedTerm not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) LockFundedTerm(context.Context, *LockFundedTermRequest) (*LockFundedTermResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LockFundedTerm not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) SetCoverageThrottlePolicy(context.Context, *SetCoverageThrottlePolicyRequest) (*SetCoverageThrottlePolicyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetCoverageThrottlePolicy not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) UpdateSystemSetting(context.Context, *UpdateSystemSettingRequest) (*UpdateSystemSettingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateSystemSetting not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) UpdateFreeModelQuotaPolicy(context.Context, *UpdateFreeModelQuotaPolicyRequest) (*UpdateFreeModelQuotaPolicyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFreeModelQuotaPolicy not implemented")
+}
+func (UnimplementedBillingAdminServiceServer) mustEmbedUnimplementedBillingAdminServiceServer() {}
+func (UnimplementedBillingAdminServiceServer) testEmbeddedByValue()                             {}
+
+// UnsafeBillingAdminServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to BillingAdminServiceServer will
+// result in compilation errors.
+type UnsafeBillingAdminServiceServer interface {
+	mustEmbedUnimplementedBillingAdminServiceServer()
+}
+
+func RegisterBillingAdminServiceServer(s grpc.ServiceRegistrar, srv BillingAdminServiceServer) {
+	// If the following call panics, it indicates UnimplementedBillingAdminServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&BillingAdminService_ServiceDesc, srv)
+}
+
+func _BillingAdminService_CreatePlanDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePlanDraftRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).CreatePlanDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_CreatePlanDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).CreatePlanDraft(ctx, req.(*CreatePlanDraftRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_ValidatePlanVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ValidatePlanVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).ValidatePlanVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_ValidatePlanVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).ValidatePlanVersion(ctx, req.(*ValidatePlanVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_PreviewPlanImpact_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PreviewPlanImpactRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).PreviewPlanImpact(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_PreviewPlanImpact_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).PreviewPlanImpact(ctx, req.(*PreviewPlanImpactRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_PublishPlanVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishPlanVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).PublishPlanVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_PublishPlanVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).PublishPlanVersion(ctx, req.(*PublishPlanVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_SetPlanSalesStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetPlanSalesStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).SetPlanSalesStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_SetPlanSalesStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).SetPlanSalesStatus(ctx, req.(*SetPlanSalesStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_SetSpendingLock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetSpendingLockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).SetSpendingLock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_SetSpendingLock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).SetSpendingLock(ctx, req.(*SetSpendingLockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_ManualLedgerAdjustment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ManualLedgerAdjustmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).ManualLedgerAdjustment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_ManualLedgerAdjustment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).ManualLedgerAdjustment(ctx, req.(*ManualLedgerAdjustmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_ResolveDepositReorgHold_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveDepositReorgHoldRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).ResolveDepositReorgHold(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_ResolveDepositReorgHold_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).ResolveDepositReorgHold(ctx, req.(*ResolveDepositReorgHoldRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_ReviewTopup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReviewTopupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).ReviewTopup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_ReviewTopup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).ReviewTopup(ctx, req.(*ReviewTopupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_RevokeReferralReward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeReferralRewardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).RevokeReferralReward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_RevokeReferralReward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).RevokeReferralReward(ctx, req.(*RevokeReferralRewardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_ResolveDiscrepancy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveDiscrepancyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).ResolveDiscrepancy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_ResolveDiscrepancy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).ResolveDiscrepancy(ctx, req.(*ResolveDiscrepancyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_RefundSettledRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefundSettledRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).RefundSettledRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_RefundSettledRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).RefundSettledRequest(ctx, req.(*RefundSettledRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_UpsertFundedTerm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpsertFundedTermRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).UpsertFundedTerm(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_UpsertFundedTerm_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).UpsertFundedTerm(ctx, req.(*UpsertFundedTermRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_LockFundedTerm_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LockFundedTermRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).LockFundedTerm(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_LockFundedTerm_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).LockFundedTerm(ctx, req.(*LockFundedTermRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_SetCoverageThrottlePolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetCoverageThrottlePolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).SetCoverageThrottlePolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_SetCoverageThrottlePolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).SetCoverageThrottlePolicy(ctx, req.(*SetCoverageThrottlePolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_UpdateSystemSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSystemSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).UpdateSystemSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_UpdateSystemSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).UpdateSystemSetting(ctx, req.(*UpdateSystemSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _BillingAdminService_UpdateFreeModelQuotaPolicy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFreeModelQuotaPolicyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BillingAdminServiceServer).UpdateFreeModelQuotaPolicy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: BillingAdminService_UpdateFreeModelQuotaPolicy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BillingAdminServiceServer).UpdateFreeModelQuotaPolicy(ctx, req.(*UpdateFreeModelQuotaPolicyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// BillingAdminService_ServiceDesc is the grpc.ServiceDesc for BillingAdminService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var BillingAdminService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "maxshot.gateway_internal.v1.BillingAdminService",
+	HandlerType: (*BillingAdminServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreatePlanDraft",
+			Handler:    _BillingAdminService_CreatePlanDraft_Handler,
+		},
+		{
+			MethodName: "ValidatePlanVersion",
+			Handler:    _BillingAdminService_ValidatePlanVersion_Handler,
+		},
+		{
+			MethodName: "PreviewPlanImpact",
+			Handler:    _BillingAdminService_PreviewPlanImpact_Handler,
+		},
+		{
+			MethodName: "PublishPlanVersion",
+			Handler:    _BillingAdminService_PublishPlanVersion_Handler,
+		},
+		{
+			MethodName: "SetPlanSalesStatus",
+			Handler:    _BillingAdminService_SetPlanSalesStatus_Handler,
+		},
+		{
+			MethodName: "SetSpendingLock",
+			Handler:    _BillingAdminService_SetSpendingLock_Handler,
+		},
+		{
+			MethodName: "ManualLedgerAdjustment",
+			Handler:    _BillingAdminService_ManualLedgerAdjustment_Handler,
+		},
+		{
+			MethodName: "ResolveDepositReorgHold",
+			Handler:    _BillingAdminService_ResolveDepositReorgHold_Handler,
+		},
+		{
+			MethodName: "ReviewTopup",
+			Handler:    _BillingAdminService_ReviewTopup_Handler,
+		},
+		{
+			MethodName: "RevokeReferralReward",
+			Handler:    _BillingAdminService_RevokeReferralReward_Handler,
+		},
+		{
+			MethodName: "ResolveDiscrepancy",
+			Handler:    _BillingAdminService_ResolveDiscrepancy_Handler,
+		},
+		{
+			MethodName: "RefundSettledRequest",
+			Handler:    _BillingAdminService_RefundSettledRequest_Handler,
+		},
+		{
+			MethodName: "UpsertFundedTerm",
+			Handler:    _BillingAdminService_UpsertFundedTerm_Handler,
+		},
+		{
+			MethodName: "LockFundedTerm",
+			Handler:    _BillingAdminService_LockFundedTerm_Handler,
+		},
+		{
+			MethodName: "SetCoverageThrottlePolicy",
+			Handler:    _BillingAdminService_SetCoverageThrottlePolicy_Handler,
+		},
+		{
+			MethodName: "UpdateSystemSetting",
+			Handler:    _BillingAdminService_UpdateSystemSetting_Handler,
+		},
+		{
+			MethodName: "UpdateFreeModelQuotaPolicy",
+			Handler:    _BillingAdminService_UpdateFreeModelQuotaPolicy_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "maxshot/gateway_internal/v1/execution.proto",
+}
+
+const (
+	StudioAdminService_ResolveUncertainJob_FullMethodName = "/maxshot.gateway_internal.v1.StudioAdminService/ResolveUncertainJob"
+	StudioAdminService_ModerateMaterial_FullMethodName    = "/maxshot.gateway_internal.v1.StudioAdminService/ModerateMaterial"
+	StudioAdminService_ResolveAppeal_FullMethodName       = "/maxshot.gateway_internal.v1.StudioAdminService/ResolveAppeal"
+)
+
+// StudioAdminServiceClient is the client API for StudioAdminService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+type StudioAdminServiceClient interface {
+	ResolveUncertainJob(ctx context.Context, in *ResolveUncertainJobRequest, opts ...grpc.CallOption) (*ResolveUncertainJobResponse, error)
+	ModerateMaterial(ctx context.Context, in *ModerateMaterialRequest, opts ...grpc.CallOption) (*ModerateMaterialResponse, error)
+	ResolveAppeal(ctx context.Context, in *ResolveAppealRequest, opts ...grpc.CallOption) (*ResolveAppealResponse, error)
+}
+
+type studioAdminServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewStudioAdminServiceClient(cc grpc.ClientConnInterface) StudioAdminServiceClient {
+	return &studioAdminServiceClient{cc}
+}
+
+func (c *studioAdminServiceClient) ResolveUncertainJob(ctx context.Context, in *ResolveUncertainJobRequest, opts ...grpc.CallOption) (*ResolveUncertainJobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveUncertainJobResponse)
+	err := c.cc.Invoke(ctx, StudioAdminService_ResolveUncertainJob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *studioAdminServiceClient) ModerateMaterial(ctx context.Context, in *ModerateMaterialRequest, opts ...grpc.CallOption) (*ModerateMaterialResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ModerateMaterialResponse)
+	err := c.cc.Invoke(ctx, StudioAdminService_ModerateMaterial_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *studioAdminServiceClient) ResolveAppeal(ctx context.Context, in *ResolveAppealRequest, opts ...grpc.CallOption) (*ResolveAppealResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveAppealResponse)
+	err := c.cc.Invoke(ctx, StudioAdminService_ResolveAppeal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StudioAdminServiceServer is the server API for StudioAdminService service.
+// All implementations must embed UnimplementedStudioAdminServiceServer
+// for forward compatibility.
+type StudioAdminServiceServer interface {
+	ResolveUncertainJob(context.Context, *ResolveUncertainJobRequest) (*ResolveUncertainJobResponse, error)
+	ModerateMaterial(context.Context, *ModerateMaterialRequest) (*ModerateMaterialResponse, error)
+	ResolveAppeal(context.Context, *ResolveAppealRequest) (*ResolveAppealResponse, error)
+	mustEmbedUnimplementedStudioAdminServiceServer()
+}
+
+// UnimplementedStudioAdminServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedStudioAdminServiceServer struct{}
+
+func (UnimplementedStudioAdminServiceServer) ResolveUncertainJob(context.Context, *ResolveUncertainJobRequest) (*ResolveUncertainJobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveUncertainJob not implemented")
+}
+func (UnimplementedStudioAdminServiceServer) ModerateMaterial(context.Context, *ModerateMaterialRequest) (*ModerateMaterialResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ModerateMaterial not implemented")
+}
+func (UnimplementedStudioAdminServiceServer) ResolveAppeal(context.Context, *ResolveAppealRequest) (*ResolveAppealResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveAppeal not implemented")
+}
+func (UnimplementedStudioAdminServiceServer) mustEmbedUnimplementedStudioAdminServiceServer() {}
+func (UnimplementedStudioAdminServiceServer) testEmbeddedByValue()                            {}
+
+// UnsafeStudioAdminServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to StudioAdminServiceServer will
+// result in compilation errors.
+type UnsafeStudioAdminServiceServer interface {
+	mustEmbedUnimplementedStudioAdminServiceServer()
+}
+
+func RegisterStudioAdminServiceServer(s grpc.ServiceRegistrar, srv StudioAdminServiceServer) {
+	// If the following call panics, it indicates UnimplementedStudioAdminServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&StudioAdminService_ServiceDesc, srv)
+}
+
+func _StudioAdminService_ResolveUncertainJob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveUncertainJobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StudioAdminServiceServer).ResolveUncertainJob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StudioAdminService_ResolveUncertainJob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StudioAdminServiceServer).ResolveUncertainJob(ctx, req.(*ResolveUncertainJobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StudioAdminService_ModerateMaterial_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ModerateMaterialRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StudioAdminServiceServer).ModerateMaterial(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StudioAdminService_ModerateMaterial_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StudioAdminServiceServer).ModerateMaterial(ctx, req.(*ModerateMaterialRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StudioAdminService_ResolveAppeal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveAppealRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StudioAdminServiceServer).ResolveAppeal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StudioAdminService_ResolveAppeal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StudioAdminServiceServer).ResolveAppeal(ctx, req.(*ResolveAppealRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// StudioAdminService_ServiceDesc is the grpc.ServiceDesc for StudioAdminService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var StudioAdminService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "maxshot.gateway_internal.v1.StudioAdminService",
+	HandlerType: (*StudioAdminServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ResolveUncertainJob",
+			Handler:    _StudioAdminService_ResolveUncertainJob_Handler,
+		},
+		{
+			MethodName: "ModerateMaterial",
+			Handler:    _StudioAdminService_ModerateMaterial_Handler,
+		},
+		{
+			MethodName: "ResolveAppeal",
+			Handler:    _StudioAdminService_ResolveAppeal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

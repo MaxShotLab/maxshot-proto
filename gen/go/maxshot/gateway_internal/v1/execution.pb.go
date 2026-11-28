@@ -8,6 +8,7 @@ package gatewayinternalv1
 
 import (
 	v1 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/common/v1"
+	v11 "github.com/MaxShotLab/maxshot-proto/gen/go/maxshot/contract_grant/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -190,7 +191,7 @@ const (
 	SettlementOutcome_SETTLEMENT_OUTCOME_NOT_ACCEPTED           SettlementOutcome = 3
 	SettlementOutcome_SETTLEMENT_OUTCOME_FAILED_BEFORE_OUTPUT   SettlementOutcome = 4
 	SettlementOutcome_SETTLEMENT_OUTCOME_CANCELLED              SettlementOutcome = 5 // charges completed outputs/components, releases remainder
-	SettlementOutcome_SETTLEMENT_OUTCOME_PENDING_RECONCILIATION SettlementOutcome = 6 // missing final usage; 24h auto-release applies
+	SettlementOutcome_SETTLEMENT_OUTCOME_PENDING_RECONCILIATION SettlementOutcome = 6 // missing final usage; the persisted release deadline applies
 )
 
 // Enum value maps for SettlementOutcome.
@@ -321,7 +322,9 @@ const (
 	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED      UncertainResolutionAction = 0
 	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED UncertainResolutionAction = 1
 	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST     UncertainResolutionAction = 2
-	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H UncertainResolutionAction = 3
+	// Deprecated: Marked as deprecated in maxshot/gateway_internal/v1/execution.proto.
+	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H           UncertainResolutionAction = 3
+	UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD UncertainResolutionAction = 4
 )
 
 // Enum value maps for UncertainResolutionAction.
@@ -331,12 +334,14 @@ var (
 		1: "UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED",
 		2: "UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST",
 		3: "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H",
+		4: "UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD",
 	}
 	UncertainResolutionAction_value = map[string]int32{
-		"UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED":      0,
-		"UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED": 1,
-		"UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST":     2,
-		"UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H": 3,
+		"UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED":                0,
+		"UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED":           1,
+		"UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST":               2,
+		"UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H":           3,
+		"UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD": 4,
 	}
 )
 
@@ -365,6 +370,224 @@ func (x UncertainResolutionAction) Number() protoreflect.EnumNumber {
 // Deprecated: Use UncertainResolutionAction.Descriptor instead.
 func (UncertainResolutionAction) EnumDescriptor() ([]byte, []int) {
 	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{5}
+}
+
+// Execution-side observations never imply permission to resend an upstream request.
+type AttemptDispatchState int32
+
+const (
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_UNSPECIFIED     AttemptDispatchState = 0
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_INTENT_RECORDED AttemptDispatchState = 1
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED    AttemptDispatchState = 2
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL AttemptDispatchState = 3
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_ACCEPTED        AttemptDispatchState = 4
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_UNKNOWN         AttemptDispatchState = 5
+	AttemptDispatchState_ATTEMPT_DISPATCH_STATE_COMPLETED       AttemptDispatchState = 6
+)
+
+// Enum value maps for AttemptDispatchState.
+var (
+	AttemptDispatchState_name = map[int32]string{
+		0: "ATTEMPT_DISPATCH_STATE_UNSPECIFIED",
+		1: "ATTEMPT_DISPATCH_STATE_INTENT_RECORDED",
+		2: "ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED",
+		3: "ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL",
+		4: "ATTEMPT_DISPATCH_STATE_ACCEPTED",
+		5: "ATTEMPT_DISPATCH_STATE_UNKNOWN",
+		6: "ATTEMPT_DISPATCH_STATE_COMPLETED",
+	}
+	AttemptDispatchState_value = map[string]int32{
+		"ATTEMPT_DISPATCH_STATE_UNSPECIFIED":     0,
+		"ATTEMPT_DISPATCH_STATE_INTENT_RECORDED": 1,
+		"ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED":    2,
+		"ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL": 3,
+		"ATTEMPT_DISPATCH_STATE_ACCEPTED":        4,
+		"ATTEMPT_DISPATCH_STATE_UNKNOWN":         5,
+		"ATTEMPT_DISPATCH_STATE_COMPLETED":       6,
+	}
+)
+
+func (x AttemptDispatchState) Enum() *AttemptDispatchState {
+	p := new(AttemptDispatchState)
+	*p = x
+	return p
+}
+
+func (x AttemptDispatchState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AttemptDispatchState) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_gateway_internal_v1_execution_proto_enumTypes[6].Descriptor()
+}
+
+func (AttemptDispatchState) Type() protoreflect.EnumType {
+	return &file_maxshot_gateway_internal_v1_execution_proto_enumTypes[6]
+}
+
+func (x AttemptDispatchState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AttemptDispatchState.Descriptor instead.
+func (AttemptDispatchState) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{6}
+}
+
+type SettlementDisposition int32
+
+const (
+	SettlementDisposition_SETTLEMENT_DISPOSITION_UNSPECIFIED            SettlementDisposition = 0
+	SettlementDisposition_SETTLEMENT_DISPOSITION_APPLIED                SettlementDisposition = 1
+	SettlementDisposition_SETTLEMENT_DISPOSITION_ALREADY_APPLIED        SettlementDisposition = 2
+	SettlementDisposition_SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION SettlementDisposition = 3
+	SettlementDisposition_SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE SettlementDisposition = 4
+	SettlementDisposition_SETTLEMENT_DISPOSITION_LEASE_LOST             SettlementDisposition = 5
+)
+
+// Enum value maps for SettlementDisposition.
+var (
+	SettlementDisposition_name = map[int32]string{
+		0: "SETTLEMENT_DISPOSITION_UNSPECIFIED",
+		1: "SETTLEMENT_DISPOSITION_APPLIED",
+		2: "SETTLEMENT_DISPOSITION_ALREADY_APPLIED",
+		3: "SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION",
+		4: "SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE",
+		5: "SETTLEMENT_DISPOSITION_LEASE_LOST",
+	}
+	SettlementDisposition_value = map[string]int32{
+		"SETTLEMENT_DISPOSITION_UNSPECIFIED":            0,
+		"SETTLEMENT_DISPOSITION_APPLIED":                1,
+		"SETTLEMENT_DISPOSITION_ALREADY_APPLIED":        2,
+		"SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION": 3,
+		"SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE": 4,
+		"SETTLEMENT_DISPOSITION_LEASE_LOST":             5,
+	}
+)
+
+func (x SettlementDisposition) Enum() *SettlementDisposition {
+	p := new(SettlementDisposition)
+	*p = x
+	return p
+}
+
+func (x SettlementDisposition) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SettlementDisposition) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_gateway_internal_v1_execution_proto_enumTypes[7].Descriptor()
+}
+
+func (SettlementDisposition) Type() protoreflect.EnumType {
+	return &file_maxshot_gateway_internal_v1_execution_proto_enumTypes[7]
+}
+
+func (x SettlementDisposition) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SettlementDisposition.Descriptor instead.
+func (SettlementDisposition) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{7}
+}
+
+type FundingNotice int32
+
+const (
+	FundingNotice_FUNDING_NOTICE_UNSPECIFIED                FundingNotice = 0
+	FundingNotice_FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED FundingNotice = 1
+	FundingNotice_FUNDING_NOTICE_AIT_COVERAGE_THROTTLED     FundingNotice = 2
+)
+
+// Enum value maps for FundingNotice.
+var (
+	FundingNotice_name = map[int32]string{
+		0: "FUNDING_NOTICE_UNSPECIFIED",
+		1: "FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED",
+		2: "FUNDING_NOTICE_AIT_COVERAGE_THROTTLED",
+	}
+	FundingNotice_value = map[string]int32{
+		"FUNDING_NOTICE_UNSPECIFIED":                0,
+		"FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED": 1,
+		"FUNDING_NOTICE_AIT_COVERAGE_THROTTLED":     2,
+	}
+)
+
+func (x FundingNotice) Enum() *FundingNotice {
+	p := new(FundingNotice)
+	*p = x
+	return p
+}
+
+func (x FundingNotice) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FundingNotice) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_gateway_internal_v1_execution_proto_enumTypes[8].Descriptor()
+}
+
+func (FundingNotice) Type() protoreflect.EnumType {
+	return &file_maxshot_gateway_internal_v1_execution_proto_enumTypes[8]
+}
+
+func (x FundingNotice) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FundingNotice.Descriptor instead.
+func (FundingNotice) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{8}
+}
+
+type OperatorAuthenticationMethod int32
+
+const (
+	OperatorAuthenticationMethod_OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED      OperatorAuthenticationMethod = 0
+	OperatorAuthenticationMethod_OPERATOR_AUTHENTICATION_METHOD_TOTP             OperatorAuthenticationMethod = 1
+	OperatorAuthenticationMethod_OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE OperatorAuthenticationMethod = 2
+)
+
+// Enum value maps for OperatorAuthenticationMethod.
+var (
+	OperatorAuthenticationMethod_name = map[int32]string{
+		0: "OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED",
+		1: "OPERATOR_AUTHENTICATION_METHOD_TOTP",
+		2: "OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE",
+	}
+	OperatorAuthenticationMethod_value = map[string]int32{
+		"OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED":      0,
+		"OPERATOR_AUTHENTICATION_METHOD_TOTP":             1,
+		"OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE": 2,
+	}
+)
+
+func (x OperatorAuthenticationMethod) Enum() *OperatorAuthenticationMethod {
+	p := new(OperatorAuthenticationMethod)
+	*p = x
+	return p
+}
+
+func (x OperatorAuthenticationMethod) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (OperatorAuthenticationMethod) Descriptor() protoreflect.EnumDescriptor {
+	return file_maxshot_gateway_internal_v1_execution_proto_enumTypes[9].Descriptor()
+}
+
+func (OperatorAuthenticationMethod) Type() protoreflect.EnumType {
+	return &file_maxshot_gateway_internal_v1_execution_proto_enumTypes[9]
+}
+
+func (x OperatorAuthenticationMethod) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use OperatorAuthenticationMethod.Descriptor instead.
+func (OperatorAuthenticationMethod) EnumDescriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{9}
 }
 
 // MediaPricingDimensions carries structured request/result dimensions so BillingExecutionService
@@ -1952,8 +2175,10 @@ type PreviewQuoteRequest struct {
 	IssueQuoteLock        bool                   `protobuf:"varint,15,opt,name=issue_quote_lock,json=issueQuoteLock,proto3" json:"issue_quote_lock,omitempty"` // true issues a 5-minute TTL locked quote_id for two-step Studio submission (BIL-R22)
 	RequestHash           string                 `protobuf:"bytes,16,opt,name=request_hash,json=requestHash,proto3" json:"request_hash,omitempty"`             // normalized generation parameter digest bound to quote_id
 	EffectiveChannel      string                 `protobuf:"bytes,17,opt,name=effective_channel,json=effectiveChannel,proto3" json:"effective_channel,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Trusted HTTP principal flows bind the quote to this canonical request fingerprint.
+	RequestBodySha256 string `protobuf:"bytes,18,opt,name=request_body_sha256,json=requestBodySha256,proto3" json:"request_body_sha256,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *PreviewQuoteRequest) Reset() {
@@ -2105,6 +2330,13 @@ func (x *PreviewQuoteRequest) GetEffectiveChannel() string {
 	return ""
 }
 
+func (x *PreviewQuoteRequest) GetRequestBodySha256() string {
+	if x != nil {
+		return x.RequestBodySha256
+	}
+	return ""
+}
+
 type PreviewQuoteResponse struct {
 	state                           protoimpl.MessageState     `protogen:"open.v1"`
 	Eligible                        bool                       `protobuf:"varint,1,opt,name=eligible,proto3" json:"eligible,omitempty"`
@@ -2115,7 +2347,7 @@ type PreviewQuoteResponse struct {
 	HardMaxMicroUsd                 int64                      `protobuf:"varint,6,opt,name=hard_max_micro_usd,json=hardMaxMicroUsd,proto3" json:"hard_max_micro_usd,omitempty"`
 	UsesFreeModelQuota              bool                       `protobuf:"varint,7,opt,name=uses_free_model_quota,json=usesFreeModelQuota,proto3" json:"uses_free_model_quota,omitempty"`
 	FreeModelQuotaExhaustedFallback bool                       `protobuf:"varint,8,opt,name=free_model_quota_exhausted_fallback,json=freeModelQuotaExhaustedFallback,proto3" json:"free_model_quota_exhausted_fallback,omitempty"` // F-model free quota exhausted; quote reflects regular 6-bucket fallback
-	RequiresDollarConfirmation      bool                       `protobuf:"varint,9,opt,name=requires_dollar_confirmation,json=requiresDollarConfirmation,proto3" json:"requires_dollar_confirmation,omitempty"`                    // BIL-R23: Studio UI must prompt user to confirm max Dollar debit
+	RequiresDollarConfirmation      bool                       `protobuf:"varint,9,opt,name=requires_dollar_confirmation,json=requiresDollarConfirmation,proto3" json:"requires_dollar_confirmation,omitempty"`                    // Studio and applicable Web Chat flows must confirm the maximum Dollar debit
 	MaxDollarDebitMicroUsd          int64                      `protobuf:"varint,10,opt,name=max_dollar_debit_micro_usd,json=maxDollarDebitMicroUsd,proto3" json:"max_dollar_debit_micro_usd,omitempty"`
 	BasicToPremiumProjected         bool                       `protobuf:"varint,11,opt,name=basic_to_premium_projected,json=basicToPremiumProjected,proto3" json:"basic_to_premium_projected,omitempty"`
 	Breakdown                       []*QuoteComponentLine      `protobuf:"bytes,12,rep,name=breakdown,proto3" json:"breakdown,omitempty"`
@@ -2615,8 +2847,16 @@ type AuthorizeAndHoldResponse struct {
 	BudgetDiagnostic            *SpendingLimitDiagnostic   `protobuf:"bytes,18,opt,name=budget_diagnostic,json=budgetDiagnostic,proto3" json:"budget_diagnostic,omitempty"`
 	CreditDiagnostic            *CreditShortfallDiagnostic `protobuf:"bytes,19,opt,name=credit_diagnostic,json=creditDiagnostic,proto3" json:"credit_diagnostic,omitempty"`
 	CachedSettlement            *SettleResponse            `protobuf:"bytes,20,opt,name=cached_settlement,json=cachedSettlement,proto3" json:"cached_settlement,omitempty"` // populated when status == HOLD_DECISION_STATUS_IDEMPOTENT_COMPLETED
-	unknownFields               protoimpl.UnknownFields
-	sizeCache                   protoimpl.SizeCache
+	CachedHttpResponse          *IdempotentHttpResponse    `protobuf:"bytes,21,opt,name=cached_http_response,json=cachedHttpResponse,proto3" json:"cached_http_response,omitempty"`
+	EffectivePrimaryBound       *UsageBound                `protobuf:"bytes,22,opt,name=effective_primary_bound,json=effectivePrimaryBound,proto3" json:"effective_primary_bound,omitempty"`
+	EffectiveBackupBound        *UsageBound                `protobuf:"bytes,23,opt,name=effective_backup_bound,json=effectiveBackupBound,proto3" json:"effective_backup_bound,omitempty"`
+	CustomerReleaseAtUnixMs     *int64                     `protobuf:"varint,24,opt,name=customer_release_at_unix_ms,json=customerReleaseAtUnixMs,proto3,oneof" json:"customer_release_at_unix_ms,omitempty"`
+	// Present when a confirmed Web request exceeds its locked Dollar maximum or needs a first confirmation.
+	ReplacementQuote       *PreviewQuoteResponse `protobuf:"bytes,25,opt,name=replacement_quote,json=replacementQuote,proto3" json:"replacement_quote,omitempty"`
+	FundingNotices         []FundingNotice       `protobuf:"varint,26,rep,packed,name=funding_notices,json=fundingNotices,proto3,enum=maxshot.gateway_internal.v1.FundingNotice" json:"funding_notices,omitempty"`
+	MaxDollarDebitMicroUsd *int64                `protobuf:"varint,27,opt,name=max_dollar_debit_micro_usd,json=maxDollarDebitMicroUsd,proto3,oneof" json:"max_dollar_debit_micro_usd,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AuthorizeAndHoldResponse) Reset() {
@@ -2789,6 +3029,55 @@ func (x *AuthorizeAndHoldResponse) GetCachedSettlement() *SettleResponse {
 	return nil
 }
 
+func (x *AuthorizeAndHoldResponse) GetCachedHttpResponse() *IdempotentHttpResponse {
+	if x != nil {
+		return x.CachedHttpResponse
+	}
+	return nil
+}
+
+func (x *AuthorizeAndHoldResponse) GetEffectivePrimaryBound() *UsageBound {
+	if x != nil {
+		return x.EffectivePrimaryBound
+	}
+	return nil
+}
+
+func (x *AuthorizeAndHoldResponse) GetEffectiveBackupBound() *UsageBound {
+	if x != nil {
+		return x.EffectiveBackupBound
+	}
+	return nil
+}
+
+func (x *AuthorizeAndHoldResponse) GetCustomerReleaseAtUnixMs() int64 {
+	if x != nil && x.CustomerReleaseAtUnixMs != nil {
+		return *x.CustomerReleaseAtUnixMs
+	}
+	return 0
+}
+
+func (x *AuthorizeAndHoldResponse) GetReplacementQuote() *PreviewQuoteResponse {
+	if x != nil {
+		return x.ReplacementQuote
+	}
+	return nil
+}
+
+func (x *AuthorizeAndHoldResponse) GetFundingNotices() []FundingNotice {
+	if x != nil {
+		return x.FundingNotices
+	}
+	return nil
+}
+
+func (x *AuthorizeAndHoldResponse) GetMaxDollarDebitMicroUsd() int64 {
+	if x != nil && x.MaxDollarDebitMicroUsd != nil {
+		return *x.MaxDollarDebitMicroUsd
+	}
+	return 0
+}
+
 type MarkSendingRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -2878,8 +3167,14 @@ type MarkSendingResponse struct {
 	Accepted             bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	LeaseExpiresAtUnixMs int64                  `protobuf:"varint,2,opt,name=lease_expires_at_unix_ms,json=leaseExpiresAtUnixMs,proto3" json:"lease_expires_at_unix_ms,omitempty"`
 	RejectReason         string                 `protobuf:"bytes,3,opt,name=reject_reason,json=rejectReason,proto3" json:"reject_reason,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// True only for the transaction that created the dispatch intent. A retry after an ambiguous
+	// RPC result never grants permission to send again, even when accepted is true.
+	NewlyAuthorized    *bool  `protobuf:"varint,4,opt,name=newly_authorized,json=newlyAuthorized,proto3,oneof" json:"newly_authorized,omitempty"`
+	DispatchedAtUnixMs *int64 `protobuf:"varint,5,opt,name=dispatched_at_unix_ms,json=dispatchedAtUnixMs,proto3,oneof" json:"dispatched_at_unix_ms,omitempty"`
+	// Reserved atomically for this attempt, including any backup after a definitive primary failure.
+	ProviderCostReservedMicroUsd *int64 `protobuf:"varint,6,opt,name=provider_cost_reserved_micro_usd,json=providerCostReservedMicroUsd,proto3,oneof" json:"provider_cost_reserved_micro_usd,omitempty"`
+	unknownFields                protoimpl.UnknownFields
+	sizeCache                    protoimpl.SizeCache
 }
 
 func (x *MarkSendingResponse) Reset() {
@@ -2931,6 +3226,27 @@ func (x *MarkSendingResponse) GetRejectReason() string {
 		return x.RejectReason
 	}
 	return ""
+}
+
+func (x *MarkSendingResponse) GetNewlyAuthorized() bool {
+	if x != nil && x.NewlyAuthorized != nil {
+		return *x.NewlyAuthorized
+	}
+	return false
+}
+
+func (x *MarkSendingResponse) GetDispatchedAtUnixMs() int64 {
+	if x != nil && x.DispatchedAtUnixMs != nil {
+		return *x.DispatchedAtUnixMs
+	}
+	return 0
+}
+
+func (x *MarkSendingResponse) GetProviderCostReservedMicroUsd() int64 {
+	if x != nil && x.ProviderCostReservedMicroUsd != nil {
+		return *x.ProviderCostReservedMicroUsd
+	}
+	return 0
 }
 
 type ExtendExecutionLeaseRequest struct {
@@ -3161,6 +3477,8 @@ type AttemptCostRecord struct {
 	AttemptNumber              int32                  `protobuf:"varint,12,opt,name=attempt_number,json=attemptNumber,proto3" json:"attempt_number,omitempty"`
 	ProviderGenerationId       string                 `protobuf:"bytes,13,opt,name=provider_generation_id,json=providerGenerationId,proto3" json:"provider_generation_id,omitempty"` // OpenRouter gen-... or Ark async task ID
 	HttpStatus                 int32                  `protobuf:"varint,14,opt,name=http_status,json=httpStatus,proto3" json:"http_status,omitempty"`
+	DispatchState              *AttemptDispatchState  `protobuf:"varint,15,opt,name=dispatch_state,json=dispatchState,proto3,enum=maxshot.gateway_internal.v1.AttemptDispatchState,oneof" json:"dispatch_state,omitempty"`
+	DispatchKey                *string                `protobuf:"bytes,16,opt,name=dispatch_key,json=dispatchKey,proto3,oneof" json:"dispatch_key,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -3293,6 +3611,20 @@ func (x *AttemptCostRecord) GetHttpStatus() int32 {
 	return 0
 }
 
+func (x *AttemptCostRecord) GetDispatchState() AttemptDispatchState {
+	if x != nil && x.DispatchState != nil {
+		return *x.DispatchState
+	}
+	return AttemptDispatchState_ATTEMPT_DISPATCH_STATE_UNSPECIFIED
+}
+
+func (x *AttemptCostRecord) GetDispatchKey() string {
+	if x != nil && x.DispatchKey != nil {
+		return *x.DispatchKey
+	}
+	return ""
+}
+
 type SettleRequest struct {
 	state                                  protoimpl.MessageState       `protogen:"open.v1"`
 	RequestId                              string                       `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -3310,8 +3642,10 @@ type SettleRequest struct {
 	Attempts                               []*AttemptCostRecord         `protobuf:"bytes,13,rep,name=attempts,proto3" json:"attempts,omitempty"`
 	CustomerChargeMode                     v1.CustomerChargeMode        `protobuf:"varint,14,opt,name=customer_charge_mode,json=customerChargeMode,proto3,enum=maxshot.common.v1.CustomerChargeMode" json:"customer_charge_mode,omitempty"`
 	ProviderReportedCustomerBaseCostUsdDec string                       `protobuf:"bytes,15,opt,name=provider_reported_customer_base_cost_usd_dec,json=providerReportedCustomerBaseCostUsdDec,proto3" json:"provider_reported_customer_base_cost_usd_dec,omitempty"` // base cost when CUSTOMER_CHARGE_MODE_PROVIDER_ACTUAL_COST applies
-	unknownFields                          protoimpl.UnknownFields
-	sizeCache                              protoimpl.SizeCache
+	// Only bounded, non-streaming responses eligible for retention. Persist with final result or leave absent.
+	HttpResponse  *IdempotentHttpResponse `protobuf:"bytes,16,opt,name=http_response,json=httpResponse,proto3" json:"http_response,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SettleRequest) Reset() {
@@ -3449,6 +3783,13 @@ func (x *SettleRequest) GetProviderReportedCustomerBaseCostUsdDec() string {
 	return ""
 }
 
+func (x *SettleRequest) GetHttpResponse() *IdempotentHttpResponse {
+	if x != nil {
+		return x.HttpResponse
+	}
+	return nil
+}
+
 type SettleResponse struct {
 	state                            protoimpl.MessageState  `protogen:"open.v1"`
 	Settled                          bool                    `protobuf:"varint,1,opt,name=settled,proto3" json:"settled,omitempty"`
@@ -3459,9 +3800,10 @@ type SettleResponse struct {
 	ShortfallTopUpMicroUsd           int64                   `protobuf:"varint,6,opt,name=shortfall_top_up_micro_usd,json=shortfallTopUpMicroUsd,proto3" json:"shortfall_top_up_micro_usd,omitempty"`                               // extra unfrozen Dollar charged when double-authorized & not ceiling-capped
 	PlatformBorneDiscrepancyMicroUsd int64                   `protobuf:"varint,7,opt,name=platform_borne_discrepancy_micro_usd,json=platformBorneDiscrepancyMicroUsd,proto3" json:"platform_borne_discrepancy_micro_usd,omitempty"` // overrun or uncompensated shortfall routed to discrepancy ledger
 	SettledProviderPayableMicroUsd   int64                   `protobuf:"varint,8,opt,name=settled_provider_payable_micro_usd,json=settledProviderPayableMicroUsd,proto3" json:"settled_provider_payable_micro_usd,omitempty"`
-	AutoReleaseAtUnixMs              int64                   `protobuf:"varint,9,opt,name=auto_release_at_unix_ms,json=autoReleaseAtUnixMs,proto3" json:"auto_release_at_unix_ms,omitempty"` // set to dispatched_at + 24h when outcome == PENDING_RECONCILIATION
+	AutoReleaseAtUnixMs              int64                   `protobuf:"varint,9,opt,name=auto_release_at_unix_ms,json=autoReleaseAtUnixMs,proto3" json:"auto_release_at_unix_ms,omitempty"` // persisted deadline when customer funds are still held
 	SettledBuckets                   []*BucketAllocationLine `protobuf:"bytes,10,rep,name=settled_buckets,json=settledBuckets,proto3" json:"settled_buckets,omitempty"`
 	ReleasedBuckets                  []*BucketAllocationLine `protobuf:"bytes,11,rep,name=released_buckets,json=releasedBuckets,proto3" json:"released_buckets,omitempty"`
+	Disposition                      *SettlementDisposition  `protobuf:"varint,12,opt,name=disposition,proto3,enum=maxshot.gateway_internal.v1.SettlementDisposition,oneof" json:"disposition,omitempty"`
 	unknownFields                    protoimpl.UnknownFields
 	sizeCache                        protoimpl.SizeCache
 }
@@ -3573,6 +3915,13 @@ func (x *SettleResponse) GetReleasedBuckets() []*BucketAllocationLine {
 	return nil
 }
 
+func (x *SettleResponse) GetDisposition() SettlementDisposition {
+	if x != nil && x.Disposition != nil {
+		return *x.Disposition
+	}
+	return SettlementDisposition_SETTLEMENT_DISPOSITION_UNSPECIFIED
+}
+
 type MarkUncertainRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	RequestId         string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -3652,7 +4001,7 @@ func (x *MarkUncertainRequest) GetReason() string {
 type MarkUncertainResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Marked              bool                   `protobuf:"varint,1,opt,name=marked,proto3" json:"marked,omitempty"`
-	AutoReleaseAtUnixMs int64                  `protobuf:"varint,2,opt,name=auto_release_at_unix_ms,json=autoReleaseAtUnixMs,proto3" json:"auto_release_at_unix_ms,omitempty"` // dispatched_at + 24h (BIL-R36)
+	AutoReleaseAtUnixMs int64                  `protobuf:"varint,2,opt,name=auto_release_at_unix_ms,json=autoReleaseAtUnixMs,proto3" json:"auto_release_at_unix_ms,omitempty"` // persisted Studio release deadline
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -3706,18 +4055,21 @@ type ResolveUncertainRequest struct {
 	RequestId                string                       `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	ResolutionIdempotencyKey string                       `protobuf:"bytes,2,opt,name=resolution_idempotency_key,json=resolutionIdempotencyKey,proto3" json:"resolution_idempotency_key,omitempty"`
 	Action                   UncertainResolutionAction    `protobuf:"varint,3,opt,name=action,proto3,enum=maxshot.gateway_internal.v1.UncertainResolutionAction" json:"action,omitempty"`
-	ActorId                  string                       `protobuf:"bytes,4,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"` // operator ID or "system:finance-worker-24h" (ADM-R12)
+	ActorId                  string                       `protobuf:"bytes,4,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"` // operator ID or "system:finance-worker" (ADM-R12)
 	Reason                   string                       `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	ServingOfferingId        string                       `protobuf:"bytes,6,opt,name=serving_offering_id,json=servingOfferingId,proto3" json:"serving_offering_id,omitempty"`
 	NativeRequestId          string                       `protobuf:"bytes,7,opt,name=native_request_id,json=nativeRequestId,proto3" json:"native_request_id,omitempty"`
-	VerifiedUsage            *UsageBound                  `protobuf:"bytes,8,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"` // populated for Studio SETTLE_DELIVERED or text 24h PENDING_RECONCILIATION recovery
+	VerifiedUsage            *UsageBound                  `protobuf:"bytes,8,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"` // populated for Studio SETTLE_DELIVERED or text PENDING_RECONCILIATION recovery
 	MediaOutputs             []*MediaOutputSettlementItem `protobuf:"bytes,9,rep,name=media_outputs,json=mediaOutputs,proto3" json:"media_outputs,omitempty"`
 	LateProviderCostUsdDec   string                       `protobuf:"bytes,10,opt,name=late_provider_cost_usd_dec,json=lateProviderCostUsdDec,proto3" json:"late_provider_cost_usd_dec,omitempty"` // recorded into discrepancy ledger if already auto-released (BIL-R36)
 	AttemptId                string                       `protobuf:"bytes,11,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
 	ProviderGenerationId     string                       `protobuf:"bytes,12,opt,name=provider_generation_id,json=providerGenerationId,proto3" json:"provider_generation_id,omitempty"`
 	OfferingId               string                       `protobuf:"bytes,13,opt,name=offering_id,json=offeringId,proto3" json:"offering_id,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Fenced recovery claim for automatic resolution. Operator paths use an operation-bound audit context.
+	RecoveryLeaseToken string           `protobuf:"bytes,14,opt,name=recovery_lease_token,json=recoveryLeaseToken,proto3" json:"recovery_lease_token,omitempty"`
+	Operator           *OperatorContext `protobuf:"bytes,15,opt,name=operator,proto3" json:"operator,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ResolveUncertainRequest) Reset() {
@@ -3841,6 +4193,20 @@ func (x *ResolveUncertainRequest) GetOfferingId() string {
 	return ""
 }
 
+func (x *ResolveUncertainRequest) GetRecoveryLeaseToken() string {
+	if x != nil {
+		return x.RecoveryLeaseToken
+	}
+	return ""
+}
+
+func (x *ResolveUncertainRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
 type ResolveUncertainResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resolved      bool                   `protobuf:"varint,1,opt,name=resolved,proto3" json:"resolved,omitempty"`
@@ -3893,11 +4259,7203 @@ func (x *ResolveUncertainResponse) GetSettlement() *SettleResponse {
 	return nil
 }
 
+type IdempotentHttpResponse struct {
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	StatusCode int32                  `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
+	// Only allowlisted end-to-end headers. Regenerate tracing headers and never persist credentials.
+	Headers       []*v1.KeyValueAttribute `protobuf:"bytes,2,rep,name=headers,proto3" json:"headers,omitempty"`
+	Body          []byte                  `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"` // Maximum 1 MiB. Never store SSE or zero-retention output.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IdempotentHttpResponse) Reset() {
+	*x = IdempotentHttpResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IdempotentHttpResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IdempotentHttpResponse) ProtoMessage() {}
+
+func (x *IdempotentHttpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IdempotentHttpResponse.ProtoReflect.Descriptor instead.
+func (*IdempotentHttpResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *IdempotentHttpResponse) GetStatusCode() int32 {
+	if x != nil {
+		return x.StatusCode
+	}
+	return 0
+}
+
+func (x *IdempotentHttpResponse) GetHeaders() []*v1.KeyValueAttribute {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *IdempotentHttpResponse) GetBody() []byte {
+	if x != nil {
+		return x.Body
+	}
+	return nil
+}
+
+type RecordAttemptObservationRequest struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId                 string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	LeaseToken                string                 `protobuf:"bytes,2,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+	ObservationIdempotencyKey string                 `protobuf:"bytes,3,opt,name=observation_idempotency_key,json=observationIdempotencyKey,proto3" json:"observation_idempotency_key,omitempty"`
+	Attempt                   *AttemptCostRecord     `protobuf:"bytes,4,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *RecordAttemptObservationRequest) Reset() {
+	*x = RecordAttemptObservationRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordAttemptObservationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordAttemptObservationRequest) ProtoMessage() {}
+
+func (x *RecordAttemptObservationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordAttemptObservationRequest.ProtoReflect.Descriptor instead.
+func (*RecordAttemptObservationRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *RecordAttemptObservationRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *RecordAttemptObservationRequest) GetLeaseToken() string {
+	if x != nil {
+		return x.LeaseToken
+	}
+	return ""
+}
+
+func (x *RecordAttemptObservationRequest) GetObservationIdempotencyKey() string {
+	if x != nil {
+		return x.ObservationIdempotencyKey
+	}
+	return ""
+}
+
+func (x *RecordAttemptObservationRequest) GetAttempt() *AttemptCostRecord {
+	if x != nil {
+		return x.Attempt
+	}
+	return nil
+}
+
+type RecordAttemptObservationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Recorded      bool                   `protobuf:"varint,1,opt,name=recorded,proto3" json:"recorded,omitempty"`
+	DispatchState AttemptDispatchState   `protobuf:"varint,2,opt,name=dispatch_state,json=dispatchState,proto3,enum=maxshot.gateway_internal.v1.AttemptDispatchState" json:"dispatch_state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordAttemptObservationResponse) Reset() {
+	*x = RecordAttemptObservationResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordAttemptObservationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordAttemptObservationResponse) ProtoMessage() {}
+
+func (x *RecordAttemptObservationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordAttemptObservationResponse.ProtoReflect.Descriptor instead.
+func (*RecordAttemptObservationResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *RecordAttemptObservationResponse) GetRecorded() bool {
+	if x != nil {
+		return x.Recorded
+	}
+	return false
+}
+
+func (x *RecordAttemptObservationResponse) GetDispatchState() AttemptDispatchState {
+	if x != nil {
+		return x.DispatchState
+	}
+	return AttemptDispatchState_ATTEMPT_DISPATCH_STATE_UNSPECIFIED
+}
+
+type ClaimExecutionRecoveryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         uint32                 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimExecutionRecoveryRequest) Reset() {
+	*x = ClaimExecutionRecoveryRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimExecutionRecoveryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimExecutionRecoveryRequest) ProtoMessage() {}
+
+func (x *ClaimExecutionRecoveryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimExecutionRecoveryRequest.ProtoReflect.Descriptor instead.
+func (*ClaimExecutionRecoveryRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ClaimExecutionRecoveryRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ExecutionRecoveryClaim struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	RequestId               string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	StudioOperationId       string                 `protobuf:"bytes,2,opt,name=studio_operation_id,json=studioOperationId,proto3" json:"studio_operation_id,omitempty"`
+	LeaseToken              string                 `protobuf:"bytes,3,opt,name=lease_token,json=leaseToken,proto3" json:"lease_token,omitempty"`
+	LeaseExpiresAtUnixMs    int64                  `protobuf:"varint,4,opt,name=lease_expires_at_unix_ms,json=leaseExpiresAtUnixMs,proto3" json:"lease_expires_at_unix_ms,omitempty"`
+	CustomerReleaseAtUnixMs int64                  `protobuf:"varint,5,opt,name=customer_release_at_unix_ms,json=customerReleaseAtUnixMs,proto3" json:"customer_release_at_unix_ms,omitempty"`
+	Channel                 ExecutionChannel       `protobuf:"varint,6,opt,name=channel,proto3,enum=maxshot.gateway_internal.v1.ExecutionChannel" json:"channel,omitempty"`
+	LockedCatalogVersion    string                 `protobuf:"bytes,7,opt,name=locked_catalog_version,json=lockedCatalogVersion,proto3" json:"locked_catalog_version,omitempty"`
+	Attempts                []*AttemptCostRecord   `protobuf:"bytes,8,rep,name=attempts,proto3" json:"attempts,omitempty"`
+	CustomerChargeMode      v1.CustomerChargeMode  `protobuf:"varint,9,opt,name=customer_charge_mode,json=customerChargeMode,proto3,enum=maxshot.common.v1.CustomerChargeMode" json:"customer_charge_mode,omitempty"`
+	CustomerHoldReleased    bool                   `protobuf:"varint,10,opt,name=customer_hold_released,json=customerHoldReleased,proto3" json:"customer_hold_released,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *ExecutionRecoveryClaim) Reset() {
+	*x = ExecutionRecoveryClaim{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutionRecoveryClaim) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutionRecoveryClaim) ProtoMessage() {}
+
+func (x *ExecutionRecoveryClaim) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutionRecoveryClaim.ProtoReflect.Descriptor instead.
+func (*ExecutionRecoveryClaim) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ExecutionRecoveryClaim) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ExecutionRecoveryClaim) GetStudioOperationId() string {
+	if x != nil {
+		return x.StudioOperationId
+	}
+	return ""
+}
+
+func (x *ExecutionRecoveryClaim) GetLeaseToken() string {
+	if x != nil {
+		return x.LeaseToken
+	}
+	return ""
+}
+
+func (x *ExecutionRecoveryClaim) GetLeaseExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.LeaseExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *ExecutionRecoveryClaim) GetCustomerReleaseAtUnixMs() int64 {
+	if x != nil {
+		return x.CustomerReleaseAtUnixMs
+	}
+	return 0
+}
+
+func (x *ExecutionRecoveryClaim) GetChannel() ExecutionChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return ExecutionChannel_EXECUTION_CHANNEL_UNSPECIFIED
+}
+
+func (x *ExecutionRecoveryClaim) GetLockedCatalogVersion() string {
+	if x != nil {
+		return x.LockedCatalogVersion
+	}
+	return ""
+}
+
+func (x *ExecutionRecoveryClaim) GetAttempts() []*AttemptCostRecord {
+	if x != nil {
+		return x.Attempts
+	}
+	return nil
+}
+
+func (x *ExecutionRecoveryClaim) GetCustomerChargeMode() v1.CustomerChargeMode {
+	if x != nil {
+		return x.CustomerChargeMode
+	}
+	return v1.CustomerChargeMode(0)
+}
+
+func (x *ExecutionRecoveryClaim) GetCustomerHoldReleased() bool {
+	if x != nil {
+		return x.CustomerHoldReleased
+	}
+	return false
+}
+
+type ClaimExecutionRecoveryResponse struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Claims        []*ExecutionRecoveryClaim `protobuf:"bytes,1,rep,name=claims,proto3" json:"claims,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClaimExecutionRecoveryResponse) Reset() {
+	*x = ClaimExecutionRecoveryResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClaimExecutionRecoveryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClaimExecutionRecoveryResponse) ProtoMessage() {}
+
+func (x *ClaimExecutionRecoveryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClaimExecutionRecoveryResponse.ProtoReflect.Descriptor instead.
+func (*ClaimExecutionRecoveryResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ClaimExecutionRecoveryResponse) GetClaims() []*ExecutionRecoveryClaim {
+	if x != nil {
+		return x.Claims
+	}
+	return nil
+}
+
+type GetBillingCatalogStateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetBillingCatalogStateRequest) Reset() {
+	*x = GetBillingCatalogStateRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBillingCatalogStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBillingCatalogStateRequest) ProtoMessage() {}
+
+func (x *GetBillingCatalogStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBillingCatalogStateRequest.ProtoReflect.Descriptor instead.
+func (*GetBillingCatalogStateRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{38}
+}
+
+type GetBillingCatalogStateResponse struct {
+	state                    protoimpl.MessageState `protogen:"open.v1"`
+	ActiveCatalogVersion     string                 `protobuf:"bytes,1,opt,name=active_catalog_version,json=activeCatalogVersion,proto3" json:"active_catalog_version,omitempty"`
+	FrozenRouting            bool                   `protobuf:"varint,2,opt,name=frozen_routing,json=frozenRouting,proto3" json:"frozen_routing,omitempty"`
+	FrozenAllowedOfferingIds []string               `protobuf:"bytes,3,rep,name=frozen_allowed_offering_ids,json=frozenAllowedOfferingIds,proto3" json:"frozen_allowed_offering_ids,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
+}
+
+func (x *GetBillingCatalogStateResponse) Reset() {
+	*x = GetBillingCatalogStateResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetBillingCatalogStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetBillingCatalogStateResponse) ProtoMessage() {}
+
+func (x *GetBillingCatalogStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetBillingCatalogStateResponse.ProtoReflect.Descriptor instead.
+func (*GetBillingCatalogStateResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetBillingCatalogStateResponse) GetActiveCatalogVersion() string {
+	if x != nil {
+		return x.ActiveCatalogVersion
+	}
+	return ""
+}
+
+func (x *GetBillingCatalogStateResponse) GetFrozenRouting() bool {
+	if x != nil {
+		return x.FrozenRouting
+	}
+	return false
+}
+
+func (x *GetBillingCatalogStateResponse) GetFrozenAllowedOfferingIds() []string {
+	if x != nil {
+		return x.FrozenAllowedOfferingIds
+	}
+	return nil
+}
+
+type RegisterAccountRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RegistrationId string                 `protobuf:"bytes,1,opt,name=registration_id,json=registrationId,proto3" json:"registration_id,omitempty"` // Stable BFF-owned identity provisioning reference, never an email or raw OAuth identifier.
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RegisterAccountRequest) Reset() {
+	*x = RegisterAccountRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterAccountRequest) ProtoMessage() {}
+
+func (x *RegisterAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterAccountRequest.ProtoReflect.Descriptor instead.
+func (*RegisterAccountRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *RegisterAccountRequest) GetRegistrationId() string {
+	if x != nil {
+		return x.RegistrationId
+	}
+	return ""
+}
+
+type RegisterAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterAccountResponse) Reset() {
+	*x = RegisterAccountResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterAccountResponse) ProtoMessage() {}
+
+func (x *RegisterAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterAccountResponse.ProtoReflect.Descriptor instead.
+func (*RegisterAccountResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *RegisterAccountResponse) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ApiKeyPolicy struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	FundingStrategy           *v1.KeyFundingStrategy `protobuf:"varint,1,opt,name=funding_strategy,json=fundingStrategy,proto3,enum=maxshot.common.v1.KeyFundingStrategy,oneof" json:"funding_strategy,omitempty"`
+	AllowAitEarnedCredit      *bool                  `protobuf:"varint,2,opt,name=allow_ait_earned_credit,json=allowAitEarnedCredit,proto3,oneof" json:"allow_ait_earned_credit,omitempty"`
+	DollarRelayEnabled        *bool                  `protobuf:"varint,3,opt,name=dollar_relay_enabled,json=dollarRelayEnabled,proto3,oneof" json:"dollar_relay_enabled,omitempty"`
+	AllowedCatalogIds         []string               `protobuf:"bytes,4,rep,name=allowed_catalog_ids,json=allowedCatalogIds,proto3" json:"allowed_catalog_ids,omitempty"`
+	ModelAllowlist            []string               `protobuf:"bytes,5,rep,name=model_allowlist,json=modelAllowlist,proto3" json:"model_allowlist,omitempty"`
+	PerRequestCeilingMicroUsd *int64                 `protobuf:"varint,6,opt,name=per_request_ceiling_micro_usd,json=perRequestCeilingMicroUsd,proto3,oneof" json:"per_request_ceiling_micro_usd,omitempty"`
+	SpendingLimits            []*v1.BudgetPeriodRule `protobuf:"bytes,7,rep,name=spending_limits,json=spendingLimits,proto3" json:"spending_limits,omitempty"`
+	ExpiresAtUnixMs           *int64                 `protobuf:"varint,8,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3,oneof" json:"expires_at_unix_ms,omitempty"`
+	RpmLimit                  *int32                 `protobuf:"varint,9,opt,name=rpm_limit,json=rpmLimit,proto3,oneof" json:"rpm_limit,omitempty"`
+	TpmLimit                  *int64                 `protobuf:"varint,10,opt,name=tpm_limit,json=tpmLimit,proto3,oneof" json:"tpm_limit,omitempty"`
+	MaxConcurrentStreams      *int32                 `protobuf:"varint,11,opt,name=max_concurrent_streams,json=maxConcurrentStreams,proto3,oneof" json:"max_concurrent_streams,omitempty"`
+	SearchPolicy              *v1.SearchPolicy       `protobuf:"varint,12,opt,name=search_policy,json=searchPolicy,proto3,enum=maxshot.common.v1.SearchPolicy,oneof" json:"search_policy,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *ApiKeyPolicy) Reset() {
+	*x = ApiKeyPolicy{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApiKeyPolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApiKeyPolicy) ProtoMessage() {}
+
+func (x *ApiKeyPolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApiKeyPolicy.ProtoReflect.Descriptor instead.
+func (*ApiKeyPolicy) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ApiKeyPolicy) GetFundingStrategy() v1.KeyFundingStrategy {
+	if x != nil && x.FundingStrategy != nil {
+		return *x.FundingStrategy
+	}
+	return v1.KeyFundingStrategy(0)
+}
+
+func (x *ApiKeyPolicy) GetAllowAitEarnedCredit() bool {
+	if x != nil && x.AllowAitEarnedCredit != nil {
+		return *x.AllowAitEarnedCredit
+	}
+	return false
+}
+
+func (x *ApiKeyPolicy) GetDollarRelayEnabled() bool {
+	if x != nil && x.DollarRelayEnabled != nil {
+		return *x.DollarRelayEnabled
+	}
+	return false
+}
+
+func (x *ApiKeyPolicy) GetAllowedCatalogIds() []string {
+	if x != nil {
+		return x.AllowedCatalogIds
+	}
+	return nil
+}
+
+func (x *ApiKeyPolicy) GetModelAllowlist() []string {
+	if x != nil {
+		return x.ModelAllowlist
+	}
+	return nil
+}
+
+func (x *ApiKeyPolicy) GetPerRequestCeilingMicroUsd() int64 {
+	if x != nil && x.PerRequestCeilingMicroUsd != nil {
+		return *x.PerRequestCeilingMicroUsd
+	}
+	return 0
+}
+
+func (x *ApiKeyPolicy) GetSpendingLimits() []*v1.BudgetPeriodRule {
+	if x != nil {
+		return x.SpendingLimits
+	}
+	return nil
+}
+
+func (x *ApiKeyPolicy) GetExpiresAtUnixMs() int64 {
+	if x != nil && x.ExpiresAtUnixMs != nil {
+		return *x.ExpiresAtUnixMs
+	}
+	return 0
+}
+
+func (x *ApiKeyPolicy) GetRpmLimit() int32 {
+	if x != nil && x.RpmLimit != nil {
+		return *x.RpmLimit
+	}
+	return 0
+}
+
+func (x *ApiKeyPolicy) GetTpmLimit() int64 {
+	if x != nil && x.TpmLimit != nil {
+		return *x.TpmLimit
+	}
+	return 0
+}
+
+func (x *ApiKeyPolicy) GetMaxConcurrentStreams() int32 {
+	if x != nil && x.MaxConcurrentStreams != nil {
+		return *x.MaxConcurrentStreams
+	}
+	return 0
+}
+
+func (x *ApiKeyPolicy) GetSearchPolicy() v1.SearchPolicy {
+	if x != nil && x.SearchPolicy != nil {
+		return *x.SearchPolicy
+	}
+	return v1.SearchPolicy(0)
+}
+
+type ManagedApiKey struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ApiKeyId        string                 `protobuf:"bytes,1,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	Label           string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	MaskedKey       string                 `protobuf:"bytes,3,opt,name=masked_key,json=maskedKey,proto3" json:"masked_key,omitempty"`
+	Policy          *ApiKeyPolicy          `protobuf:"bytes,4,opt,name=policy,proto3" json:"policy,omitempty"`
+	CreatedAtUnixMs int64                  `protobuf:"varint,5,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	RevokedAtUnixMs int64                  `protobuf:"varint,6,opt,name=revoked_at_unix_ms,json=revokedAtUnixMs,proto3" json:"revoked_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ManagedApiKey) Reset() {
+	*x = ManagedApiKey{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ManagedApiKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ManagedApiKey) ProtoMessage() {}
+
+func (x *ManagedApiKey) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ManagedApiKey.ProtoReflect.Descriptor instead.
+func (*ManagedApiKey) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ManagedApiKey) GetApiKeyId() string {
+	if x != nil {
+		return x.ApiKeyId
+	}
+	return ""
+}
+
+func (x *ManagedApiKey) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ManagedApiKey) GetMaskedKey() string {
+	if x != nil {
+		return x.MaskedKey
+	}
+	return ""
+}
+
+func (x *ManagedApiKey) GetPolicy() *ApiKeyPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *ManagedApiKey) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *ManagedApiKey) GetRevokedAtUnixMs() int64 {
+	if x != nil {
+		return x.RevokedAtUnixMs
+	}
+	return 0
+}
+
+type CreateApiKeyRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Label          string                 `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
+	Policy         *ApiKeyPolicy          `protobuf:"bytes,4,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateApiKeyRequest) Reset() {
+	*x = CreateApiKeyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateApiKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateApiKeyRequest) ProtoMessage() {}
+
+func (x *CreateApiKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateApiKeyRequest.ProtoReflect.Descriptor instead.
+func (*CreateApiKeyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *CreateApiKeyRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CreateApiKeyRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CreateApiKeyRequest) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *CreateApiKeyRequest) GetPolicy() *ApiKeyPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type CreateApiKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           *ManagedApiKey         `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	OneTimeSecret string                 `protobuf:"bytes,2,opt,name=one_time_secret,json=oneTimeSecret,proto3" json:"one_time_secret,omitempty"` // Never returned by reads or logged.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateApiKeyResponse) Reset() {
+	*x = CreateApiKeyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateApiKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateApiKeyResponse) ProtoMessage() {}
+
+func (x *CreateApiKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateApiKeyResponse.ProtoReflect.Descriptor instead.
+func (*CreateApiKeyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *CreateApiKeyResponse) GetKey() *ManagedApiKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+func (x *CreateApiKeyResponse) GetOneTimeSecret() string {
+	if x != nil {
+		return x.OneTimeSecret
+	}
+	return ""
+}
+
+type UpdateApiKeyRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ApiKeyId       string                 `protobuf:"bytes,2,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Label          *string                `protobuf:"bytes,4,opt,name=label,proto3,oneof" json:"label,omitempty"`
+	Policy         *ApiKeyPolicy          `protobuf:"bytes,5,opt,name=policy,proto3" json:"policy,omitempty"`
+	// Allowlisted policy field names to replace, including explicit clearing of repeated fields.
+	PolicyUpdateFields []string `protobuf:"bytes,6,rep,name=policy_update_fields,json=policyUpdateFields,proto3" json:"policy_update_fields,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *UpdateApiKeyRequest) Reset() {
+	*x = UpdateApiKeyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateApiKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateApiKeyRequest) ProtoMessage() {}
+
+func (x *UpdateApiKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateApiKeyRequest.ProtoReflect.Descriptor instead.
+func (*UpdateApiKeyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *UpdateApiKeyRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UpdateApiKeyRequest) GetApiKeyId() string {
+	if x != nil {
+		return x.ApiKeyId
+	}
+	return ""
+}
+
+func (x *UpdateApiKeyRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *UpdateApiKeyRequest) GetLabel() string {
+	if x != nil && x.Label != nil {
+		return *x.Label
+	}
+	return ""
+}
+
+func (x *UpdateApiKeyRequest) GetPolicy() *ApiKeyPolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *UpdateApiKeyRequest) GetPolicyUpdateFields() []string {
+	if x != nil {
+		return x.PolicyUpdateFields
+	}
+	return nil
+}
+
+type UpdateApiKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           *ManagedApiKey         `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateApiKeyResponse) Reset() {
+	*x = UpdateApiKeyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateApiKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateApiKeyResponse) ProtoMessage() {}
+
+func (x *UpdateApiKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateApiKeyResponse.ProtoReflect.Descriptor instead.
+func (*UpdateApiKeyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *UpdateApiKeyResponse) GetKey() *ManagedApiKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+type RevokeApiKeyRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ApiKeyId       string                 `protobuf:"bytes,2,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RevokeApiKeyRequest) Reset() {
+	*x = RevokeApiKeyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeApiKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeApiKeyRequest) ProtoMessage() {}
+
+func (x *RevokeApiKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeApiKeyRequest.ProtoReflect.Descriptor instead.
+func (*RevokeApiKeyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *RevokeApiKeyRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RevokeApiKeyRequest) GetApiKeyId() string {
+	if x != nil {
+		return x.ApiKeyId
+	}
+	return ""
+}
+
+func (x *RevokeApiKeyRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type RevokeApiKeyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           *ManagedApiKey         `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeApiKeyResponse) Reset() {
+	*x = RevokeApiKeyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeApiKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeApiKeyResponse) ProtoMessage() {}
+
+func (x *RevokeApiKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeApiKeyResponse.ProtoReflect.Descriptor instead.
+func (*RevokeApiKeyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *RevokeApiKeyResponse) GetKey() *ManagedApiKey {
+	if x != nil {
+		return x.Key
+	}
+	return nil
+}
+
+type ListApiKeysRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Page          *v1.CursorPageRequest  `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApiKeysRequest) Reset() {
+	*x = ListApiKeysRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApiKeysRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApiKeysRequest) ProtoMessage() {}
+
+func (x *ListApiKeysRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApiKeysRequest.ProtoReflect.Descriptor instead.
+func (*ListApiKeysRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *ListApiKeysRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListApiKeysRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListApiKeysResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keys          []*ManagedApiKey       `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	Page          *v1.CursorPageResponse `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListApiKeysResponse) Reset() {
+	*x = ListApiKeysResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListApiKeysResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListApiKeysResponse) ProtoMessage() {}
+
+func (x *ListApiKeysResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListApiKeysResponse.ProtoReflect.Descriptor instead.
+func (*ListApiKeysResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *ListApiKeysResponse) GetKeys() []*ManagedApiKey {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
+func (x *ListApiKeysResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type AccountFundingSettings struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	WebDollarRelayEnabled *bool                  `protobuf:"varint,1,opt,name=web_dollar_relay_enabled,json=webDollarRelayEnabled,proto3,oneof" json:"web_dollar_relay_enabled,omitempty"`
+	AllowBasicToPremium   *bool                  `protobuf:"varint,2,opt,name=allow_basic_to_premium,json=allowBasicToPremium,proto3,oneof" json:"allow_basic_to_premium,omitempty"`
+	AllowAitEarnedCredit  *bool                  `protobuf:"varint,3,opt,name=allow_ait_earned_credit,json=allowAitEarnedCredit,proto3,oneof" json:"allow_ait_earned_credit,omitempty"`
+	SpendingLimits        []*v1.BudgetPeriodRule `protobuf:"bytes,4,rep,name=spending_limits,json=spendingLimits,proto3" json:"spending_limits,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *AccountFundingSettings) Reset() {
+	*x = AccountFundingSettings{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountFundingSettings) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountFundingSettings) ProtoMessage() {}
+
+func (x *AccountFundingSettings) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountFundingSettings.ProtoReflect.Descriptor instead.
+func (*AccountFundingSettings) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *AccountFundingSettings) GetWebDollarRelayEnabled() bool {
+	if x != nil && x.WebDollarRelayEnabled != nil {
+		return *x.WebDollarRelayEnabled
+	}
+	return false
+}
+
+func (x *AccountFundingSettings) GetAllowBasicToPremium() bool {
+	if x != nil && x.AllowBasicToPremium != nil {
+		return *x.AllowBasicToPremium
+	}
+	return false
+}
+
+func (x *AccountFundingSettings) GetAllowAitEarnedCredit() bool {
+	if x != nil && x.AllowAitEarnedCredit != nil {
+		return *x.AllowAitEarnedCredit
+	}
+	return false
+}
+
+func (x *AccountFundingSettings) GetSpendingLimits() []*v1.BudgetPeriodRule {
+	if x != nil {
+		return x.SpendingLimits
+	}
+	return nil
+}
+
+type GetAccountFundingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccountFundingRequest) Reset() {
+	*x = GetAccountFundingRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountFundingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountFundingRequest) ProtoMessage() {}
+
+func (x *GetAccountFundingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountFundingRequest.ProtoReflect.Descriptor instead.
+func (*GetAccountFundingRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *GetAccountFundingRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type GetAccountFundingResponse struct {
+	state                          protoimpl.MessageState  `protogen:"open.v1"`
+	Settings                       *AccountFundingSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	Balances                       []*BucketBalanceView    `protobuf:"bytes,2,rep,name=balances,proto3" json:"balances,omitempty"`
+	Windows                        []*FundingWindowStatus  `protobuf:"bytes,3,rep,name=windows,proto3" json:"windows,omitempty"`
+	SpendingLocked                 bool                    `protobuf:"varint,4,opt,name=spending_locked,json=spendingLocked,proto3" json:"spending_locked,omitempty"`
+	FreeRequestsRemaining          int64                   `protobuf:"varint,5,opt,name=free_requests_remaining,json=freeRequestsRemaining,proto3" json:"free_requests_remaining,omitempty"`
+	FreeEquivalentCreditsRemaining int64                   `protobuf:"varint,6,opt,name=free_equivalent_credits_remaining,json=freeEquivalentCreditsRemaining,proto3" json:"free_equivalent_credits_remaining,omitempty"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
+}
+
+func (x *GetAccountFundingResponse) Reset() {
+	*x = GetAccountFundingResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountFundingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountFundingResponse) ProtoMessage() {}
+
+func (x *GetAccountFundingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountFundingResponse.ProtoReflect.Descriptor instead.
+func (*GetAccountFundingResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *GetAccountFundingResponse) GetSettings() *AccountFundingSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *GetAccountFundingResponse) GetBalances() []*BucketBalanceView {
+	if x != nil {
+		return x.Balances
+	}
+	return nil
+}
+
+func (x *GetAccountFundingResponse) GetWindows() []*FundingWindowStatus {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+func (x *GetAccountFundingResponse) GetSpendingLocked() bool {
+	if x != nil {
+		return x.SpendingLocked
+	}
+	return false
+}
+
+func (x *GetAccountFundingResponse) GetFreeRequestsRemaining() int64 {
+	if x != nil {
+		return x.FreeRequestsRemaining
+	}
+	return 0
+}
+
+func (x *GetAccountFundingResponse) GetFreeEquivalentCreditsRemaining() int64 {
+	if x != nil {
+		return x.FreeEquivalentCreditsRemaining
+	}
+	return 0
+}
+
+type UpdateAccountSettingsRequest struct {
+	state                 protoimpl.MessageState  `protogen:"open.v1"`
+	AccountId             string                  `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	IdempotencyKey        string                  `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Settings              *AccountFundingSettings `protobuf:"bytes,3,opt,name=settings,proto3" json:"settings,omitempty"`
+	ReplaceSpendingLimits bool                    `protobuf:"varint,4,opt,name=replace_spending_limits,json=replaceSpendingLimits,proto3" json:"replace_spending_limits,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *UpdateAccountSettingsRequest) Reset() {
+	*x = UpdateAccountSettingsRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccountSettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccountSettingsRequest) ProtoMessage() {}
+
+func (x *UpdateAccountSettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccountSettingsRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAccountSettingsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *UpdateAccountSettingsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UpdateAccountSettingsRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *UpdateAccountSettingsRequest) GetSettings() *AccountFundingSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *UpdateAccountSettingsRequest) GetReplaceSpendingLimits() bool {
+	if x != nil {
+		return x.ReplaceSpendingLimits
+	}
+	return false
+}
+
+type UpdateAccountSettingsResponse struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Settings      *AccountFundingSettings `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAccountSettingsResponse) Reset() {
+	*x = UpdateAccountSettingsResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAccountSettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAccountSettingsResponse) ProtoMessage() {}
+
+func (x *UpdateAccountSettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAccountSettingsResponse.ProtoReflect.Descriptor instead.
+func (*UpdateAccountSettingsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *UpdateAccountSettingsResponse) GetSettings() *AccountFundingSettings {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type SubscriptionPlanVersion struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	PlanId           string                 `protobuf:"bytes,1,opt,name=plan_id,json=planId,proto3" json:"plan_id,omitempty"`
+	VersionId        string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	SalesStatus      string                 `protobuf:"bytes,3,opt,name=sales_status,json=salesStatus,proto3" json:"sales_status,omitempty"`
+	IsMockCommercial bool                   `protobuf:"varint,4,opt,name=is_mock_commercial,json=isMockCommercial,proto3" json:"is_mock_commercial,omitempty"`
+	PriceCents       int64                  `protobuf:"varint,5,opt,name=price_cents,json=priceCents,proto3" json:"price_cents,omitempty"`
+	Currency         string                 `protobuf:"bytes,6,opt,name=currency,proto3" json:"currency,omitempty"`
+	// UTF-8 PRD PlanVersionConfig JSON. The owner parses exact integers and rejects unknown fields.
+	PolicyJson    []byte `protobuf:"bytes,7,opt,name=policy_json,json=policyJson,proto3" json:"policy_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubscriptionPlanVersion) Reset() {
+	*x = SubscriptionPlanVersion{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscriptionPlanVersion) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscriptionPlanVersion) ProtoMessage() {}
+
+func (x *SubscriptionPlanVersion) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscriptionPlanVersion.ProtoReflect.Descriptor instead.
+func (*SubscriptionPlanVersion) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *SubscriptionPlanVersion) GetPlanId() string {
+	if x != nil {
+		return x.PlanId
+	}
+	return ""
+}
+
+func (x *SubscriptionPlanVersion) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *SubscriptionPlanVersion) GetSalesStatus() string {
+	if x != nil {
+		return x.SalesStatus
+	}
+	return ""
+}
+
+func (x *SubscriptionPlanVersion) GetIsMockCommercial() bool {
+	if x != nil {
+		return x.IsMockCommercial
+	}
+	return false
+}
+
+func (x *SubscriptionPlanVersion) GetPriceCents() int64 {
+	if x != nil {
+		return x.PriceCents
+	}
+	return 0
+}
+
+func (x *SubscriptionPlanVersion) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *SubscriptionPlanVersion) GetPolicyJson() []byte {
+	if x != nil {
+		return x.PolicyJson
+	}
+	return nil
+}
+
+type AccountSubscription struct {
+	state                protoimpl.MessageState   `protogen:"open.v1"`
+	SubscriptionId       string                   `protobuf:"bytes,1,opt,name=subscription_id,json=subscriptionId,proto3" json:"subscription_id,omitempty"`
+	Status               string                   `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	CurrentPlan          *SubscriptionPlanVersion `protobuf:"bytes,3,opt,name=current_plan,json=currentPlan,proto3" json:"current_plan,omitempty"`
+	PeriodId             string                   `protobuf:"bytes,4,opt,name=period_id,json=periodId,proto3" json:"period_id,omitempty"`
+	PeriodStartUnixMs    int64                    `protobuf:"varint,5,opt,name=period_start_unix_ms,json=periodStartUnixMs,proto3" json:"period_start_unix_ms,omitempty"`
+	PeriodEndUnixMs      int64                    `protobuf:"varint,6,opt,name=period_end_unix_ms,json=periodEndUnixMs,proto3" json:"period_end_unix_ms,omitempty"`
+	AutoRenew            bool                     `protobuf:"varint,7,opt,name=auto_renew,json=autoRenew,proto3" json:"auto_renew,omitempty"`
+	PendingPlanVersionId string                   `protobuf:"bytes,8,opt,name=pending_plan_version_id,json=pendingPlanVersionId,proto3" json:"pending_plan_version_id,omitempty"`
+	AnchorDayOfMonth     int32                    `protobuf:"varint,9,opt,name=anchor_day_of_month,json=anchorDayOfMonth,proto3" json:"anchor_day_of_month,omitempty"`
+	RemainingPools       []*BucketBalanceView     `protobuf:"bytes,10,rep,name=remaining_pools,json=remainingPools,proto3" json:"remaining_pools,omitempty"`
+	Windows              []*FundingWindowStatus   `protobuf:"bytes,11,rep,name=windows,proto3" json:"windows,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AccountSubscription) Reset() {
+	*x = AccountSubscription{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountSubscription) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountSubscription) ProtoMessage() {}
+
+func (x *AccountSubscription) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountSubscription.ProtoReflect.Descriptor instead.
+func (*AccountSubscription) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *AccountSubscription) GetSubscriptionId() string {
+	if x != nil {
+		return x.SubscriptionId
+	}
+	return ""
+}
+
+func (x *AccountSubscription) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AccountSubscription) GetCurrentPlan() *SubscriptionPlanVersion {
+	if x != nil {
+		return x.CurrentPlan
+	}
+	return nil
+}
+
+func (x *AccountSubscription) GetPeriodId() string {
+	if x != nil {
+		return x.PeriodId
+	}
+	return ""
+}
+
+func (x *AccountSubscription) GetPeriodStartUnixMs() int64 {
+	if x != nil {
+		return x.PeriodStartUnixMs
+	}
+	return 0
+}
+
+func (x *AccountSubscription) GetPeriodEndUnixMs() int64 {
+	if x != nil {
+		return x.PeriodEndUnixMs
+	}
+	return 0
+}
+
+func (x *AccountSubscription) GetAutoRenew() bool {
+	if x != nil {
+		return x.AutoRenew
+	}
+	return false
+}
+
+func (x *AccountSubscription) GetPendingPlanVersionId() string {
+	if x != nil {
+		return x.PendingPlanVersionId
+	}
+	return ""
+}
+
+func (x *AccountSubscription) GetAnchorDayOfMonth() int32 {
+	if x != nil {
+		return x.AnchorDayOfMonth
+	}
+	return 0
+}
+
+func (x *AccountSubscription) GetRemainingPools() []*BucketBalanceView {
+	if x != nil {
+		return x.RemainingPools
+	}
+	return nil
+}
+
+func (x *AccountSubscription) GetWindows() []*FundingWindowStatus {
+	if x != nil {
+		return x.Windows
+	}
+	return nil
+}
+
+type SubscriptionInvoice struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	InvoiceId           string                 `protobuf:"bytes,1,opt,name=invoice_id,json=invoiceId,proto3" json:"invoice_id,omitempty"`
+	PlanVersionId       string                 `protobuf:"bytes,2,opt,name=plan_version_id,json=planVersionId,proto3" json:"plan_version_id,omitempty"`
+	PeriodId            string                 `protobuf:"bytes,3,opt,name=period_id,json=periodId,proto3" json:"period_id,omitempty"`
+	PaymentId           string                 `protobuf:"bytes,4,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	DollarDebitMicroUsd int64                  `protobuf:"varint,5,opt,name=dollar_debit_micro_usd,json=dollarDebitMicroUsd,proto3" json:"dollar_debit_micro_usd,omitempty"`
+	PeriodStartUnixMs   int64                  `protobuf:"varint,6,opt,name=period_start_unix_ms,json=periodStartUnixMs,proto3" json:"period_start_unix_ms,omitempty"`
+	PeriodEndUnixMs     int64                  `protobuf:"varint,7,opt,name=period_end_unix_ms,json=periodEndUnixMs,proto3" json:"period_end_unix_ms,omitempty"`
+	PaidAtUnixMs        int64                  `protobuf:"varint,8,opt,name=paid_at_unix_ms,json=paidAtUnixMs,proto3" json:"paid_at_unix_ms,omitempty"`
+	Status              string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	Currency            string                 `protobuf:"bytes,10,opt,name=currency,proto3" json:"currency,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *SubscriptionInvoice) Reset() {
+	*x = SubscriptionInvoice{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubscriptionInvoice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubscriptionInvoice) ProtoMessage() {}
+
+func (x *SubscriptionInvoice) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubscriptionInvoice.ProtoReflect.Descriptor instead.
+func (*SubscriptionInvoice) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *SubscriptionInvoice) GetInvoiceId() string {
+	if x != nil {
+		return x.InvoiceId
+	}
+	return ""
+}
+
+func (x *SubscriptionInvoice) GetPlanVersionId() string {
+	if x != nil {
+		return x.PlanVersionId
+	}
+	return ""
+}
+
+func (x *SubscriptionInvoice) GetPeriodId() string {
+	if x != nil {
+		return x.PeriodId
+	}
+	return ""
+}
+
+func (x *SubscriptionInvoice) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *SubscriptionInvoice) GetDollarDebitMicroUsd() int64 {
+	if x != nil {
+		return x.DollarDebitMicroUsd
+	}
+	return 0
+}
+
+func (x *SubscriptionInvoice) GetPeriodStartUnixMs() int64 {
+	if x != nil {
+		return x.PeriodStartUnixMs
+	}
+	return 0
+}
+
+func (x *SubscriptionInvoice) GetPeriodEndUnixMs() int64 {
+	if x != nil {
+		return x.PeriodEndUnixMs
+	}
+	return 0
+}
+
+func (x *SubscriptionInvoice) GetPaidAtUnixMs() int64 {
+	if x != nil {
+		return x.PaidAtUnixMs
+	}
+	return 0
+}
+
+func (x *SubscriptionInvoice) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *SubscriptionInvoice) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+type ListSubscriptionPlansRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSubscriptionPlansRequest) Reset() {
+	*x = ListSubscriptionPlansRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSubscriptionPlansRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSubscriptionPlansRequest) ProtoMessage() {}
+
+func (x *ListSubscriptionPlansRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSubscriptionPlansRequest.ProtoReflect.Descriptor instead.
+func (*ListSubscriptionPlansRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{60}
+}
+
+type ListSubscriptionPlansResponse struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Plans         []*SubscriptionPlanVersion `protobuf:"bytes,1,rep,name=plans,proto3" json:"plans,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSubscriptionPlansResponse) Reset() {
+	*x = ListSubscriptionPlansResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSubscriptionPlansResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSubscriptionPlansResponse) ProtoMessage() {}
+
+func (x *ListSubscriptionPlansResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSubscriptionPlansResponse.ProtoReflect.Descriptor instead.
+func (*ListSubscriptionPlansResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *ListSubscriptionPlansResponse) GetPlans() []*SubscriptionPlanVersion {
+	if x != nil {
+		return x.Plans
+	}
+	return nil
+}
+
+type GetSubscriptionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubscriptionRequest) Reset() {
+	*x = GetSubscriptionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionRequest) ProtoMessage() {}
+
+func (x *GetSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *GetSubscriptionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type GetSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *AccountSubscription   `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSubscriptionResponse) Reset() {
+	*x = GetSubscriptionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSubscriptionResponse) ProtoMessage() {}
+
+func (x *GetSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*GetSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *GetSubscriptionResponse) GetSubscription() *AccountSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+type PurchaseSubscriptionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	PlanVersionId  string                 `protobuf:"bytes,2,opt,name=plan_version_id,json=planVersionId,proto3" json:"plan_version_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PurchaseSubscriptionRequest) Reset() {
+	*x = PurchaseSubscriptionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PurchaseSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PurchaseSubscriptionRequest) ProtoMessage() {}
+
+func (x *PurchaseSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PurchaseSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*PurchaseSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *PurchaseSubscriptionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *PurchaseSubscriptionRequest) GetPlanVersionId() string {
+	if x != nil {
+		return x.PlanVersionId
+	}
+	return ""
+}
+
+func (x *PurchaseSubscriptionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type PurchaseSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *AccountSubscription   `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	Invoice       *SubscriptionInvoice   `protobuf:"bytes,2,opt,name=invoice,proto3" json:"invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PurchaseSubscriptionResponse) Reset() {
+	*x = PurchaseSubscriptionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PurchaseSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PurchaseSubscriptionResponse) ProtoMessage() {}
+
+func (x *PurchaseSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PurchaseSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*PurchaseSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *PurchaseSubscriptionResponse) GetSubscription() *AccountSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+func (x *PurchaseSubscriptionResponse) GetInvoice() *SubscriptionInvoice {
+	if x != nil {
+		return x.Invoice
+	}
+	return nil
+}
+
+type RenewSubscriptionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	PlanVersionId  string                 `protobuf:"bytes,2,opt,name=plan_version_id,json=planVersionId,proto3" json:"plan_version_id,omitempty"` // Optional requested plan for manual recovery.
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RenewSubscriptionRequest) Reset() {
+	*x = RenewSubscriptionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenewSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenewSubscriptionRequest) ProtoMessage() {}
+
+func (x *RenewSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenewSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*RenewSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *RenewSubscriptionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RenewSubscriptionRequest) GetPlanVersionId() string {
+	if x != nil {
+		return x.PlanVersionId
+	}
+	return ""
+}
+
+func (x *RenewSubscriptionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type RenewSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *AccountSubscription   `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	Invoice       *SubscriptionInvoice   `protobuf:"bytes,2,opt,name=invoice,proto3" json:"invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RenewSubscriptionResponse) Reset() {
+	*x = RenewSubscriptionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RenewSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RenewSubscriptionResponse) ProtoMessage() {}
+
+func (x *RenewSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RenewSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*RenewSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *RenewSubscriptionResponse) GetSubscription() *AccountSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+func (x *RenewSubscriptionResponse) GetInvoice() *SubscriptionInvoice {
+	if x != nil {
+		return x.Invoice
+	}
+	return nil
+}
+
+type CancelSubscriptionRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AccountId       string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	IdempotencyKey  string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	ResumeAutoRenew bool                   `protobuf:"varint,3,opt,name=resume_auto_renew,json=resumeAutoRenew,proto3" json:"resume_auto_renew,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CancelSubscriptionRequest) Reset() {
+	*x = CancelSubscriptionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelSubscriptionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelSubscriptionRequest) ProtoMessage() {}
+
+func (x *CancelSubscriptionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelSubscriptionRequest.ProtoReflect.Descriptor instead.
+func (*CancelSubscriptionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *CancelSubscriptionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CancelSubscriptionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CancelSubscriptionRequest) GetResumeAutoRenew() bool {
+	if x != nil {
+		return x.ResumeAutoRenew
+	}
+	return false
+}
+
+type CancelSubscriptionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *AccountSubscription   `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelSubscriptionResponse) Reset() {
+	*x = CancelSubscriptionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelSubscriptionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelSubscriptionResponse) ProtoMessage() {}
+
+func (x *CancelSubscriptionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelSubscriptionResponse.ProtoReflect.Descriptor instead.
+func (*CancelSubscriptionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *CancelSubscriptionResponse) GetSubscription() *AccountSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+type SchedulePlanChangeRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	PlanVersionId  string                 `protobuf:"bytes,2,opt,name=plan_version_id,json=planVersionId,proto3" json:"plan_version_id,omitempty"` // Empty clears a user change where allowed.
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SchedulePlanChangeRequest) Reset() {
+	*x = SchedulePlanChangeRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SchedulePlanChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SchedulePlanChangeRequest) ProtoMessage() {}
+
+func (x *SchedulePlanChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SchedulePlanChangeRequest.ProtoReflect.Descriptor instead.
+func (*SchedulePlanChangeRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *SchedulePlanChangeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SchedulePlanChangeRequest) GetPlanVersionId() string {
+	if x != nil {
+		return x.PlanVersionId
+	}
+	return ""
+}
+
+func (x *SchedulePlanChangeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SchedulePlanChangeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Subscription  *AccountSubscription   `protobuf:"bytes,1,opt,name=subscription,proto3" json:"subscription,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SchedulePlanChangeResponse) Reset() {
+	*x = SchedulePlanChangeResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SchedulePlanChangeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SchedulePlanChangeResponse) ProtoMessage() {}
+
+func (x *SchedulePlanChangeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SchedulePlanChangeResponse.ProtoReflect.Descriptor instead.
+func (*SchedulePlanChangeResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *SchedulePlanChangeResponse) GetSubscription() *AccountSubscription {
+	if x != nil {
+		return x.Subscription
+	}
+	return nil
+}
+
+type ListInvoicesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Page          *v1.CursorPageRequest  `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvoicesRequest) Reset() {
+	*x = ListInvoicesRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvoicesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvoicesRequest) ProtoMessage() {}
+
+func (x *ListInvoicesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvoicesRequest.ProtoReflect.Descriptor instead.
+func (*ListInvoicesRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *ListInvoicesRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListInvoicesRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListInvoicesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invoices      []*SubscriptionInvoice `protobuf:"bytes,1,rep,name=invoices,proto3" json:"invoices,omitempty"`
+	Page          *v1.CursorPageResponse `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInvoicesResponse) Reset() {
+	*x = ListInvoicesResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInvoicesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInvoicesResponse) ProtoMessage() {}
+
+func (x *ListInvoicesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInvoicesResponse.ProtoReflect.Descriptor instead.
+func (*ListInvoicesResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *ListInvoicesResponse) GetInvoices() []*SubscriptionInvoice {
+	if x != nil {
+		return x.Invoices
+	}
+	return nil
+}
+
+func (x *ListInvoicesResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type GetInvoiceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	InvoiceId     string                 `protobuf:"bytes,2,opt,name=invoice_id,json=invoiceId,proto3" json:"invoice_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInvoiceRequest) Reset() {
+	*x = GetInvoiceRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInvoiceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInvoiceRequest) ProtoMessage() {}
+
+func (x *GetInvoiceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInvoiceRequest.ProtoReflect.Descriptor instead.
+func (*GetInvoiceRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *GetInvoiceRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetInvoiceRequest) GetInvoiceId() string {
+	if x != nil {
+		return x.InvoiceId
+	}
+	return ""
+}
+
+type GetInvoiceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Invoice       *SubscriptionInvoice   `protobuf:"bytes,1,opt,name=invoice,proto3" json:"invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetInvoiceResponse) Reset() {
+	*x = GetInvoiceResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetInvoiceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetInvoiceResponse) ProtoMessage() {}
+
+func (x *GetInvoiceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetInvoiceResponse.ProtoReflect.Descriptor instead.
+func (*GetInvoiceResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *GetInvoiceResponse) GetInvoice() *SubscriptionInvoice {
+	if x != nil {
+		return x.Invoice
+	}
+	return nil
+}
+
+type GetDepositAddressRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ChainId       string                 `protobuf:"bytes,2,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDepositAddressRequest) Reset() {
+	*x = GetDepositAddressRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDepositAddressRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDepositAddressRequest) ProtoMessage() {}
+
+func (x *GetDepositAddressRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDepositAddressRequest.ProtoReflect.Descriptor instead.
+func (*GetDepositAddressRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *GetDepositAddressRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetDepositAddressRequest) GetChainId() string {
+	if x != nil {
+		return x.ChainId
+	}
+	return ""
+}
+
+type GetDepositAddressResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChainId       string                 `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	Address       string                 `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDepositAddressResponse) Reset() {
+	*x = GetDepositAddressResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDepositAddressResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDepositAddressResponse) ProtoMessage() {}
+
+func (x *GetDepositAddressResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDepositAddressResponse.ProtoReflect.Descriptor instead.
+func (*GetDepositAddressResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *GetDepositAddressResponse) GetChainId() string {
+	if x != nil {
+		return x.ChainId
+	}
+	return ""
+}
+
+func (x *GetDepositAddressResponse) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+type TopupOrder struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	OrderId            string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Channel            string                 `protobuf:"bytes,2,opt,name=channel,proto3" json:"channel,omitempty"`
+	Status             string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	ProviderReference  string                 `protobuf:"bytes,4,opt,name=provider_reference,json=providerReference,proto3" json:"provider_reference,omitempty"`
+	DestinationChainId string                 `protobuf:"bytes,5,opt,name=destination_chain_id,json=destinationChainId,proto3" json:"destination_chain_id,omitempty"`
+	DestinationAddress string                 `protobuf:"bytes,6,opt,name=destination_address,json=destinationAddress,proto3" json:"destination_address,omitempty"`
+	NetMicroUsd        int64                  `protobuf:"varint,7,opt,name=net_micro_usd,json=netMicroUsd,proto3" json:"net_micro_usd,omitempty"`
+	CreatedAtUnixMs    int64                  `protobuf:"varint,8,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *TopupOrder) Reset() {
+	*x = TopupOrder{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TopupOrder) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TopupOrder) ProtoMessage() {}
+
+func (x *TopupOrder) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TopupOrder.ProtoReflect.Descriptor instead.
+func (*TopupOrder) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *TopupOrder) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetProviderReference() string {
+	if x != nil {
+		return x.ProviderReference
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetDestinationChainId() string {
+	if x != nil {
+		return x.DestinationChainId
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetDestinationAddress() string {
+	if x != nil {
+		return x.DestinationAddress
+	}
+	return ""
+}
+
+func (x *TopupOrder) GetNetMicroUsd() int64 {
+	if x != nil {
+		return x.NetMicroUsd
+	}
+	return 0
+}
+
+func (x *TopupOrder) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+type CreateTopupOrderRequest struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AccountId             string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	IdempotencyKey        string                 `protobuf:"bytes,2,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	Channel               string                 `protobuf:"bytes,3,opt,name=channel,proto3" json:"channel,omitempty"`
+	SourceChainId         string                 `protobuf:"bytes,4,opt,name=source_chain_id,json=sourceChainId,proto3" json:"source_chain_id,omitempty"`
+	SourceAssetId         string                 `protobuf:"bytes,5,opt,name=source_asset_id,json=sourceAssetId,proto3" json:"source_asset_id,omitempty"`
+	SourceAmountAtomicDec string                 `protobuf:"bytes,6,opt,name=source_amount_atomic_dec,json=sourceAmountAtomicDec,proto3" json:"source_amount_atomic_dec,omitempty"`
+	QuoteReference        string                 `protobuf:"bytes,7,opt,name=quote_reference,json=quoteReference,proto3" json:"quote_reference,omitempty"`
+	RequestedUsdCents     int64                  `protobuf:"varint,8,opt,name=requested_usd_cents,json=requestedUsdCents,proto3" json:"requested_usd_cents,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CreateTopupOrderRequest) Reset() {
+	*x = CreateTopupOrderRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTopupOrderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTopupOrderRequest) ProtoMessage() {}
+
+func (x *CreateTopupOrderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTopupOrderRequest.ProtoReflect.Descriptor instead.
+func (*CreateTopupOrderRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *CreateTopupOrderRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetSourceChainId() string {
+	if x != nil {
+		return x.SourceChainId
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetSourceAssetId() string {
+	if x != nil {
+		return x.SourceAssetId
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetSourceAmountAtomicDec() string {
+	if x != nil {
+		return x.SourceAmountAtomicDec
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetQuoteReference() string {
+	if x != nil {
+		return x.QuoteReference
+	}
+	return ""
+}
+
+func (x *CreateTopupOrderRequest) GetRequestedUsdCents() int64 {
+	if x != nil {
+		return x.RequestedUsdCents
+	}
+	return 0
+}
+
+type CreateTopupOrderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Order         *TopupOrder            `protobuf:"bytes,1,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateTopupOrderResponse) Reset() {
+	*x = CreateTopupOrderResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTopupOrderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTopupOrderResponse) ProtoMessage() {}
+
+func (x *CreateTopupOrderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTopupOrderResponse.ProtoReflect.Descriptor instead.
+func (*CreateTopupOrderResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *CreateTopupOrderResponse) GetOrder() *TopupOrder {
+	if x != nil {
+		return x.Order
+	}
+	return nil
+}
+
+type RecordStripePaymentRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	EventId           string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	PaymentId         string                 `protobuf:"bytes,2,opt,name=payment_id,json=paymentId,proto3" json:"payment_id,omitempty"`
+	CheckoutSessionId string                 `protobuf:"bytes,3,opt,name=checkout_session_id,json=checkoutSessionId,proto3" json:"checkout_session_id,omitempty"`
+	Currency          string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	PaidMinorUnits    int64                  `protobuf:"varint,5,opt,name=paid_minor_units,json=paidMinorUnits,proto3" json:"paid_minor_units,omitempty"`
+	OccurredAtUnixMs  int64                  `protobuf:"varint,6,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RecordStripePaymentRequest) Reset() {
+	*x = RecordStripePaymentRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordStripePaymentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordStripePaymentRequest) ProtoMessage() {}
+
+func (x *RecordStripePaymentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordStripePaymentRequest.ProtoReflect.Descriptor instead.
+func (*RecordStripePaymentRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *RecordStripePaymentRequest) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *RecordStripePaymentRequest) GetPaymentId() string {
+	if x != nil {
+		return x.PaymentId
+	}
+	return ""
+}
+
+func (x *RecordStripePaymentRequest) GetCheckoutSessionId() string {
+	if x != nil {
+		return x.CheckoutSessionId
+	}
+	return ""
+}
+
+func (x *RecordStripePaymentRequest) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *RecordStripePaymentRequest) GetPaidMinorUnits() int64 {
+	if x != nil {
+		return x.PaidMinorUnits
+	}
+	return 0
+}
+
+func (x *RecordStripePaymentRequest) GetOccurredAtUnixMs() int64 {
+	if x != nil {
+		return x.OccurredAtUnixMs
+	}
+	return 0
+}
+
+type RecordStripePaymentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Order         *TopupOrder            `protobuf:"bytes,1,opt,name=order,proto3" json:"order,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordStripePaymentResponse) Reset() {
+	*x = RecordStripePaymentResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordStripePaymentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordStripePaymentResponse) ProtoMessage() {}
+
+func (x *RecordStripePaymentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordStripePaymentResponse.ProtoReflect.Descriptor instead.
+func (*RecordStripePaymentResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *RecordStripePaymentResponse) GetOrder() *TopupOrder {
+	if x != nil {
+		return x.Order
+	}
+	return nil
+}
+
+type ListTopupsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Page          *v1.CursorPageRequest  `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	OrderId       string                 `protobuf:"bytes,3,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTopupsRequest) Reset() {
+	*x = ListTopupsRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTopupsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTopupsRequest) ProtoMessage() {}
+
+func (x *ListTopupsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTopupsRequest.ProtoReflect.Descriptor instead.
+func (*ListTopupsRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *ListTopupsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListTopupsRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *ListTopupsRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+type ListTopupsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topups        []*TopupOrder          `protobuf:"bytes,1,rep,name=topups,proto3" json:"topups,omitempty"`
+	Page          *v1.CursorPageResponse `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTopupsResponse) Reset() {
+	*x = ListTopupsResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTopupsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTopupsResponse) ProtoMessage() {}
+
+func (x *ListTopupsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTopupsResponse.ProtoReflect.Descriptor instead.
+func (*ListTopupsResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *ListTopupsResponse) GetTopups() []*TopupOrder {
+	if x != nil {
+		return x.Topups
+	}
+	return nil
+}
+
+func (x *ListTopupsResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type LinkedWallet struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AccountId       string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	WalletAddress   string                 `protobuf:"bytes,2,opt,name=wallet_address,json=walletAddress,proto3" json:"wallet_address,omitempty"`
+	ChainId         uint64                 `protobuf:"varint,3,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	LinkedAtUnixSec int64                  `protobuf:"varint,4,opt,name=linked_at_unix_sec,json=linkedAtUnixSec,proto3" json:"linked_at_unix_sec,omitempty"`
+	SiweProofRef    string                 `protobuf:"bytes,5,opt,name=siwe_proof_ref,json=siweProofRef,proto3" json:"siwe_proof_ref,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LinkedWallet) Reset() {
+	*x = LinkedWallet{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkedWallet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkedWallet) ProtoMessage() {}
+
+func (x *LinkedWallet) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkedWallet.ProtoReflect.Descriptor instead.
+func (*LinkedWallet) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *LinkedWallet) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *LinkedWallet) GetWalletAddress() string {
+	if x != nil {
+		return x.WalletAddress
+	}
+	return ""
+}
+
+func (x *LinkedWallet) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
+	}
+	return 0
+}
+
+func (x *LinkedWallet) GetLinkedAtUnixSec() int64 {
+	if x != nil {
+		return x.LinkedAtUnixSec
+	}
+	return 0
+}
+
+func (x *LinkedWallet) GetSiweProofRef() string {
+	if x != nil {
+		return x.SiweProofRef
+	}
+	return ""
+}
+
+type LinkWalletRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	WalletAddress  string                 `protobuf:"bytes,2,opt,name=wallet_address,json=walletAddress,proto3" json:"wallet_address,omitempty"`
+	ChainId        uint64                 `protobuf:"varint,3,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	SiweMessage    string                 `protobuf:"bytes,4,opt,name=siwe_message,json=siweMessage,proto3" json:"siwe_message,omitempty"`
+	Signature      []byte                 `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
+	SiweProofRef   string                 `protobuf:"bytes,6,opt,name=siwe_proof_ref,json=siweProofRef,proto3" json:"siwe_proof_ref,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,7,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *LinkWalletRequest) Reset() {
+	*x = LinkWalletRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[86]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkWalletRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkWalletRequest) ProtoMessage() {}
+
+func (x *LinkWalletRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[86]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkWalletRequest.ProtoReflect.Descriptor instead.
+func (*LinkWalletRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{86}
+}
+
+func (x *LinkWalletRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *LinkWalletRequest) GetWalletAddress() string {
+	if x != nil {
+		return x.WalletAddress
+	}
+	return ""
+}
+
+func (x *LinkWalletRequest) GetChainId() uint64 {
+	if x != nil {
+		return x.ChainId
+	}
+	return 0
+}
+
+func (x *LinkWalletRequest) GetSiweMessage() string {
+	if x != nil {
+		return x.SiweMessage
+	}
+	return ""
+}
+
+func (x *LinkWalletRequest) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+func (x *LinkWalletRequest) GetSiweProofRef() string {
+	if x != nil {
+		return x.SiweProofRef
+	}
+	return ""
+}
+
+func (x *LinkWalletRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type LinkWalletResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Link          *LinkedWallet          `protobuf:"bytes,1,opt,name=link,proto3" json:"link,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LinkWalletResponse) Reset() {
+	*x = LinkWalletResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[87]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LinkWalletResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LinkWalletResponse) ProtoMessage() {}
+
+func (x *LinkWalletResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[87]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LinkWalletResponse.ProtoReflect.Descriptor instead.
+func (*LinkWalletResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{87}
+}
+
+func (x *LinkWalletResponse) GetLink() *LinkedWallet {
+	if x != nil {
+		return x.Link
+	}
+	return nil
+}
+
+type GetWalletLinkRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWalletLinkRequest) Reset() {
+	*x = GetWalletLinkRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[88]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWalletLinkRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWalletLinkRequest) ProtoMessage() {}
+
+func (x *GetWalletLinkRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[88]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWalletLinkRequest.ProtoReflect.Descriptor instead.
+func (*GetWalletLinkRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{88}
+}
+
+func (x *GetWalletLinkRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type GetWalletLinkResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Link          *LinkedWallet          `protobuf:"bytes,1,opt,name=link,proto3" json:"link,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetWalletLinkResponse) Reset() {
+	*x = GetWalletLinkResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[89]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetWalletLinkResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetWalletLinkResponse) ProtoMessage() {}
+
+func (x *GetWalletLinkResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[89]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetWalletLinkResponse.ProtoReflect.Descriptor instead.
+func (*GetWalletLinkResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{89}
+}
+
+func (x *GetWalletLinkResponse) GetLink() *LinkedWallet {
+	if x != nil {
+		return x.Link
+	}
+	return nil
+}
+
+type AcceptFundedTermRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TermId         string                 `protobuf:"bytes,2,opt,name=term_id,json=termId,proto3" json:"term_id,omitempty"`
+	TermsVersion   string                 `protobuf:"bytes,3,opt,name=terms_version,json=termsVersion,proto3" json:"terms_version,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AcceptFundedTermRequest) Reset() {
+	*x = AcceptFundedTermRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[90]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptFundedTermRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptFundedTermRequest) ProtoMessage() {}
+
+func (x *AcceptFundedTermRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[90]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptFundedTermRequest.ProtoReflect.Descriptor instead.
+func (*AcceptFundedTermRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{90}
+}
+
+func (x *AcceptFundedTermRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AcceptFundedTermRequest) GetTermId() string {
+	if x != nil {
+		return x.TermId
+	}
+	return ""
+}
+
+func (x *AcceptFundedTermRequest) GetTermsVersion() string {
+	if x != nil {
+		return x.TermsVersion
+	}
+	return ""
+}
+
+func (x *AcceptFundedTermRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type AcceptFundedTermResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Acceptance    *v11.TermAcceptance    `protobuf:"bytes,1,opt,name=acceptance,proto3" json:"acceptance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AcceptFundedTermResponse) Reset() {
+	*x = AcceptFundedTermResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[91]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AcceptFundedTermResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AcceptFundedTermResponse) ProtoMessage() {}
+
+func (x *AcceptFundedTermResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[91]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AcceptFundedTermResponse.ProtoReflect.Descriptor instead.
+func (*AcceptFundedTermResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{91}
+}
+
+func (x *AcceptFundedTermResponse) GetAcceptance() *v11.TermAcceptance {
+	if x != nil {
+		return x.Acceptance
+	}
+	return nil
+}
+
+type GetCurrentFundedTermRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentFundedTermRequest) Reset() {
+	*x = GetCurrentFundedTermRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[92]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentFundedTermRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentFundedTermRequest) ProtoMessage() {}
+
+func (x *GetCurrentFundedTermRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[92]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentFundedTermRequest.ProtoReflect.Descriptor instead.
+func (*GetCurrentFundedTermRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{92}
+}
+
+func (x *GetCurrentFundedTermRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type GetCurrentFundedTermResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CurrentTerm   *v11.FundedTermConfig  `protobuf:"bytes,1,opt,name=current_term,json=currentTerm,proto3" json:"current_term,omitempty"`
+	Acceptance    *v11.TermAcceptance    `protobuf:"bytes,2,opt,name=acceptance,proto3" json:"acceptance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentFundedTermResponse) Reset() {
+	*x = GetCurrentFundedTermResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[93]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentFundedTermResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentFundedTermResponse) ProtoMessage() {}
+
+func (x *GetCurrentFundedTermResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[93]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentFundedTermResponse.ProtoReflect.Descriptor instead.
+func (*GetCurrentFundedTermResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{93}
+}
+
+func (x *GetCurrentFundedTermResponse) GetCurrentTerm() *v11.FundedTermConfig {
+	if x != nil {
+		return x.CurrentTerm
+	}
+	return nil
+}
+
+func (x *GetCurrentFundedTermResponse) GetAcceptance() *v11.TermAcceptance {
+	if x != nil {
+		return x.Acceptance
+	}
+	return nil
+}
+
+type PrepareAccountMergeRequest struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	AccountId              string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	SourceAccountId        string                 `protobuf:"bytes,2,opt,name=source_account_id,json=sourceAccountId,proto3" json:"source_account_id,omitempty"`
+	IdempotencyKey         string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	VerifiedSourceProofRef string                 `protobuf:"bytes,4,opt,name=verified_source_proof_ref,json=verifiedSourceProofRef,proto3" json:"verified_source_proof_ref,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *PrepareAccountMergeRequest) Reset() {
+	*x = PrepareAccountMergeRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[94]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareAccountMergeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareAccountMergeRequest) ProtoMessage() {}
+
+func (x *PrepareAccountMergeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[94]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareAccountMergeRequest.ProtoReflect.Descriptor instead.
+func (*PrepareAccountMergeRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{94}
+}
+
+func (x *PrepareAccountMergeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *PrepareAccountMergeRequest) GetSourceAccountId() string {
+	if x != nil {
+		return x.SourceAccountId
+	}
+	return ""
+}
+
+func (x *PrepareAccountMergeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *PrepareAccountMergeRequest) GetVerifiedSourceProofRef() string {
+	if x != nil {
+		return x.VerifiedSourceProofRef
+	}
+	return ""
+}
+
+type PrepareAccountMergeResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	MergeId         string                 `protobuf:"bytes,1,opt,name=merge_id,json=mergeId,proto3" json:"merge_id,omitempty"`
+	Blockers        []string               `protobuf:"bytes,2,rep,name=blockers,proto3" json:"blockers,omitempty"`
+	ExpiresAtUnixMs int64                  `protobuf:"varint,3,opt,name=expires_at_unix_ms,json=expiresAtUnixMs,proto3" json:"expires_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PrepareAccountMergeResponse) Reset() {
+	*x = PrepareAccountMergeResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[95]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareAccountMergeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareAccountMergeResponse) ProtoMessage() {}
+
+func (x *PrepareAccountMergeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[95]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareAccountMergeResponse.ProtoReflect.Descriptor instead.
+func (*PrepareAccountMergeResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{95}
+}
+
+func (x *PrepareAccountMergeResponse) GetMergeId() string {
+	if x != nil {
+		return x.MergeId
+	}
+	return ""
+}
+
+func (x *PrepareAccountMergeResponse) GetBlockers() []string {
+	if x != nil {
+		return x.Blockers
+	}
+	return nil
+}
+
+func (x *PrepareAccountMergeResponse) GetExpiresAtUnixMs() int64 {
+	if x != nil {
+		return x.ExpiresAtUnixMs
+	}
+	return 0
+}
+
+type CommitAccountMergeRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	MergeId        string                 `protobuf:"bytes,2,opt,name=merge_id,json=mergeId,proto3" json:"merge_id,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CommitAccountMergeRequest) Reset() {
+	*x = CommitAccountMergeRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[96]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitAccountMergeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitAccountMergeRequest) ProtoMessage() {}
+
+func (x *CommitAccountMergeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[96]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitAccountMergeRequest.ProtoReflect.Descriptor instead.
+func (*CommitAccountMergeRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{96}
+}
+
+func (x *CommitAccountMergeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CommitAccountMergeRequest) GetMergeId() string {
+	if x != nil {
+		return x.MergeId
+	}
+	return ""
+}
+
+func (x *CommitAccountMergeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type CommitAccountMergeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommitAccountMergeResponse) Reset() {
+	*x = CommitAccountMergeResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[97]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommitAccountMergeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommitAccountMergeResponse) ProtoMessage() {}
+
+func (x *CommitAccountMergeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[97]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommitAccountMergeResponse.ProtoReflect.Descriptor instead.
+func (*CommitAccountMergeResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{97}
+}
+
+func (x *CommitAccountMergeResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type AccountUsage struct {
+	state                   protoimpl.MessageState  `protogen:"open.v1"`
+	RequestId               string                  `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	ApiKeyId                string                  `protobuf:"bytes,2,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	ModelId                 string                  `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	SelectedOfferingId      string                  `protobuf:"bytes,4,opt,name=selected_offering_id,json=selectedOfferingId,proto3" json:"selected_offering_id,omitempty"`
+	ServingOfferingId       string                  `protobuf:"bytes,5,opt,name=serving_offering_id,json=servingOfferingId,proto3" json:"serving_offering_id,omitempty"`
+	FallbackUsed            bool                    `protobuf:"varint,6,opt,name=fallback_used,json=fallbackUsed,proto3" json:"fallback_used,omitempty"`
+	FallbackReason          string                  `protobuf:"bytes,7,opt,name=fallback_reason,json=fallbackReason,proto3" json:"fallback_reason,omitempty"`
+	CreatedAtUnixMs         int64                   `protobuf:"varint,8,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	Status                  string                  `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	AcceptedHardMaxMicroUsd int64                   `protobuf:"varint,10,opt,name=accepted_hard_max_micro_usd,json=acceptedHardMaxMicroUsd,proto3" json:"accepted_hard_max_micro_usd,omitempty"`
+	SettledBuckets          []*BucketAllocationLine `protobuf:"bytes,11,rep,name=settled_buckets,json=settledBuckets,proto3" json:"settled_buckets,omitempty"`
+	Usage                   *UsageBound             `protobuf:"bytes,12,opt,name=usage,proto3" json:"usage,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *AccountUsage) Reset() {
+	*x = AccountUsage{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[98]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountUsage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountUsage) ProtoMessage() {}
+
+func (x *AccountUsage) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[98]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountUsage.ProtoReflect.Descriptor instead.
+func (*AccountUsage) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{98}
+}
+
+func (x *AccountUsage) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetApiKeyId() string {
+	if x != nil {
+		return x.ApiKeyId
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetSelectedOfferingId() string {
+	if x != nil {
+		return x.SelectedOfferingId
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetServingOfferingId() string {
+	if x != nil {
+		return x.ServingOfferingId
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetFallbackUsed() bool {
+	if x != nil {
+		return x.FallbackUsed
+	}
+	return false
+}
+
+func (x *AccountUsage) GetFallbackReason() string {
+	if x != nil {
+		return x.FallbackReason
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AccountUsage) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AccountUsage) GetAcceptedHardMaxMicroUsd() int64 {
+	if x != nil {
+		return x.AcceptedHardMaxMicroUsd
+	}
+	return 0
+}
+
+func (x *AccountUsage) GetSettledBuckets() []*BucketAllocationLine {
+	if x != nil {
+		return x.SettledBuckets
+	}
+	return nil
+}
+
+func (x *AccountUsage) GetUsage() *UsageBound {
+	if x != nil {
+		return x.Usage
+	}
+	return nil
+}
+
+type ListUsageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Page          *v1.CursorPageRequest  `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	ApiKeyId      string                 `protobuf:"bytes,3,opt,name=api_key_id,json=apiKeyId,proto3" json:"api_key_id,omitempty"`
+	SinceUnixMs   int64                  `protobuf:"varint,4,opt,name=since_unix_ms,json=sinceUnixMs,proto3" json:"since_unix_ms,omitempty"`
+	UntilUnixMs   int64                  `protobuf:"varint,5,opt,name=until_unix_ms,json=untilUnixMs,proto3" json:"until_unix_ms,omitempty"`
+	ModelId       string                 `protobuf:"bytes,6,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUsageRequest) Reset() {
+	*x = ListUsageRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[99]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsageRequest) ProtoMessage() {}
+
+func (x *ListUsageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[99]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsageRequest.ProtoReflect.Descriptor instead.
+func (*ListUsageRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{99}
+}
+
+func (x *ListUsageRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListUsageRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+func (x *ListUsageRequest) GetApiKeyId() string {
+	if x != nil {
+		return x.ApiKeyId
+	}
+	return ""
+}
+
+func (x *ListUsageRequest) GetSinceUnixMs() int64 {
+	if x != nil {
+		return x.SinceUnixMs
+	}
+	return 0
+}
+
+func (x *ListUsageRequest) GetUntilUnixMs() int64 {
+	if x != nil {
+		return x.UntilUnixMs
+	}
+	return 0
+}
+
+func (x *ListUsageRequest) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+type ListUsageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Records       []*AccountUsage        `protobuf:"bytes,1,rep,name=records,proto3" json:"records,omitempty"`
+	Page          *v1.CursorPageResponse `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUsageResponse) Reset() {
+	*x = ListUsageResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[100]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsageResponse) ProtoMessage() {}
+
+func (x *ListUsageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[100]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsageResponse.ProtoReflect.Descriptor instead.
+func (*ListUsageResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{100}
+}
+
+func (x *ListUsageResponse) GetRecords() []*AccountUsage {
+	if x != nil {
+		return x.Records
+	}
+	return nil
+}
+
+func (x *ListUsageResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type GetUsageDetailRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUsageDetailRequest) Reset() {
+	*x = GetUsageDetailRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[101]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUsageDetailRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUsageDetailRequest) ProtoMessage() {}
+
+func (x *GetUsageDetailRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[101]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUsageDetailRequest.ProtoReflect.Descriptor instead.
+func (*GetUsageDetailRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{101}
+}
+
+func (x *GetUsageDetailRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetUsageDetailRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type GetUsageDetailResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Usage         *AccountUsage          `protobuf:"bytes,1,opt,name=usage,proto3" json:"usage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUsageDetailResponse) Reset() {
+	*x = GetUsageDetailResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[102]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUsageDetailResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUsageDetailResponse) ProtoMessage() {}
+
+func (x *GetUsageDetailResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[102]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUsageDetailResponse.ProtoReflect.Descriptor instead.
+func (*GetUsageDetailResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{102}
+}
+
+func (x *GetUsageDetailResponse) GetUsage() *AccountUsage {
+	if x != nil {
+		return x.Usage
+	}
+	return nil
+}
+
+type AccountNotice struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	NoticeId          string                 `protobuf:"bytes,1,opt,name=notice_id,json=noticeId,proto3" json:"notice_id,omitempty"`
+	Kind              string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	IssuedAtUnixMs    int64                  `protobuf:"varint,3,opt,name=issued_at_unix_ms,json=issuedAtUnixMs,proto3" json:"issued_at_unix_ms,omitempty"`
+	ReadAtUnixMs      int64                  `protobuf:"varint,4,opt,name=read_at_unix_ms,json=readAtUnixMs,proto3" json:"read_at_unix_ms,omitempty"`
+	FromPlanVersionId string                 `protobuf:"bytes,5,opt,name=from_plan_version_id,json=fromPlanVersionId,proto3" json:"from_plan_version_id,omitempty"`
+	ToPlanVersionId   string                 `protobuf:"bytes,6,opt,name=to_plan_version_id,json=toPlanVersionId,proto3" json:"to_plan_version_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *AccountNotice) Reset() {
+	*x = AccountNotice{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[103]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountNotice) ProtoMessage() {}
+
+func (x *AccountNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[103]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountNotice.ProtoReflect.Descriptor instead.
+func (*AccountNotice) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{103}
+}
+
+func (x *AccountNotice) GetNoticeId() string {
+	if x != nil {
+		return x.NoticeId
+	}
+	return ""
+}
+
+func (x *AccountNotice) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *AccountNotice) GetIssuedAtUnixMs() int64 {
+	if x != nil {
+		return x.IssuedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AccountNotice) GetReadAtUnixMs() int64 {
+	if x != nil {
+		return x.ReadAtUnixMs
+	}
+	return 0
+}
+
+func (x *AccountNotice) GetFromPlanVersionId() string {
+	if x != nil {
+		return x.FromPlanVersionId
+	}
+	return ""
+}
+
+func (x *AccountNotice) GetToPlanVersionId() string {
+	if x != nil {
+		return x.ToPlanVersionId
+	}
+	return ""
+}
+
+type ListAccountNoticesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Page          *v1.CursorPageRequest  `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountNoticesRequest) Reset() {
+	*x = ListAccountNoticesRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[104]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountNoticesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountNoticesRequest) ProtoMessage() {}
+
+func (x *ListAccountNoticesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[104]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountNoticesRequest.ProtoReflect.Descriptor instead.
+func (*ListAccountNoticesRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{104}
+}
+
+func (x *ListAccountNoticesRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListAccountNoticesRequest) GetPage() *v1.CursorPageRequest {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type ListAccountNoticesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notices       []*AccountNotice       `protobuf:"bytes,1,rep,name=notices,proto3" json:"notices,omitempty"`
+	Page          *v1.CursorPageResponse `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAccountNoticesResponse) Reset() {
+	*x = ListAccountNoticesResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[105]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAccountNoticesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAccountNoticesResponse) ProtoMessage() {}
+
+func (x *ListAccountNoticesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[105]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAccountNoticesResponse.ProtoReflect.Descriptor instead.
+func (*ListAccountNoticesResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{105}
+}
+
+func (x *ListAccountNoticesResponse) GetNotices() []*AccountNotice {
+	if x != nil {
+		return x.Notices
+	}
+	return nil
+}
+
+func (x *ListAccountNoticesResponse) GetPage() *v1.CursorPageResponse {
+	if x != nil {
+		return x.Page
+	}
+	return nil
+}
+
+type AckAccountNoticeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	NoticeId      string                 `protobuf:"bytes,2,opt,name=notice_id,json=noticeId,proto3" json:"notice_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckAccountNoticeRequest) Reset() {
+	*x = AckAccountNoticeRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[106]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckAccountNoticeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckAccountNoticeRequest) ProtoMessage() {}
+
+func (x *AckAccountNoticeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[106]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckAccountNoticeRequest.ProtoReflect.Descriptor instead.
+func (*AckAccountNoticeRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{106}
+}
+
+func (x *AckAccountNoticeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AckAccountNoticeRequest) GetNoticeId() string {
+	if x != nil {
+		return x.NoticeId
+	}
+	return ""
+}
+
+type AckAccountNoticeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notice        *AccountNotice         `protobuf:"bytes,1,opt,name=notice,proto3" json:"notice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckAccountNoticeResponse) Reset() {
+	*x = AckAccountNoticeResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckAccountNoticeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckAccountNoticeResponse) ProtoMessage() {}
+
+func (x *AckAccountNoticeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckAccountNoticeResponse.ProtoReflect.Descriptor instead.
+func (*AckAccountNoticeResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *AckAccountNoticeResponse) GetNotice() *AccountNotice {
+	if x != nil {
+		return x.Notice
+	}
+	return nil
+}
+
+type GetReferralSummaryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReferralSummaryRequest) Reset() {
+	*x = GetReferralSummaryRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReferralSummaryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReferralSummaryRequest) ProtoMessage() {}
+
+func (x *GetReferralSummaryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReferralSummaryRequest.ProtoReflect.Descriptor instead.
+func (*GetReferralSummaryRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *GetReferralSummaryRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type GetReferralSummaryResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ReferralCode     string                 `protobuf:"bytes,1,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
+	RewardedCredits  int64                  `protobuf:"varint,2,opt,name=rewarded_credits,json=rewardedCredits,proto3" json:"rewarded_credits,omitempty"`
+	AvailableCredits int64                  `protobuf:"varint,3,opt,name=available_credits,json=availableCredits,proto3" json:"available_credits,omitempty"`
+	ReferredAccounts int64                  `protobuf:"varint,4,opt,name=referred_accounts,json=referredAccounts,proto3" json:"referred_accounts,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *GetReferralSummaryResponse) Reset() {
+	*x = GetReferralSummaryResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReferralSummaryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReferralSummaryResponse) ProtoMessage() {}
+
+func (x *GetReferralSummaryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReferralSummaryResponse.ProtoReflect.Descriptor instead.
+func (*GetReferralSummaryResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *GetReferralSummaryResponse) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+func (x *GetReferralSummaryResponse) GetRewardedCredits() int64 {
+	if x != nil {
+		return x.RewardedCredits
+	}
+	return 0
+}
+
+func (x *GetReferralSummaryResponse) GetAvailableCredits() int64 {
+	if x != nil {
+		return x.AvailableCredits
+	}
+	return 0
+}
+
+func (x *GetReferralSummaryResponse) GetReferredAccounts() int64 {
+	if x != nil {
+		return x.ReferredAccounts
+	}
+	return 0
+}
+
+type SetReferralAttributionRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AccountId      string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ReferralCode   string                 `protobuf:"bytes,2,opt,name=referral_code,json=referralCode,proto3" json:"referral_code,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,3,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SetReferralAttributionRequest) Reset() {
+	*x = SetReferralAttributionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetReferralAttributionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetReferralAttributionRequest) ProtoMessage() {}
+
+func (x *SetReferralAttributionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetReferralAttributionRequest.ProtoReflect.Descriptor instead.
+func (*SetReferralAttributionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *SetReferralAttributionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetReferralAttributionRequest) GetReferralCode() string {
+	if x != nil {
+		return x.ReferralCode
+	}
+	return ""
+}
+
+func (x *SetReferralAttributionRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+type SetReferralAttributionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Attributed    bool                   `protobuf:"varint,1,opt,name=attributed,proto3" json:"attributed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetReferralAttributionResponse) Reset() {
+	*x = SetReferralAttributionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetReferralAttributionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetReferralAttributionResponse) ProtoMessage() {}
+
+func (x *SetReferralAttributionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetReferralAttributionResponse.ProtoReflect.Descriptor instead.
+func (*SetReferralAttributionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *SetReferralAttributionResponse) GetAttributed() bool {
+	if x != nil {
+		return x.Attributed
+	}
+	return false
+}
+
+type OperatorContext struct {
+	state                  protoimpl.MessageState       `protogen:"open.v1"`
+	OperatorId             string                       `protobuf:"bytes,1,opt,name=operator_id,json=operatorId,proto3" json:"operator_id,omitempty"`
+	AuthenticationMethod   OperatorAuthenticationMethod `protobuf:"varint,2,opt,name=authentication_method,json=authenticationMethod,proto3,enum=maxshot.gateway_internal.v1.OperatorAuthenticationMethod" json:"authentication_method,omitempty"`
+	Reason                 string                       `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	IdempotencyKey         string                       `protobuf:"bytes,4,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	SourceIp               string                       `protobuf:"bytes,5,opt,name=source_ip,json=sourceIp,proto3" json:"source_ip,omitempty"`
+	StepUpVerifiedAtUnixMs int64                        `protobuf:"varint,6,opt,name=step_up_verified_at_unix_ms,json=stepUpVerifiedAtUnixMs,proto3" json:"step_up_verified_at_unix_ms,omitempty"`
+	// Audit reference to the method- and target-bound step-up, never the TOTP code or wallet signature.
+	StepUpProofRef string `protobuf:"bytes,7,opt,name=step_up_proof_ref,json=stepUpProofRef,proto3" json:"step_up_proof_ref,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *OperatorContext) Reset() {
+	*x = OperatorContext{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[112]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OperatorContext) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OperatorContext) ProtoMessage() {}
+
+func (x *OperatorContext) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[112]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OperatorContext.ProtoReflect.Descriptor instead.
+func (*OperatorContext) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{112}
+}
+
+func (x *OperatorContext) GetOperatorId() string {
+	if x != nil {
+		return x.OperatorId
+	}
+	return ""
+}
+
+func (x *OperatorContext) GetAuthenticationMethod() OperatorAuthenticationMethod {
+	if x != nil {
+		return x.AuthenticationMethod
+	}
+	return OperatorAuthenticationMethod_OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED
+}
+
+func (x *OperatorContext) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *OperatorContext) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *OperatorContext) GetSourceIp() string {
+	if x != nil {
+		return x.SourceIp
+	}
+	return ""
+}
+
+func (x *OperatorContext) GetStepUpVerifiedAtUnixMs() int64 {
+	if x != nil {
+		return x.StepUpVerifiedAtUnixMs
+	}
+	return 0
+}
+
+func (x *OperatorContext) GetStepUpProofRef() string {
+	if x != nil {
+		return x.StepUpProofRef
+	}
+	return ""
+}
+
+type AdminMutationResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AuditId       string                 `protobuf:"bytes,1,opt,name=audit_id,json=auditId,proto3" json:"audit_id,omitempty"`
+	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdminMutationResult) Reset() {
+	*x = AdminMutationResult{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminMutationResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminMutationResult) ProtoMessage() {}
+
+func (x *AdminMutationResult) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminMutationResult.ProtoReflect.Descriptor instead.
+func (*AdminMutationResult) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{113}
+}
+
+func (x *AdminMutationResult) GetAuditId() string {
+	if x != nil {
+		return x.AuditId
+	}
+	return ""
+}
+
+func (x *AdminMutationResult) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+func (x *AdminMutationResult) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type PlanCostValidation struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	CatalogVersion              string                 `protobuf:"bytes,1,opt,name=catalog_version,json=catalogVersion,proto3" json:"catalog_version,omitempty"`
+	BasicWorstCostMicroUsd      int64                  `protobuf:"varint,2,opt,name=basic_worst_cost_micro_usd,json=basicWorstCostMicroUsd,proto3" json:"basic_worst_cost_micro_usd,omitempty"`
+	PremiumWorstCostMicroUsd    int64                  `protobuf:"varint,3,opt,name=premium_worst_cost_micro_usd,json=premiumWorstCostMicroUsd,proto3" json:"premium_worst_cost_micro_usd,omitempty"`
+	MinimumContributionMicroUsd int64                  `protobuf:"varint,4,opt,name=minimum_contribution_micro_usd,json=minimumContributionMicroUsd,proto3" json:"minimum_contribution_micro_usd,omitempty"`
+	Violations                  []string               `protobuf:"bytes,5,rep,name=violations,proto3" json:"violations,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *PlanCostValidation) Reset() {
+	*x = PlanCostValidation{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[114]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanCostValidation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanCostValidation) ProtoMessage() {}
+
+func (x *PlanCostValidation) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[114]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanCostValidation.ProtoReflect.Descriptor instead.
+func (*PlanCostValidation) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{114}
+}
+
+func (x *PlanCostValidation) GetCatalogVersion() string {
+	if x != nil {
+		return x.CatalogVersion
+	}
+	return ""
+}
+
+func (x *PlanCostValidation) GetBasicWorstCostMicroUsd() int64 {
+	if x != nil {
+		return x.BasicWorstCostMicroUsd
+	}
+	return 0
+}
+
+func (x *PlanCostValidation) GetPremiumWorstCostMicroUsd() int64 {
+	if x != nil {
+		return x.PremiumWorstCostMicroUsd
+	}
+	return 0
+}
+
+func (x *PlanCostValidation) GetMinimumContributionMicroUsd() int64 {
+	if x != nil {
+		return x.MinimumContributionMicroUsd
+	}
+	return 0
+}
+
+func (x *PlanCostValidation) GetViolations() []string {
+	if x != nil {
+		return x.Violations
+	}
+	return nil
+}
+
+type CreatePlanDraftRequest struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Operator      *OperatorContext         `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	Plan          *SubscriptionPlanVersion `protobuf:"bytes,2,opt,name=plan,proto3" json:"plan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreatePlanDraftRequest) Reset() {
+	*x = CreatePlanDraftRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[115]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePlanDraftRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePlanDraftRequest) ProtoMessage() {}
+
+func (x *CreatePlanDraftRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[115]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePlanDraftRequest.ProtoReflect.Descriptor instead.
+func (*CreatePlanDraftRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{115}
+}
+
+func (x *CreatePlanDraftRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *CreatePlanDraftRequest) GetPlan() *SubscriptionPlanVersion {
+	if x != nil {
+		return x.Plan
+	}
+	return nil
+}
+
+type CreatePlanDraftResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreatePlanDraftResponse) Reset() {
+	*x = CreatePlanDraftResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePlanDraftResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePlanDraftResponse) ProtoMessage() {}
+
+func (x *CreatePlanDraftResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePlanDraftResponse.ProtoReflect.Descriptor instead.
+func (*CreatePlanDraftResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{116}
+}
+
+func (x *CreatePlanDraftResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ValidatePlanVersionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VersionId     string                 `protobuf:"bytes,1,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidatePlanVersionRequest) Reset() {
+	*x = ValidatePlanVersionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[117]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidatePlanVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidatePlanVersionRequest) ProtoMessage() {}
+
+func (x *ValidatePlanVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[117]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidatePlanVersionRequest.ProtoReflect.Descriptor instead.
+func (*ValidatePlanVersionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{117}
+}
+
+func (x *ValidatePlanVersionRequest) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+type ValidatePlanVersionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Validation    *PlanCostValidation    `protobuf:"bytes,1,opt,name=validation,proto3" json:"validation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidatePlanVersionResponse) Reset() {
+	*x = ValidatePlanVersionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[118]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidatePlanVersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidatePlanVersionResponse) ProtoMessage() {}
+
+func (x *ValidatePlanVersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[118]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidatePlanVersionResponse.ProtoReflect.Descriptor instead.
+func (*ValidatePlanVersionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{118}
+}
+
+func (x *ValidatePlanVersionResponse) GetValidation() *PlanCostValidation {
+	if x != nil {
+		return x.Validation
+	}
+	return nil
+}
+
+type PreviewPlanImpactRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VersionId     string                 `protobuf:"bytes,1,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PreviewPlanImpactRequest) Reset() {
+	*x = PreviewPlanImpactRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[119]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewPlanImpactRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewPlanImpactRequest) ProtoMessage() {}
+
+func (x *PreviewPlanImpactRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[119]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewPlanImpactRequest.ProtoReflect.Descriptor instead.
+func (*PreviewPlanImpactRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{119}
+}
+
+func (x *PreviewPlanImpactRequest) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+type PreviewPlanImpactResponse struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	AffectedSubscriptions int64                  `protobuf:"varint,1,opt,name=affected_subscriptions,json=affectedSubscriptions,proto3" json:"affected_subscriptions,omitempty"`
+	AdverseChanges        []string               `protobuf:"bytes,2,rep,name=adverse_changes,json=adverseChanges,proto3" json:"adverse_changes,omitempty"`
+	Validation            *PlanCostValidation    `protobuf:"bytes,3,opt,name=validation,proto3" json:"validation,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PreviewPlanImpactResponse) Reset() {
+	*x = PreviewPlanImpactResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[120]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PreviewPlanImpactResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PreviewPlanImpactResponse) ProtoMessage() {}
+
+func (x *PreviewPlanImpactResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[120]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PreviewPlanImpactResponse.ProtoReflect.Descriptor instead.
+func (*PreviewPlanImpactResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{120}
+}
+
+func (x *PreviewPlanImpactResponse) GetAffectedSubscriptions() int64 {
+	if x != nil {
+		return x.AffectedSubscriptions
+	}
+	return 0
+}
+
+func (x *PreviewPlanImpactResponse) GetAdverseChanges() []string {
+	if x != nil {
+		return x.AdverseChanges
+	}
+	return nil
+}
+
+func (x *PreviewPlanImpactResponse) GetValidation() *PlanCostValidation {
+	if x != nil {
+		return x.Validation
+	}
+	return nil
+}
+
+type PublishPlanVersionRequest struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Operator               *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	VersionId              string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	ExpectedCatalogVersion string                 `protobuf:"bytes,3,opt,name=expected_catalog_version,json=expectedCatalogVersion,proto3" json:"expected_catalog_version,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *PublishPlanVersionRequest) Reset() {
+	*x = PublishPlanVersionRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishPlanVersionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishPlanVersionRequest) ProtoMessage() {}
+
+func (x *PublishPlanVersionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishPlanVersionRequest.ProtoReflect.Descriptor instead.
+func (*PublishPlanVersionRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *PublishPlanVersionRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *PublishPlanVersionRequest) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *PublishPlanVersionRequest) GetExpectedCatalogVersion() string {
+	if x != nil {
+		return x.ExpectedCatalogVersion
+	}
+	return ""
+}
+
+type PublishPlanVersionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishPlanVersionResponse) Reset() {
+	*x = PublishPlanVersionResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishPlanVersionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishPlanVersionResponse) ProtoMessage() {}
+
+func (x *PublishPlanVersionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishPlanVersionResponse.ProtoReflect.Descriptor instead.
+func (*PublishPlanVersionResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *PublishPlanVersionResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type SetPlanSalesStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	VersionId     string                 `protobuf:"bytes,2,opt,name=version_id,json=versionId,proto3" json:"version_id,omitempty"`
+	SalesStatus   string                 `protobuf:"bytes,3,opt,name=sales_status,json=salesStatus,proto3" json:"sales_status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetPlanSalesStatusRequest) Reset() {
+	*x = SetPlanSalesStatusRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetPlanSalesStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetPlanSalesStatusRequest) ProtoMessage() {}
+
+func (x *SetPlanSalesStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetPlanSalesStatusRequest.ProtoReflect.Descriptor instead.
+func (*SetPlanSalesStatusRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *SetPlanSalesStatusRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *SetPlanSalesStatusRequest) GetVersionId() string {
+	if x != nil {
+		return x.VersionId
+	}
+	return ""
+}
+
+func (x *SetPlanSalesStatusRequest) GetSalesStatus() string {
+	if x != nil {
+		return x.SalesStatus
+	}
+	return ""
+}
+
+type SetPlanSalesStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetPlanSalesStatusResponse) Reset() {
+	*x = SetPlanSalesStatusResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetPlanSalesStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetPlanSalesStatusResponse) ProtoMessage() {}
+
+func (x *SetPlanSalesStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetPlanSalesStatusResponse.ProtoReflect.Descriptor instead.
+func (*SetPlanSalesStatusResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *SetPlanSalesStatusResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type SetSpendingLockRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Locked        bool                   `protobuf:"varint,3,opt,name=locked,proto3" json:"locked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSpendingLockRequest) Reset() {
+	*x = SetSpendingLockRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSpendingLockRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSpendingLockRequest) ProtoMessage() {}
+
+func (x *SetSpendingLockRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSpendingLockRequest.ProtoReflect.Descriptor instead.
+func (*SetSpendingLockRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *SetSpendingLockRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *SetSpendingLockRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetSpendingLockRequest) GetLocked() bool {
+	if x != nil {
+		return x.Locked
+	}
+	return false
+}
+
+type SetSpendingLockResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSpendingLockResponse) Reset() {
+	*x = SetSpendingLockResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[126]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSpendingLockResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSpendingLockResponse) ProtoMessage() {}
+
+func (x *SetSpendingLockResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[126]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSpendingLockResponse.ProtoReflect.Descriptor instead.
+func (*SetSpendingLockResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{126}
+}
+
+func (x *SetSpendingLockResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ManualLedgerAdjustmentRequest struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Operator            *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	AccountId           string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	FundingBucket       v1.FundingBucket       `protobuf:"varint,3,opt,name=funding_bucket,json=fundingBucket,proto3,enum=maxshot.common.v1.FundingBucket" json:"funding_bucket,omitempty"`
+	SourceId            string                 `protobuf:"bytes,4,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	CreditDelta         int64                  `protobuf:"varint,5,opt,name=credit_delta,json=creditDelta,proto3" json:"credit_delta,omitempty"`
+	DollarDeltaMicroUsd int64                  `protobuf:"varint,6,opt,name=dollar_delta_micro_usd,json=dollarDeltaMicroUsd,proto3" json:"dollar_delta_micro_usd,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ManualLedgerAdjustmentRequest) Reset() {
+	*x = ManualLedgerAdjustmentRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[127]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ManualLedgerAdjustmentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ManualLedgerAdjustmentRequest) ProtoMessage() {}
+
+func (x *ManualLedgerAdjustmentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[127]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ManualLedgerAdjustmentRequest.ProtoReflect.Descriptor instead.
+func (*ManualLedgerAdjustmentRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{127}
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetFundingBucket() v1.FundingBucket {
+	if x != nil {
+		return x.FundingBucket
+	}
+	return v1.FundingBucket(0)
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetSourceId() string {
+	if x != nil {
+		return x.SourceId
+	}
+	return ""
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetCreditDelta() int64 {
+	if x != nil {
+		return x.CreditDelta
+	}
+	return 0
+}
+
+func (x *ManualLedgerAdjustmentRequest) GetDollarDeltaMicroUsd() int64 {
+	if x != nil {
+		return x.DollarDeltaMicroUsd
+	}
+	return 0
+}
+
+type ManualLedgerAdjustmentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ManualLedgerAdjustmentResponse) Reset() {
+	*x = ManualLedgerAdjustmentResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[128]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ManualLedgerAdjustmentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ManualLedgerAdjustmentResponse) ProtoMessage() {}
+
+func (x *ManualLedgerAdjustmentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[128]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ManualLedgerAdjustmentResponse.ProtoReflect.Descriptor instead.
+func (*ManualLedgerAdjustmentResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{128}
+}
+
+func (x *ManualLedgerAdjustmentResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ResolveDepositReorgHoldRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	HoldId        string                 `protobuf:"bytes,2,opt,name=hold_id,json=holdId,proto3" json:"hold_id,omitempty"`
+	Decision      string                 `protobuf:"bytes,3,opt,name=decision,proto3" json:"decision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDepositReorgHoldRequest) Reset() {
+	*x = ResolveDepositReorgHoldRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[129]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDepositReorgHoldRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDepositReorgHoldRequest) ProtoMessage() {}
+
+func (x *ResolveDepositReorgHoldRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[129]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDepositReorgHoldRequest.ProtoReflect.Descriptor instead.
+func (*ResolveDepositReorgHoldRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{129}
+}
+
+func (x *ResolveDepositReorgHoldRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ResolveDepositReorgHoldRequest) GetHoldId() string {
+	if x != nil {
+		return x.HoldId
+	}
+	return ""
+}
+
+func (x *ResolveDepositReorgHoldRequest) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+type ResolveDepositReorgHoldResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDepositReorgHoldResponse) Reset() {
+	*x = ResolveDepositReorgHoldResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[130]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDepositReorgHoldResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDepositReorgHoldResponse) ProtoMessage() {}
+
+func (x *ResolveDepositReorgHoldResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[130]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDepositReorgHoldResponse.ProtoReflect.Descriptor instead.
+func (*ResolveDepositReorgHoldResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{130}
+}
+
+func (x *ResolveDepositReorgHoldResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ReviewTopupRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	OrderId       string                 `protobuf:"bytes,2,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	Decision      string                 `protobuf:"bytes,3,opt,name=decision,proto3" json:"decision,omitempty"`
+	EvidenceRef   string                 `protobuf:"bytes,4,opt,name=evidence_ref,json=evidenceRef,proto3" json:"evidence_ref,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewTopupRequest) Reset() {
+	*x = ReviewTopupRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[131]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewTopupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewTopupRequest) ProtoMessage() {}
+
+func (x *ReviewTopupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[131]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewTopupRequest.ProtoReflect.Descriptor instead.
+func (*ReviewTopupRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{131}
+}
+
+func (x *ReviewTopupRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ReviewTopupRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *ReviewTopupRequest) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+func (x *ReviewTopupRequest) GetEvidenceRef() string {
+	if x != nil {
+		return x.EvidenceRef
+	}
+	return ""
+}
+
+type ReviewTopupResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewTopupResponse) Reset() {
+	*x = ReviewTopupResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[132]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewTopupResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewTopupResponse) ProtoMessage() {}
+
+func (x *ReviewTopupResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[132]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewTopupResponse.ProtoReflect.Descriptor instead.
+func (*ReviewTopupResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{132}
+}
+
+func (x *ReviewTopupResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type RevokeReferralRewardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	RewardId      string                 `protobuf:"bytes,2,opt,name=reward_id,json=rewardId,proto3" json:"reward_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeReferralRewardRequest) Reset() {
+	*x = RevokeReferralRewardRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[133]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeReferralRewardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeReferralRewardRequest) ProtoMessage() {}
+
+func (x *RevokeReferralRewardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[133]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeReferralRewardRequest.ProtoReflect.Descriptor instead.
+func (*RevokeReferralRewardRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{133}
+}
+
+func (x *RevokeReferralRewardRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *RevokeReferralRewardRequest) GetRewardId() string {
+	if x != nil {
+		return x.RewardId
+	}
+	return ""
+}
+
+type RevokeReferralRewardResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeReferralRewardResponse) Reset() {
+	*x = RevokeReferralRewardResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[134]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeReferralRewardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeReferralRewardResponse) ProtoMessage() {}
+
+func (x *RevokeReferralRewardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[134]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeReferralRewardResponse.ProtoReflect.Descriptor instead.
+func (*RevokeReferralRewardResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{134}
+}
+
+func (x *RevokeReferralRewardResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ResolveDiscrepancyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	DiscrepancyId string                 `protobuf:"bytes,2,opt,name=discrepancy_id,json=discrepancyId,proto3" json:"discrepancy_id,omitempty"`
+	Disposition   string                 `protobuf:"bytes,3,opt,name=disposition,proto3" json:"disposition,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDiscrepancyRequest) Reset() {
+	*x = ResolveDiscrepancyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[135]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDiscrepancyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDiscrepancyRequest) ProtoMessage() {}
+
+func (x *ResolveDiscrepancyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[135]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDiscrepancyRequest.ProtoReflect.Descriptor instead.
+func (*ResolveDiscrepancyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{135}
+}
+
+func (x *ResolveDiscrepancyRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ResolveDiscrepancyRequest) GetDiscrepancyId() string {
+	if x != nil {
+		return x.DiscrepancyId
+	}
+	return ""
+}
+
+func (x *ResolveDiscrepancyRequest) GetDisposition() string {
+	if x != nil {
+		return x.Disposition
+	}
+	return ""
+}
+
+type ResolveDiscrepancyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveDiscrepancyResponse) Reset() {
+	*x = ResolveDiscrepancyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[136]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveDiscrepancyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveDiscrepancyResponse) ProtoMessage() {}
+
+func (x *ResolveDiscrepancyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[136]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveDiscrepancyResponse.ProtoReflect.Descriptor instead.
+func (*ResolveDiscrepancyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{136}
+}
+
+func (x *ResolveDiscrepancyResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type RefundSettledRequestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefundSettledRequestRequest) Reset() {
+	*x = RefundSettledRequestRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[137]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundSettledRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundSettledRequestRequest) ProtoMessage() {}
+
+func (x *RefundSettledRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[137]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundSettledRequestRequest.ProtoReflect.Descriptor instead.
+func (*RefundSettledRequestRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{137}
+}
+
+func (x *RefundSettledRequestRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *RefundSettledRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RefundSettledRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefundSettledRequestResponse) Reset() {
+	*x = RefundSettledRequestResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[138]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundSettledRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundSettledRequestResponse) ProtoMessage() {}
+
+func (x *RefundSettledRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[138]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundSettledRequestResponse.ProtoReflect.Descriptor instead.
+func (*RefundSettledRequestResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{138}
+}
+
+func (x *RefundSettledRequestResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type UpsertFundedTermRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Operator         *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	Term             *v11.FundedTermConfig  `protobuf:"bytes,2,opt,name=term,proto3" json:"term,omitempty"`
+	RefundReserveBps *uint32                `protobuf:"varint,3,opt,name=refund_reserve_bps,json=refundReserveBps,proto3,oneof" json:"refund_reserve_bps,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UpsertFundedTermRequest) Reset() {
+	*x = UpsertFundedTermRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[139]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertFundedTermRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertFundedTermRequest) ProtoMessage() {}
+
+func (x *UpsertFundedTermRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[139]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertFundedTermRequest.ProtoReflect.Descriptor instead.
+func (*UpsertFundedTermRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{139}
+}
+
+func (x *UpsertFundedTermRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *UpsertFundedTermRequest) GetTerm() *v11.FundedTermConfig {
+	if x != nil {
+		return x.Term
+	}
+	return nil
+}
+
+func (x *UpsertFundedTermRequest) GetRefundReserveBps() uint32 {
+	if x != nil && x.RefundReserveBps != nil {
+		return *x.RefundReserveBps
+	}
+	return 0
+}
+
+type UpsertFundedTermResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpsertFundedTermResponse) Reset() {
+	*x = UpsertFundedTermResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[140]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertFundedTermResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertFundedTermResponse) ProtoMessage() {}
+
+func (x *UpsertFundedTermResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[140]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertFundedTermResponse.ProtoReflect.Descriptor instead.
+func (*UpsertFundedTermResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{140}
+}
+
+func (x *UpsertFundedTermResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type LockFundedTermRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Operator             *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	TermId               string                 `protobuf:"bytes,2,opt,name=term_id,json=termId,proto3" json:"term_id,omitempty"`
+	FundingReservationId string                 `protobuf:"bytes,3,opt,name=funding_reservation_id,json=fundingReservationId,proto3" json:"funding_reservation_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *LockFundedTermRequest) Reset() {
+	*x = LockFundedTermRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[141]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockFundedTermRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockFundedTermRequest) ProtoMessage() {}
+
+func (x *LockFundedTermRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[141]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockFundedTermRequest.ProtoReflect.Descriptor instead.
+func (*LockFundedTermRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{141}
+}
+
+func (x *LockFundedTermRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *LockFundedTermRequest) GetTermId() string {
+	if x != nil {
+		return x.TermId
+	}
+	return ""
+}
+
+func (x *LockFundedTermRequest) GetFundingReservationId() string {
+	if x != nil {
+		return x.FundingReservationId
+	}
+	return ""
+}
+
+type LockFundedTermResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LockFundedTermResponse) Reset() {
+	*x = LockFundedTermResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[142]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockFundedTermResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockFundedTermResponse) ProtoMessage() {}
+
+func (x *LockFundedTermResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[142]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockFundedTermResponse.ProtoReflect.Descriptor instead.
+func (*LockFundedTermResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{142}
+}
+
+func (x *LockFundedTermResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type SetCoverageThrottlePolicyRequest struct {
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	Operator      *OperatorContext               `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	Policy        *v11.AitCoverageThrottlePolicy `protobuf:"bytes,2,opt,name=policy,proto3" json:"policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetCoverageThrottlePolicyRequest) Reset() {
+	*x = SetCoverageThrottlePolicyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[143]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetCoverageThrottlePolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetCoverageThrottlePolicyRequest) ProtoMessage() {}
+
+func (x *SetCoverageThrottlePolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[143]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetCoverageThrottlePolicyRequest.ProtoReflect.Descriptor instead.
+func (*SetCoverageThrottlePolicyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{143}
+}
+
+func (x *SetCoverageThrottlePolicyRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *SetCoverageThrottlePolicyRequest) GetPolicy() *v11.AitCoverageThrottlePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+type SetCoverageThrottlePolicyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetCoverageThrottlePolicyResponse) Reset() {
+	*x = SetCoverageThrottlePolicyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[144]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetCoverageThrottlePolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetCoverageThrottlePolicyResponse) ProtoMessage() {}
+
+func (x *SetCoverageThrottlePolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[144]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetCoverageThrottlePolicyResponse.ProtoReflect.Descriptor instead.
+func (*SetCoverageThrottlePolicyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{144}
+}
+
+func (x *SetCoverageThrottlePolicyResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type UpdateSystemSettingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	SettingKey    string                 `protobuf:"bytes,2,opt,name=setting_key,json=settingKey,proto3" json:"setting_key,omitempty"`
+	ValueJson     []byte                 `protobuf:"bytes,3,opt,name=value_json,json=valueJson,proto3" json:"value_json,omitempty"` // Schema and eligible keys owned by billing-service.
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSystemSettingRequest) Reset() {
+	*x = UpdateSystemSettingRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[145]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSystemSettingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSystemSettingRequest) ProtoMessage() {}
+
+func (x *UpdateSystemSettingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[145]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSystemSettingRequest.ProtoReflect.Descriptor instead.
+func (*UpdateSystemSettingRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{145}
+}
+
+func (x *UpdateSystemSettingRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *UpdateSystemSettingRequest) GetSettingKey() string {
+	if x != nil {
+		return x.SettingKey
+	}
+	return ""
+}
+
+func (x *UpdateSystemSettingRequest) GetValueJson() []byte {
+	if x != nil {
+		return x.ValueJson
+	}
+	return nil
+}
+
+type UpdateSystemSettingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateSystemSettingResponse) Reset() {
+	*x = UpdateSystemSettingResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[146]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateSystemSettingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateSystemSettingResponse) ProtoMessage() {}
+
+func (x *UpdateSystemSettingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[146]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateSystemSettingResponse.ProtoReflect.Descriptor instead.
+func (*UpdateSystemSettingResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{146}
+}
+
+func (x *UpdateSystemSettingResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type UpdateFreeModelQuotaPolicyRequest struct {
+	state                           protoimpl.MessageState `protogen:"open.v1"`
+	Operator                        *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	ModelId                         string                 `protobuf:"bytes,2,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"` // Empty targets the account-wide policy.
+	DailyFreeRequestsLimit          int64                  `protobuf:"varint,3,opt,name=daily_free_requests_limit,json=dailyFreeRequestsLimit,proto3" json:"daily_free_requests_limit,omitempty"`
+	DailyFreeEquivalentCreditsLimit int64                  `protobuf:"varint,4,opt,name=daily_free_equivalent_credits_limit,json=dailyFreeEquivalentCreditsLimit,proto3" json:"daily_free_equivalent_credits_limit,omitempty"`
+	unknownFields                   protoimpl.UnknownFields
+	sizeCache                       protoimpl.SizeCache
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) Reset() {
+	*x = UpdateFreeModelQuotaPolicyRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[147]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFreeModelQuotaPolicyRequest) ProtoMessage() {}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[147]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFreeModelQuotaPolicyRequest.ProtoReflect.Descriptor instead.
+func (*UpdateFreeModelQuotaPolicyRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{147}
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) GetDailyFreeRequestsLimit() int64 {
+	if x != nil {
+		return x.DailyFreeRequestsLimit
+	}
+	return 0
+}
+
+func (x *UpdateFreeModelQuotaPolicyRequest) GetDailyFreeEquivalentCreditsLimit() int64 {
+	if x != nil {
+		return x.DailyFreeEquivalentCreditsLimit
+	}
+	return 0
+}
+
+type UpdateFreeModelQuotaPolicyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateFreeModelQuotaPolicyResponse) Reset() {
+	*x = UpdateFreeModelQuotaPolicyResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[148]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateFreeModelQuotaPolicyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateFreeModelQuotaPolicyResponse) ProtoMessage() {}
+
+func (x *UpdateFreeModelQuotaPolicyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[148]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateFreeModelQuotaPolicyResponse.ProtoReflect.Descriptor instead.
+func (*UpdateFreeModelQuotaPolicyResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{148}
+}
+
+func (x *UpdateFreeModelQuotaPolicyResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ResolveUncertainJobRequest struct {
+	state           protoimpl.MessageState       `protogen:"open.v1"`
+	Operator        *OperatorContext             `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	OperationId     string                       `protobuf:"bytes,2,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	Action          UncertainResolutionAction    `protobuf:"varint,3,opt,name=action,proto3,enum=maxshot.gateway_internal.v1.UncertainResolutionAction" json:"action,omitempty"`
+	VerifiedOutputs []*MediaOutputSettlementItem `protobuf:"bytes,4,rep,name=verified_outputs,json=verifiedOutputs,proto3" json:"verified_outputs,omitempty"`
+	VerifiedUsage   *UsageBound                  `protobuf:"bytes,5,opt,name=verified_usage,json=verifiedUsage,proto3" json:"verified_usage,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ResolveUncertainJobRequest) Reset() {
+	*x = ResolveUncertainJobRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[149]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveUncertainJobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveUncertainJobRequest) ProtoMessage() {}
+
+func (x *ResolveUncertainJobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[149]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveUncertainJobRequest.ProtoReflect.Descriptor instead.
+func (*ResolveUncertainJobRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{149}
+}
+
+func (x *ResolveUncertainJobRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ResolveUncertainJobRequest) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *ResolveUncertainJobRequest) GetAction() UncertainResolutionAction {
+	if x != nil {
+		return x.Action
+	}
+	return UncertainResolutionAction_UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED
+}
+
+func (x *ResolveUncertainJobRequest) GetVerifiedOutputs() []*MediaOutputSettlementItem {
+	if x != nil {
+		return x.VerifiedOutputs
+	}
+	return nil
+}
+
+func (x *ResolveUncertainJobRequest) GetVerifiedUsage() *UsageBound {
+	if x != nil {
+		return x.VerifiedUsage
+	}
+	return nil
+}
+
+type ResolveUncertainJobResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveUncertainJobResponse) Reset() {
+	*x = ResolveUncertainJobResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[150]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveUncertainJobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveUncertainJobResponse) ProtoMessage() {}
+
+func (x *ResolveUncertainJobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[150]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveUncertainJobResponse.ProtoReflect.Descriptor instead.
+func (*ResolveUncertainJobResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{150}
+}
+
+func (x *ResolveUncertainJobResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ModerateMaterialRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	MaterialId    string                 `protobuf:"bytes,2,opt,name=material_id,json=materialId,proto3" json:"material_id,omitempty"`
+	Decision      string                 `protobuf:"bytes,3,opt,name=decision,proto3" json:"decision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModerateMaterialRequest) Reset() {
+	*x = ModerateMaterialRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[151]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModerateMaterialRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModerateMaterialRequest) ProtoMessage() {}
+
+func (x *ModerateMaterialRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[151]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModerateMaterialRequest.ProtoReflect.Descriptor instead.
+func (*ModerateMaterialRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{151}
+}
+
+func (x *ModerateMaterialRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ModerateMaterialRequest) GetMaterialId() string {
+	if x != nil {
+		return x.MaterialId
+	}
+	return ""
+}
+
+func (x *ModerateMaterialRequest) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+type ModerateMaterialResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModerateMaterialResponse) Reset() {
+	*x = ModerateMaterialResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[152]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModerateMaterialResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModerateMaterialResponse) ProtoMessage() {}
+
+func (x *ModerateMaterialResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[152]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModerateMaterialResponse.ProtoReflect.Descriptor instead.
+func (*ModerateMaterialResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{152}
+}
+
+func (x *ModerateMaterialResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+type ResolveAppealRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Operator      *OperatorContext       `protobuf:"bytes,1,opt,name=operator,proto3" json:"operator,omitempty"`
+	AppealId      string                 `protobuf:"bytes,2,opt,name=appeal_id,json=appealId,proto3" json:"appeal_id,omitempty"`
+	Decision      string                 `protobuf:"bytes,3,opt,name=decision,proto3" json:"decision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveAppealRequest) Reset() {
+	*x = ResolveAppealRequest{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[153]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveAppealRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveAppealRequest) ProtoMessage() {}
+
+func (x *ResolveAppealRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[153]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveAppealRequest.ProtoReflect.Descriptor instead.
+func (*ResolveAppealRequest) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{153}
+}
+
+func (x *ResolveAppealRequest) GetOperator() *OperatorContext {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
+}
+
+func (x *ResolveAppealRequest) GetAppealId() string {
+	if x != nil {
+		return x.AppealId
+	}
+	return ""
+}
+
+func (x *ResolveAppealRequest) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+type ResolveAppealResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        *AdminMutationResult   `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveAppealResponse) Reset() {
+	*x = ResolveAppealResponse{}
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[154]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveAppealResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveAppealResponse) ProtoMessage() {}
+
+func (x *ResolveAppealResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_maxshot_gateway_internal_v1_execution_proto_msgTypes[154]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveAppealResponse.ProtoReflect.Descriptor instead.
+func (*ResolveAppealResponse) Descriptor() ([]byte, []int) {
+	return file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP(), []int{154}
+}
+
+func (x *ResolveAppealResponse) GetResult() *AdminMutationResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
 var File_maxshot_gateway_internal_v1_execution_proto protoreflect.FileDescriptor
 
 const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\n" +
-	"+maxshot/gateway_internal/v1/execution.proto\x12\x1bmaxshot.gateway_internal.v1\x1a\x1dmaxshot/common/v1/types.proto\"\xa0\x04\n" +
+	"+maxshot/gateway_internal/v1/execution.proto\x12\x1bmaxshot.gateway_internal.v1\x1a\x1dmaxshot/common/v1/types.proto\x1a.maxshot/contract_grant/v1/contract_grant.proto\"\xa0\x04\n" +
 	"\x16MediaPricingDimensions\x12\x1e\n" +
 	"\n" +
 	"resolution\x18\x01 \x01(\tR\n" +
@@ -4051,7 +11609,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0fbucket_balances\x18\x03 \x03(\v2..maxshot.gateway_internal.v1.BucketBalanceViewR\x0ebucketBalances\x12J\n" +
 	"\awindows\x18\x04 \x03(\v20.maxshot.gateway_internal.v1.FundingWindowStatusR\awindows\x12[\n" +
 	"\x10key_gross_window\x18\x05 \x01(\v21.maxshot.gateway_internal.v1.KeyGrossWindowStatusR\x0ekeyGrossWindow\x12M\n" +
-	"\x06models\x18\x06 \x03(\v25.maxshot.gateway_internal.v1.ModelDiscoveryEvaluationR\x06models\"\x85\a\n" +
+	"\x06models\x18\x06 \x03(\v25.maxshot.gateway_internal.v1.ModelDiscoveryEvaluationR\x06models\"\xb5\a\n" +
 	"\x13PreviewQuoteRequest\x12$\n" +
 	"\x0eapi_key_sha256\x18\x01 \x01(\tR\fapiKeySha256\x12.\n" +
 	"\x13internal_account_id\x18\x02 \x01(\tR\x11internalAccountId\x12G\n" +
@@ -4070,7 +11628,8 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\rclient_region\x18\x0e \x01(\tR\fclientRegion\x12(\n" +
 	"\x10issue_quote_lock\x18\x0f \x01(\bR\x0eissueQuoteLock\x12!\n" +
 	"\frequest_hash\x18\x10 \x01(\tR\vrequestHash\x12+\n" +
-	"\x11effective_channel\x18\x11 \x01(\tR\x10effectiveChannel\"\xa4\f\n" +
+	"\x11effective_channel\x18\x11 \x01(\tR\x10effectiveChannel\x12.\n" +
+	"\x13request_body_sha256\x18\x12 \x01(\tR\x11requestBodySha256\"\xa4\f\n" +
 	"\x14PreviewQuoteResponse\x12\x1a\n" +
 	"\beligible\x18\x01 \x01(\bR\beligible\x12>\n" +
 	"\vreject_code\x18\x02 \x01(\x0e2\x1d.maxshot.common.v1.RejectCodeR\n" +
@@ -4128,7 +11687,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\bquote_id\x18\x18 \x01(\tR\aquoteId\x12!\n" +
 	"\frequest_hash\x18\x19 \x01(\tR\vrequestHash\x12h\n" +
 	"\x1dcustomer_charge_mode_override\x18\x1a \x01(\x0e2%.maxshot.common.v1.CustomerChargeModeR\x1acustomerChargeModeOverride\x12+\n" +
-	"\x11effective_channel\x18\x1b \x01(\tR\x10effectiveChannel\"\xe6\t\n" +
+	"\x11effective_channel\x18\x1b \x01(\tR\x10effectiveChannel\"\x85\x0f\n" +
 	"\x18AuthorizeAndHoldResponse\x12G\n" +
 	"\x06status\x18\x01 \x01(\x0e2/.maxshot.gateway_internal.v1.HoldDecisionStatusR\x06status\x12\x1a\n" +
 	"\badmitted\x18\x02 \x01(\bR\badmitted\x12>\n" +
@@ -4153,7 +11712,16 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x12threshold_warnings\x18\x11 \x03(\v2-.maxshot.gateway_internal.v1.ThresholdWarningR\x11thresholdWarnings\x12a\n" +
 	"\x11budget_diagnostic\x18\x12 \x01(\v24.maxshot.gateway_internal.v1.SpendingLimitDiagnosticR\x10budgetDiagnostic\x12c\n" +
 	"\x11credit_diagnostic\x18\x13 \x01(\v26.maxshot.gateway_internal.v1.CreditShortfallDiagnosticR\x10creditDiagnostic\x12X\n" +
-	"\x11cached_settlement\x18\x14 \x01(\v2+.maxshot.gateway_internal.v1.SettleResponseR\x10cachedSettlement\"\xd9\x01\n" +
+	"\x11cached_settlement\x18\x14 \x01(\v2+.maxshot.gateway_internal.v1.SettleResponseR\x10cachedSettlement\x12e\n" +
+	"\x14cached_http_response\x18\x15 \x01(\v23.maxshot.gateway_internal.v1.IdempotentHttpResponseR\x12cachedHttpResponse\x12_\n" +
+	"\x17effective_primary_bound\x18\x16 \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\x15effectivePrimaryBound\x12]\n" +
+	"\x16effective_backup_bound\x18\x17 \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\x14effectiveBackupBound\x12A\n" +
+	"\x1bcustomer_release_at_unix_ms\x18\x18 \x01(\x03H\x00R\x17customerReleaseAtUnixMs\x88\x01\x01\x12^\n" +
+	"\x11replacement_quote\x18\x19 \x01(\v21.maxshot.gateway_internal.v1.PreviewQuoteResponseR\x10replacementQuote\x12S\n" +
+	"\x0ffunding_notices\x18\x1a \x03(\x0e2*.maxshot.gateway_internal.v1.FundingNoticeR\x0efundingNotices\x12?\n" +
+	"\x1amax_dollar_debit_micro_usd\x18\x1b \x01(\x03H\x01R\x16maxDollarDebitMicroUsd\x88\x01\x01B\x1e\n" +
+	"\x1c_customer_release_at_unix_msB\x1d\n" +
+	"\x1b_max_dollar_debit_micro_usd\"\xd9\x01\n" +
 	"\x12MarkSendingRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1d\n" +
@@ -4165,11 +11733,17 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\vlease_token\x18\x05 \x01(\tR\n" +
 	"leaseToken\x12 \n" +
 	"\flease_ttl_ms\x18\x06 \x01(\x03R\n" +
-	"leaseTtlMs\"\x8e\x01\n" +
+	"leaseTtlMs\"\x97\x03\n" +
 	"\x13MarkSendingResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x126\n" +
 	"\x18lease_expires_at_unix_ms\x18\x02 \x01(\x03R\x14leaseExpiresAtUnixMs\x12#\n" +
-	"\rreject_reason\x18\x03 \x01(\tR\frejectReason\"\x81\x01\n" +
+	"\rreject_reason\x18\x03 \x01(\tR\frejectReason\x12.\n" +
+	"\x10newly_authorized\x18\x04 \x01(\bH\x00R\x0fnewlyAuthorized\x88\x01\x01\x126\n" +
+	"\x15dispatched_at_unix_ms\x18\x05 \x01(\x03H\x01R\x12dispatchedAtUnixMs\x88\x01\x01\x12K\n" +
+	" provider_cost_reserved_micro_usd\x18\x06 \x01(\x03H\x02R\x1cproviderCostReservedMicroUsd\x88\x01\x01B\x13\n" +
+	"\x11_newly_authorizedB\x18\n" +
+	"\x16_dispatched_at_unix_msB#\n" +
+	"!_provider_cost_reserved_micro_usd\"\x81\x01\n" +
 	"\x1bExtendExecutionLeaseRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1f\n" +
@@ -4188,7 +11762,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\thas_audio\x18\x05 \x01(\bR\bhasAudio\x12\x14\n" +
 	"\x05width\x18\x06 \x01(\x05R\x05width\x12\x16\n" +
 	"\x06height\x18\a \x01(\x05R\x06height\x12!\n" +
-	"\ffailure_code\x18\b \x01(\tR\vfailureCode\"\xc3\x05\n" +
+	"\ffailure_code\x18\b \x01(\tR\vfailureCode\"\xee\x06\n" +
 	"\x11AttemptCostRecord\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x1f\n" +
@@ -4208,7 +11782,11 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x0eattempt_number\x18\f \x01(\x05R\rattemptNumber\x124\n" +
 	"\x16provider_generation_id\x18\r \x01(\tR\x14providerGenerationId\x12\x1f\n" +
 	"\vhttp_status\x18\x0e \x01(\x05R\n" +
-	"httpStatus\"\xb6\a\n" +
+	"httpStatus\x12]\n" +
+	"\x0edispatch_state\x18\x0f \x01(\x0e21.maxshot.gateway_internal.v1.AttemptDispatchStateH\x00R\rdispatchState\x88\x01\x01\x12&\n" +
+	"\fdispatch_key\x18\x10 \x01(\tH\x01R\vdispatchKey\x88\x01\x01B\x11\n" +
+	"\x0f_dispatch_stateB\x0f\n" +
+	"\r_dispatch_key\"\x90\b\n" +
 	"\rSettleRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12<\n" +
@@ -4227,7 +11805,8 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\rmedia_outputs\x18\f \x03(\v26.maxshot.gateway_internal.v1.MediaOutputSettlementItemR\fmediaOutputs\x12J\n" +
 	"\battempts\x18\r \x03(\v2..maxshot.gateway_internal.v1.AttemptCostRecordR\battempts\x12W\n" +
 	"\x14customer_charge_mode\x18\x0e \x01(\x0e2%.maxshot.common.v1.CustomerChargeModeR\x12customerChargeMode\x12\\\n" +
-	",provider_reported_customer_base_cost_usd_dec\x18\x0f \x01(\tR&providerReportedCustomerBaseCostUsdDec\"\xd9\x05\n" +
+	",provider_reported_customer_base_cost_usd_dec\x18\x0f \x01(\tR&providerReportedCustomerBaseCostUsdDec\x12X\n" +
+	"\rhttp_response\x18\x10 \x01(\v23.maxshot.gateway_internal.v1.IdempotentHttpResponseR\fhttpResponse\"\xc4\x06\n" +
 	"\x0eSettleResponse\x12\x18\n" +
 	"\asettled\x18\x01 \x01(\bR\asettled\x124\n" +
 	"\x16final_customer_credits\x18\x02 \x01(\x03R\x14finalCustomerCredits\x12D\n" +
@@ -4240,7 +11819,9 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x17auto_release_at_unix_ms\x18\t \x01(\x03R\x13autoReleaseAtUnixMs\x12Z\n" +
 	"\x0fsettled_buckets\x18\n" +
 	" \x03(\v21.maxshot.gateway_internal.v1.BucketAllocationLineR\x0esettledBuckets\x12\\\n" +
-	"\x10released_buckets\x18\v \x03(\v21.maxshot.gateway_internal.v1.BucketAllocationLineR\x0freleasedBuckets\"\xc8\x01\n" +
+	"\x10released_buckets\x18\v \x03(\v21.maxshot.gateway_internal.v1.BucketAllocationLineR\x0freleasedBuckets\x12Y\n" +
+	"\vdisposition\x18\f \x01(\x0e22.maxshot.gateway_internal.v1.SettlementDispositionH\x00R\vdisposition\x88\x01\x01B\x0e\n" +
+	"\f_disposition\"\xc8\x01\n" +
 	"\x14MarkUncertainRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12.\n" +
@@ -4251,7 +11832,7 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\"e\n" +
 	"\x15MarkUncertainResponse\x12\x16\n" +
 	"\x06marked\x18\x01 \x01(\bR\x06marked\x124\n" +
-	"\x17auto_release_at_unix_ms\x18\x02 \x01(\x03R\x13autoReleaseAtUnixMs\"\xb4\x05\n" +
+	"\x17auto_release_at_unix_ms\x18\x02 \x01(\x03R\x13autoReleaseAtUnixMs\"\xb0\x06\n" +
 	"\x17ResolveUncertainRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12<\n" +
@@ -4269,12 +11850,579 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"attempt_id\x18\v \x01(\tR\tattemptId\x124\n" +
 	"\x16provider_generation_id\x18\f \x01(\tR\x14providerGenerationId\x12\x1f\n" +
 	"\voffering_id\x18\r \x01(\tR\n" +
-	"offeringId\"\x83\x01\n" +
+	"offeringId\x120\n" +
+	"\x14recovery_lease_token\x18\x0e \x01(\tR\x12recoveryLeaseToken\x12H\n" +
+	"\boperator\x18\x0f \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\"\x83\x01\n" +
 	"\x18ResolveUncertainResponse\x12\x1a\n" +
 	"\bresolved\x18\x01 \x01(\bR\bresolved\x12K\n" +
 	"\n" +
 	"settlement\x18\x02 \x01(\v2+.maxshot.gateway_internal.v1.SettleResponseR\n" +
-	"settlement*\x8e\x01\n" +
+	"settlement\"\x8d\x01\n" +
+	"\x16IdempotentHttpResponse\x12\x1f\n" +
+	"\vstatus_code\x18\x01 \x01(\x05R\n" +
+	"statusCode\x12>\n" +
+	"\aheaders\x18\x02 \x03(\v2$.maxshot.common.v1.KeyValueAttributeR\aheaders\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\fR\x04body\"\xeb\x01\n" +
+	"\x1fRecordAttemptObservationRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1f\n" +
+	"\vlease_token\x18\x02 \x01(\tR\n" +
+	"leaseToken\x12>\n" +
+	"\x1bobservation_idempotency_key\x18\x03 \x01(\tR\x19observationIdempotencyKey\x12H\n" +
+	"\aattempt\x18\x04 \x01(\v2..maxshot.gateway_internal.v1.AttemptCostRecordR\aattempt\"\x98\x01\n" +
+	" RecordAttemptObservationResponse\x12\x1a\n" +
+	"\brecorded\x18\x01 \x01(\bR\brecorded\x12X\n" +
+	"\x0edispatch_state\x18\x02 \x01(\x0e21.maxshot.gateway_internal.v1.AttemptDispatchStateR\rdispatchState\"5\n" +
+	"\x1dClaimExecutionRecoveryRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\rR\x05limit\"\xd8\x04\n" +
+	"\x16ExecutionRecoveryClaim\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12.\n" +
+	"\x13studio_operation_id\x18\x02 \x01(\tR\x11studioOperationId\x12\x1f\n" +
+	"\vlease_token\x18\x03 \x01(\tR\n" +
+	"leaseToken\x126\n" +
+	"\x18lease_expires_at_unix_ms\x18\x04 \x01(\x03R\x14leaseExpiresAtUnixMs\x12<\n" +
+	"\x1bcustomer_release_at_unix_ms\x18\x05 \x01(\x03R\x17customerReleaseAtUnixMs\x12G\n" +
+	"\achannel\x18\x06 \x01(\x0e2-.maxshot.gateway_internal.v1.ExecutionChannelR\achannel\x124\n" +
+	"\x16locked_catalog_version\x18\a \x01(\tR\x14lockedCatalogVersion\x12J\n" +
+	"\battempts\x18\b \x03(\v2..maxshot.gateway_internal.v1.AttemptCostRecordR\battempts\x12W\n" +
+	"\x14customer_charge_mode\x18\t \x01(\x0e2%.maxshot.common.v1.CustomerChargeModeR\x12customerChargeMode\x124\n" +
+	"\x16customer_hold_released\x18\n" +
+	" \x01(\bR\x14customerHoldReleased\"m\n" +
+	"\x1eClaimExecutionRecoveryResponse\x12K\n" +
+	"\x06claims\x18\x01 \x03(\v23.maxshot.gateway_internal.v1.ExecutionRecoveryClaimR\x06claims\"\x1f\n" +
+	"\x1dGetBillingCatalogStateRequest\"\xbc\x01\n" +
+	"\x1eGetBillingCatalogStateResponse\x124\n" +
+	"\x16active_catalog_version\x18\x01 \x01(\tR\x14activeCatalogVersion\x12%\n" +
+	"\x0efrozen_routing\x18\x02 \x01(\bR\rfrozenRouting\x12=\n" +
+	"\x1bfrozen_allowed_offering_ids\x18\x03 \x03(\tR\x18frozenAllowedOfferingIds\"A\n" +
+	"\x16RegisterAccountRequest\x12'\n" +
+	"\x0fregistration_id\x18\x01 \x01(\tR\x0eregistrationId\"8\n" +
+	"\x17RegisterAccountResponse\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\x8e\a\n" +
+	"\fApiKeyPolicy\x12U\n" +
+	"\x10funding_strategy\x18\x01 \x01(\x0e2%.maxshot.common.v1.KeyFundingStrategyH\x00R\x0ffundingStrategy\x88\x01\x01\x12:\n" +
+	"\x17allow_ait_earned_credit\x18\x02 \x01(\bH\x01R\x14allowAitEarnedCredit\x88\x01\x01\x125\n" +
+	"\x14dollar_relay_enabled\x18\x03 \x01(\bH\x02R\x12dollarRelayEnabled\x88\x01\x01\x12.\n" +
+	"\x13allowed_catalog_ids\x18\x04 \x03(\tR\x11allowedCatalogIds\x12'\n" +
+	"\x0fmodel_allowlist\x18\x05 \x03(\tR\x0emodelAllowlist\x12E\n" +
+	"\x1dper_request_ceiling_micro_usd\x18\x06 \x01(\x03H\x03R\x19perRequestCeilingMicroUsd\x88\x01\x01\x12L\n" +
+	"\x0fspending_limits\x18\a \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x0espendingLimits\x120\n" +
+	"\x12expires_at_unix_ms\x18\b \x01(\x03H\x04R\x0fexpiresAtUnixMs\x88\x01\x01\x12 \n" +
+	"\trpm_limit\x18\t \x01(\x05H\x05R\brpmLimit\x88\x01\x01\x12 \n" +
+	"\ttpm_limit\x18\n" +
+	" \x01(\x03H\x06R\btpmLimit\x88\x01\x01\x129\n" +
+	"\x16max_concurrent_streams\x18\v \x01(\x05H\aR\x14maxConcurrentStreams\x88\x01\x01\x12I\n" +
+	"\rsearch_policy\x18\f \x01(\x0e2\x1f.maxshot.common.v1.SearchPolicyH\bR\fsearchPolicy\x88\x01\x01B\x13\n" +
+	"\x11_funding_strategyB\x1a\n" +
+	"\x18_allow_ait_earned_creditB\x17\n" +
+	"\x15_dollar_relay_enabledB \n" +
+	"\x1e_per_request_ceiling_micro_usdB\x15\n" +
+	"\x13_expires_at_unix_msB\f\n" +
+	"\n" +
+	"_rpm_limitB\f\n" +
+	"\n" +
+	"_tpm_limitB\x19\n" +
+	"\x17_max_concurrent_streamsB\x10\n" +
+	"\x0e_search_policy\"\xff\x01\n" +
+	"\rManagedApiKey\x12\x1c\n" +
+	"\n" +
+	"api_key_id\x18\x01 \x01(\tR\bapiKeyId\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1d\n" +
+	"\n" +
+	"masked_key\x18\x03 \x01(\tR\tmaskedKey\x12A\n" +
+	"\x06policy\x18\x04 \x01(\v2).maxshot.gateway_internal.v1.ApiKeyPolicyR\x06policy\x12+\n" +
+	"\x12created_at_unix_ms\x18\x05 \x01(\x03R\x0fcreatedAtUnixMs\x12+\n" +
+	"\x12revoked_at_unix_ms\x18\x06 \x01(\x03R\x0frevokedAtUnixMs\"\xb6\x01\n" +
+	"\x13CreateApiKeyRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12\x14\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12A\n" +
+	"\x06policy\x18\x04 \x01(\v2).maxshot.gateway_internal.v1.ApiKeyPolicyR\x06policy\"|\n" +
+	"\x14CreateApiKeyResponse\x12<\n" +
+	"\x03key\x18\x01 \x01(\v2*.maxshot.gateway_internal.v1.ManagedApiKeyR\x03key\x12&\n" +
+	"\x0fone_time_secret\x18\x02 \x01(\tR\roneTimeSecret\"\x95\x02\n" +
+	"\x13UpdateApiKeyRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1c\n" +
+	"\n" +
+	"api_key_id\x18\x02 \x01(\tR\bapiKeyId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x12\x19\n" +
+	"\x05label\x18\x04 \x01(\tH\x00R\x05label\x88\x01\x01\x12A\n" +
+	"\x06policy\x18\x05 \x01(\v2).maxshot.gateway_internal.v1.ApiKeyPolicyR\x06policy\x120\n" +
+	"\x14policy_update_fields\x18\x06 \x03(\tR\x12policyUpdateFieldsB\b\n" +
+	"\x06_label\"T\n" +
+	"\x14UpdateApiKeyResponse\x12<\n" +
+	"\x03key\x18\x01 \x01(\v2*.maxshot.gateway_internal.v1.ManagedApiKeyR\x03key\"{\n" +
+	"\x13RevokeApiKeyRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1c\n" +
+	"\n" +
+	"api_key_id\x18\x02 \x01(\tR\bapiKeyId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"T\n" +
+	"\x14RevokeApiKeyResponse\x12<\n" +
+	"\x03key\x18\x01 \x01(\v2*.maxshot.gateway_internal.v1.ManagedApiKeyR\x03key\"m\n" +
+	"\x12ListApiKeysRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x128\n" +
+	"\x04page\x18\x02 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\"\x90\x01\n" +
+	"\x13ListApiKeysResponse\x12>\n" +
+	"\x04keys\x18\x01 \x03(\v2*.maxshot.gateway_internal.v1.ManagedApiKeyR\x04keys\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"\xee\x02\n" +
+	"\x16AccountFundingSettings\x12<\n" +
+	"\x18web_dollar_relay_enabled\x18\x01 \x01(\bH\x00R\x15webDollarRelayEnabled\x88\x01\x01\x128\n" +
+	"\x16allow_basic_to_premium\x18\x02 \x01(\bH\x01R\x13allowBasicToPremium\x88\x01\x01\x12:\n" +
+	"\x17allow_ait_earned_credit\x18\x03 \x01(\bH\x02R\x14allowAitEarnedCredit\x88\x01\x01\x12L\n" +
+	"\x0fspending_limits\x18\x04 \x03(\v2#.maxshot.common.v1.BudgetPeriodRuleR\x0espendingLimitsB\x1b\n" +
+	"\x19_web_dollar_relay_enabledB\x19\n" +
+	"\x17_allow_basic_to_premiumB\x1a\n" +
+	"\x18_allow_ait_earned_credit\"9\n" +
+	"\x18GetAccountFundingRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\xb0\x03\n" +
+	"\x19GetAccountFundingResponse\x12O\n" +
+	"\bsettings\x18\x01 \x01(\v23.maxshot.gateway_internal.v1.AccountFundingSettingsR\bsettings\x12J\n" +
+	"\bbalances\x18\x02 \x03(\v2..maxshot.gateway_internal.v1.BucketBalanceViewR\bbalances\x12J\n" +
+	"\awindows\x18\x03 \x03(\v20.maxshot.gateway_internal.v1.FundingWindowStatusR\awindows\x12'\n" +
+	"\x0fspending_locked\x18\x04 \x01(\bR\x0espendingLocked\x126\n" +
+	"\x17free_requests_remaining\x18\x05 \x01(\x03R\x15freeRequestsRemaining\x12I\n" +
+	"!free_equivalent_credits_remaining\x18\x06 \x01(\x03R\x1efreeEquivalentCreditsRemaining\"\xef\x01\n" +
+	"\x1cUpdateAccountSettingsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12O\n" +
+	"\bsettings\x18\x03 \x01(\v23.maxshot.gateway_internal.v1.AccountFundingSettingsR\bsettings\x126\n" +
+	"\x17replace_spending_limits\x18\x04 \x01(\bR\x15replaceSpendingLimits\"p\n" +
+	"\x1dUpdateAccountSettingsResponse\x12O\n" +
+	"\bsettings\x18\x01 \x01(\v23.maxshot.gateway_internal.v1.AccountFundingSettingsR\bsettings\"\x80\x02\n" +
+	"\x17SubscriptionPlanVersion\x12\x17\n" +
+	"\aplan_id\x18\x01 \x01(\tR\x06planId\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12!\n" +
+	"\fsales_status\x18\x03 \x01(\tR\vsalesStatus\x12,\n" +
+	"\x12is_mock_commercial\x18\x04 \x01(\bR\x10isMockCommercial\x12\x1f\n" +
+	"\vprice_cents\x18\x05 \x01(\x03R\n" +
+	"priceCents\x12\x1a\n" +
+	"\bcurrency\x18\x06 \x01(\tR\bcurrency\x12\x1f\n" +
+	"\vpolicy_json\x18\a \x01(\fR\n" +
+	"policyJson\"\xd4\x04\n" +
+	"\x13AccountSubscription\x12'\n" +
+	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12W\n" +
+	"\fcurrent_plan\x18\x03 \x01(\v24.maxshot.gateway_internal.v1.SubscriptionPlanVersionR\vcurrentPlan\x12\x1b\n" +
+	"\tperiod_id\x18\x04 \x01(\tR\bperiodId\x12/\n" +
+	"\x14period_start_unix_ms\x18\x05 \x01(\x03R\x11periodStartUnixMs\x12+\n" +
+	"\x12period_end_unix_ms\x18\x06 \x01(\x03R\x0fperiodEndUnixMs\x12\x1d\n" +
+	"\n" +
+	"auto_renew\x18\a \x01(\bR\tautoRenew\x125\n" +
+	"\x17pending_plan_version_id\x18\b \x01(\tR\x14pendingPlanVersionId\x12-\n" +
+	"\x13anchor_day_of_month\x18\t \x01(\x05R\x10anchorDayOfMonth\x12W\n" +
+	"\x0fremaining_pools\x18\n" +
+	" \x03(\v2..maxshot.gateway_internal.v1.BucketBalanceViewR\x0eremainingPools\x12J\n" +
+	"\awindows\x18\v \x03(\v20.maxshot.gateway_internal.v1.FundingWindowStatusR\awindows\"\x86\x03\n" +
+	"\x13SubscriptionInvoice\x12\x1d\n" +
+	"\n" +
+	"invoice_id\x18\x01 \x01(\tR\tinvoiceId\x12&\n" +
+	"\x0fplan_version_id\x18\x02 \x01(\tR\rplanVersionId\x12\x1b\n" +
+	"\tperiod_id\x18\x03 \x01(\tR\bperiodId\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x04 \x01(\tR\tpaymentId\x123\n" +
+	"\x16dollar_debit_micro_usd\x18\x05 \x01(\x03R\x13dollarDebitMicroUsd\x12/\n" +
+	"\x14period_start_unix_ms\x18\x06 \x01(\x03R\x11periodStartUnixMs\x12+\n" +
+	"\x12period_end_unix_ms\x18\a \x01(\x03R\x0fperiodEndUnixMs\x12%\n" +
+	"\x0fpaid_at_unix_ms\x18\b \x01(\x03R\fpaidAtUnixMs\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12\x1a\n" +
+	"\bcurrency\x18\n" +
+	" \x01(\tR\bcurrency\"\x1e\n" +
+	"\x1cListSubscriptionPlansRequest\"k\n" +
+	"\x1dListSubscriptionPlansResponse\x12J\n" +
+	"\x05plans\x18\x01 \x03(\v24.maxshot.gateway_internal.v1.SubscriptionPlanVersionR\x05plans\"7\n" +
+	"\x16GetSubscriptionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"o\n" +
+	"\x17GetSubscriptionResponse\x12T\n" +
+	"\fsubscription\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AccountSubscriptionR\fsubscription\"\x8d\x01\n" +
+	"\x1bPurchaseSubscriptionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
+	"\x0fplan_version_id\x18\x02 \x01(\tR\rplanVersionId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"\xc0\x01\n" +
+	"\x1cPurchaseSubscriptionResponse\x12T\n" +
+	"\fsubscription\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AccountSubscriptionR\fsubscription\x12J\n" +
+	"\ainvoice\x18\x02 \x01(\v20.maxshot.gateway_internal.v1.SubscriptionInvoiceR\ainvoice\"\x8a\x01\n" +
+	"\x18RenewSubscriptionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
+	"\x0fplan_version_id\x18\x02 \x01(\tR\rplanVersionId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"\xbd\x01\n" +
+	"\x19RenewSubscriptionResponse\x12T\n" +
+	"\fsubscription\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AccountSubscriptionR\fsubscription\x12J\n" +
+	"\ainvoice\x18\x02 \x01(\v20.maxshot.gateway_internal.v1.SubscriptionInvoiceR\ainvoice\"\x8f\x01\n" +
+	"\x19CancelSubscriptionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12*\n" +
+	"\x11resume_auto_renew\x18\x03 \x01(\bR\x0fresumeAutoRenew\"r\n" +
+	"\x1aCancelSubscriptionResponse\x12T\n" +
+	"\fsubscription\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AccountSubscriptionR\fsubscription\"\x8b\x01\n" +
+	"\x19SchedulePlanChangeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
+	"\x0fplan_version_id\x18\x02 \x01(\tR\rplanVersionId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"r\n" +
+	"\x1aSchedulePlanChangeResponse\x12T\n" +
+	"\fsubscription\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AccountSubscriptionR\fsubscription\"n\n" +
+	"\x13ListInvoicesRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x128\n" +
+	"\x04page\x18\x02 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\"\x9f\x01\n" +
+	"\x14ListInvoicesResponse\x12L\n" +
+	"\binvoices\x18\x01 \x03(\v20.maxshot.gateway_internal.v1.SubscriptionInvoiceR\binvoices\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"Q\n" +
+	"\x11GetInvoiceRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"invoice_id\x18\x02 \x01(\tR\tinvoiceId\"`\n" +
+	"\x12GetInvoiceResponse\x12J\n" +
+	"\ainvoice\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.SubscriptionInvoiceR\ainvoice\"T\n" +
+	"\x18GetDepositAddressRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bchain_id\x18\x02 \x01(\tR\achainId\"P\n" +
+	"\x19GetDepositAddressResponse\x12\x19\n" +
+	"\bchain_id\x18\x01 \x01(\tR\achainId\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\"\xbc\x02\n" +
+	"\n" +
+	"TopupOrder\x12\x19\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x18\n" +
+	"\achannel\x18\x02 \x01(\tR\achannel\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12-\n" +
+	"\x12provider_reference\x18\x04 \x01(\tR\x11providerReference\x120\n" +
+	"\x14destination_chain_id\x18\x05 \x01(\tR\x12destinationChainId\x12/\n" +
+	"\x13destination_address\x18\x06 \x01(\tR\x12destinationAddress\x12\"\n" +
+	"\rnet_micro_usd\x18\a \x01(\x03R\vnetMicroUsd\x12+\n" +
+	"\x12created_at_unix_ms\x18\b \x01(\x03R\x0fcreatedAtUnixMs\"\xdd\x02\n" +
+	"\x17CreateTopupOrderRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12'\n" +
+	"\x0fidempotency_key\x18\x02 \x01(\tR\x0eidempotencyKey\x12\x18\n" +
+	"\achannel\x18\x03 \x01(\tR\achannel\x12&\n" +
+	"\x0fsource_chain_id\x18\x04 \x01(\tR\rsourceChainId\x12&\n" +
+	"\x0fsource_asset_id\x18\x05 \x01(\tR\rsourceAssetId\x127\n" +
+	"\x18source_amount_atomic_dec\x18\x06 \x01(\tR\x15sourceAmountAtomicDec\x12'\n" +
+	"\x0fquote_reference\x18\a \x01(\tR\x0equoteReference\x12.\n" +
+	"\x13requested_usd_cents\x18\b \x01(\x03R\x11requestedUsdCents\"Y\n" +
+	"\x18CreateTopupOrderResponse\x12=\n" +
+	"\x05order\x18\x01 \x01(\v2'.maxshot.gateway_internal.v1.TopupOrderR\x05order\"\xfb\x01\n" +
+	"\x1aRecordStripePaymentRequest\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1d\n" +
+	"\n" +
+	"payment_id\x18\x02 \x01(\tR\tpaymentId\x12.\n" +
+	"\x13checkout_session_id\x18\x03 \x01(\tR\x11checkoutSessionId\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency\x12(\n" +
+	"\x10paid_minor_units\x18\x05 \x01(\x03R\x0epaidMinorUnits\x12-\n" +
+	"\x13occurred_at_unix_ms\x18\x06 \x01(\x03R\x10occurredAtUnixMs\"\\\n" +
+	"\x1bRecordStripePaymentResponse\x12=\n" +
+	"\x05order\x18\x01 \x01(\v2'.maxshot.gateway_internal.v1.TopupOrderR\x05order\"\x87\x01\n" +
+	"\x11ListTopupsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x128\n" +
+	"\x04page\x18\x02 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\x12\x19\n" +
+	"\border_id\x18\x03 \x01(\tR\aorderId\"\x90\x01\n" +
+	"\x12ListTopupsResponse\x12?\n" +
+	"\x06topups\x18\x01 \x03(\v2'.maxshot.gateway_internal.v1.TopupOrderR\x06topups\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"\xc2\x01\n" +
+	"\fLinkedWallet\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12%\n" +
+	"\x0ewallet_address\x18\x02 \x01(\tR\rwalletAddress\x12\x19\n" +
+	"\bchain_id\x18\x03 \x01(\x04R\achainId\x12+\n" +
+	"\x12linked_at_unix_sec\x18\x04 \x01(\x03R\x0flinkedAtUnixSec\x12$\n" +
+	"\x0esiwe_proof_ref\x18\x05 \x01(\tR\fsiweProofRef\"\x84\x02\n" +
+	"\x11LinkWalletRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12%\n" +
+	"\x0ewallet_address\x18\x02 \x01(\tR\rwalletAddress\x12\x19\n" +
+	"\bchain_id\x18\x03 \x01(\x04R\achainId\x12!\n" +
+	"\fsiwe_message\x18\x04 \x01(\tR\vsiweMessage\x12\x1c\n" +
+	"\tsignature\x18\x05 \x01(\fR\tsignature\x12$\n" +
+	"\x0esiwe_proof_ref\x18\x06 \x01(\tR\fsiweProofRef\x12'\n" +
+	"\x0fidempotency_key\x18\a \x01(\tR\x0eidempotencyKey\"S\n" +
+	"\x12LinkWalletResponse\x12=\n" +
+	"\x04link\x18\x01 \x01(\v2).maxshot.gateway_internal.v1.LinkedWalletR\x04link\"5\n" +
+	"\x14GetWalletLinkRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"V\n" +
+	"\x15GetWalletLinkResponse\x12=\n" +
+	"\x04link\x18\x01 \x01(\v2).maxshot.gateway_internal.v1.LinkedWalletR\x04link\"\x9f\x01\n" +
+	"\x17AcceptFundedTermRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x17\n" +
+	"\aterm_id\x18\x02 \x01(\tR\x06termId\x12#\n" +
+	"\rterms_version\x18\x03 \x01(\tR\ftermsVersion\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\"e\n" +
+	"\x18AcceptFundedTermResponse\x12I\n" +
+	"\n" +
+	"acceptance\x18\x01 \x01(\v2).maxshot.contract_grant.v1.TermAcceptanceR\n" +
+	"acceptance\"<\n" +
+	"\x1bGetCurrentFundedTermRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\xb9\x01\n" +
+	"\x1cGetCurrentFundedTermResponse\x12N\n" +
+	"\fcurrent_term\x18\x01 \x01(\v2+.maxshot.contract_grant.v1.FundedTermConfigR\vcurrentTerm\x12I\n" +
+	"\n" +
+	"acceptance\x18\x02 \x01(\v2).maxshot.contract_grant.v1.TermAcceptanceR\n" +
+	"acceptance\"\xcb\x01\n" +
+	"\x1aPrepareAccountMergeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12*\n" +
+	"\x11source_account_id\x18\x02 \x01(\tR\x0fsourceAccountId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\x129\n" +
+	"\x19verified_source_proof_ref\x18\x04 \x01(\tR\x16verifiedSourceProofRef\"\x81\x01\n" +
+	"\x1bPrepareAccountMergeResponse\x12\x19\n" +
+	"\bmerge_id\x18\x01 \x01(\tR\amergeId\x12\x1a\n" +
+	"\bblockers\x18\x02 \x03(\tR\bblockers\x12+\n" +
+	"\x12expires_at_unix_ms\x18\x03 \x01(\x03R\x0fexpiresAtUnixMs\"~\n" +
+	"\x19CommitAccountMergeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bmerge_id\x18\x02 \x01(\tR\amergeId\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"4\n" +
+	"\x1aCommitAccountMergeResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\"\xb4\x04\n" +
+	"\fAccountUsage\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1c\n" +
+	"\n" +
+	"api_key_id\x18\x02 \x01(\tR\bapiKeyId\x12\x19\n" +
+	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x120\n" +
+	"\x14selected_offering_id\x18\x04 \x01(\tR\x12selectedOfferingId\x12.\n" +
+	"\x13serving_offering_id\x18\x05 \x01(\tR\x11servingOfferingId\x12#\n" +
+	"\rfallback_used\x18\x06 \x01(\bR\ffallbackUsed\x12'\n" +
+	"\x0ffallback_reason\x18\a \x01(\tR\x0efallbackReason\x12+\n" +
+	"\x12created_at_unix_ms\x18\b \x01(\x03R\x0fcreatedAtUnixMs\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12<\n" +
+	"\x1baccepted_hard_max_micro_usd\x18\n" +
+	" \x01(\x03R\x17acceptedHardMaxMicroUsd\x12Z\n" +
+	"\x0fsettled_buckets\x18\v \x03(\v21.maxshot.gateway_internal.v1.BucketAllocationLineR\x0esettledBuckets\x12=\n" +
+	"\x05usage\x18\f \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\x05usage\"\xec\x01\n" +
+	"\x10ListUsageRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x128\n" +
+	"\x04page\x18\x02 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\x12\x1c\n" +
+	"\n" +
+	"api_key_id\x18\x03 \x01(\tR\bapiKeyId\x12\"\n" +
+	"\rsince_unix_ms\x18\x04 \x01(\x03R\vsinceUnixMs\x12\"\n" +
+	"\runtil_unix_ms\x18\x05 \x01(\x03R\vuntilUnixMs\x12\x19\n" +
+	"\bmodel_id\x18\x06 \x01(\tR\amodelId\"\x93\x01\n" +
+	"\x11ListUsageResponse\x12C\n" +
+	"\arecords\x18\x01 \x03(\v2).maxshot.gateway_internal.v1.AccountUsageR\arecords\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"U\n" +
+	"\x15GetUsageDetailRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"Y\n" +
+	"\x16GetUsageDetailResponse\x12?\n" +
+	"\x05usage\x18\x01 \x01(\v2).maxshot.gateway_internal.v1.AccountUsageR\x05usage\"\xf0\x01\n" +
+	"\rAccountNotice\x12\x1b\n" +
+	"\tnotice_id\x18\x01 \x01(\tR\bnoticeId\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12)\n" +
+	"\x11issued_at_unix_ms\x18\x03 \x01(\x03R\x0eissuedAtUnixMs\x12%\n" +
+	"\x0fread_at_unix_ms\x18\x04 \x01(\x03R\freadAtUnixMs\x12/\n" +
+	"\x14from_plan_version_id\x18\x05 \x01(\tR\x11fromPlanVersionId\x12+\n" +
+	"\x12to_plan_version_id\x18\x06 \x01(\tR\x0ftoPlanVersionId\"t\n" +
+	"\x19ListAccountNoticesRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x128\n" +
+	"\x04page\x18\x02 \x01(\v2$.maxshot.common.v1.CursorPageRequestR\x04page\"\x9d\x01\n" +
+	"\x1aListAccountNoticesResponse\x12D\n" +
+	"\anotices\x18\x01 \x03(\v2*.maxshot.gateway_internal.v1.AccountNoticeR\anotices\x129\n" +
+	"\x04page\x18\x02 \x01(\v2%.maxshot.common.v1.CursorPageResponseR\x04page\"U\n" +
+	"\x17AckAccountNoticeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1b\n" +
+	"\tnotice_id\x18\x02 \x01(\tR\bnoticeId\"^\n" +
+	"\x18AckAccountNoticeResponse\x12B\n" +
+	"\x06notice\x18\x01 \x01(\v2*.maxshot.gateway_internal.v1.AccountNoticeR\x06notice\":\n" +
+	"\x19GetReferralSummaryRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\xc6\x01\n" +
+	"\x1aGetReferralSummaryResponse\x12#\n" +
+	"\rreferral_code\x18\x01 \x01(\tR\freferralCode\x12)\n" +
+	"\x10rewarded_credits\x18\x02 \x01(\x03R\x0frewardedCredits\x12+\n" +
+	"\x11available_credits\x18\x03 \x01(\x03R\x10availableCredits\x12+\n" +
+	"\x11referred_accounts\x18\x04 \x01(\x03R\x10referredAccounts\"\x8c\x01\n" +
+	"\x1dSetReferralAttributionRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12#\n" +
+	"\rreferral_code\x18\x02 \x01(\tR\freferralCode\x12'\n" +
+	"\x0fidempotency_key\x18\x03 \x01(\tR\x0eidempotencyKey\"@\n" +
+	"\x1eSetReferralAttributionResponse\x12\x1e\n" +
+	"\n" +
+	"attributed\x18\x01 \x01(\bR\n" +
+	"attributed\"\xe8\x02\n" +
+	"\x0fOperatorContext\x12\x1f\n" +
+	"\voperator_id\x18\x01 \x01(\tR\n" +
+	"operatorId\x12n\n" +
+	"\x15authentication_method\x18\x02 \x01(\x0e29.maxshot.gateway_internal.v1.OperatorAuthenticationMethodR\x14authenticationMethod\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12'\n" +
+	"\x0fidempotency_key\x18\x04 \x01(\tR\x0eidempotencyKey\x12\x1b\n" +
+	"\tsource_ip\x18\x05 \x01(\tR\bsourceIp\x12;\n" +
+	"\x1bstep_up_verified_at_unix_ms\x18\x06 \x01(\x03R\x16stepUpVerifiedAtUnixMs\x12)\n" +
+	"\x11step_up_proof_ref\x18\a \x01(\tR\x0estepUpProofRef\"i\n" +
+	"\x13AdminMutationResult\x12\x19\n" +
+	"\baudit_id\x18\x01 \x01(\tR\aauditId\x12\x1f\n" +
+	"\vresource_id\x18\x02 \x01(\tR\n" +
+	"resourceId\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\"\x9e\x02\n" +
+	"\x12PlanCostValidation\x12'\n" +
+	"\x0fcatalog_version\x18\x01 \x01(\tR\x0ecatalogVersion\x12:\n" +
+	"\x1abasic_worst_cost_micro_usd\x18\x02 \x01(\x03R\x16basicWorstCostMicroUsd\x12>\n" +
+	"\x1cpremium_worst_cost_micro_usd\x18\x03 \x01(\x03R\x18premiumWorstCostMicroUsd\x12C\n" +
+	"\x1eminimum_contribution_micro_usd\x18\x04 \x01(\x03R\x1bminimumContributionMicroUsd\x12\x1e\n" +
+	"\n" +
+	"violations\x18\x05 \x03(\tR\n" +
+	"violations\"\xac\x01\n" +
+	"\x16CreatePlanDraftRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12H\n" +
+	"\x04plan\x18\x02 \x01(\v24.maxshot.gateway_internal.v1.SubscriptionPlanVersionR\x04plan\"c\n" +
+	"\x17CreatePlanDraftResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\";\n" +
+	"\x1aValidatePlanVersionRequest\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x01 \x01(\tR\tversionId\"n\n" +
+	"\x1bValidatePlanVersionResponse\x12O\n" +
+	"\n" +
+	"validation\x18\x01 \x01(\v2/.maxshot.gateway_internal.v1.PlanCostValidationR\n" +
+	"validation\"9\n" +
+	"\x18PreviewPlanImpactRequest\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x01 \x01(\tR\tversionId\"\xcc\x01\n" +
+	"\x19PreviewPlanImpactResponse\x125\n" +
+	"\x16affected_subscriptions\x18\x01 \x01(\x03R\x15affectedSubscriptions\x12'\n" +
+	"\x0fadverse_changes\x18\x02 \x03(\tR\x0eadverseChanges\x12O\n" +
+	"\n" +
+	"validation\x18\x03 \x01(\v2/.maxshot.gateway_internal.v1.PlanCostValidationR\n" +
+	"validation\"\xbe\x01\n" +
+	"\x19PublishPlanVersionRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x128\n" +
+	"\x18expected_catalog_version\x18\x03 \x01(\tR\x16expectedCatalogVersion\"f\n" +
+	"\x1aPublishPlanVersionResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xa7\x01\n" +
+	"\x19SetPlanSalesStatusRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1d\n" +
+	"\n" +
+	"version_id\x18\x02 \x01(\tR\tversionId\x12!\n" +
+	"\fsales_status\x18\x03 \x01(\tR\vsalesStatus\"f\n" +
+	"\x1aSetPlanSalesStatusResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x99\x01\n" +
+	"\x16SetSpendingLockRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06locked\x18\x03 \x01(\bR\x06locked\"c\n" +
+	"\x17SetSpendingLockResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xc6\x02\n" +
+	"\x1dManualLedgerAdjustmentRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12G\n" +
+	"\x0efunding_bucket\x18\x03 \x01(\x0e2 .maxshot.common.v1.FundingBucketR\rfundingBucket\x12\x1b\n" +
+	"\tsource_id\x18\x04 \x01(\tR\bsourceId\x12!\n" +
+	"\fcredit_delta\x18\x05 \x01(\x03R\vcreditDelta\x123\n" +
+	"\x16dollar_delta_micro_usd\x18\x06 \x01(\x03R\x13dollarDeltaMicroUsd\"j\n" +
+	"\x1eManualLedgerAdjustmentResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x9f\x01\n" +
+	"\x1eResolveDepositReorgHoldRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x17\n" +
+	"\ahold_id\x18\x02 \x01(\tR\x06holdId\x12\x1a\n" +
+	"\bdecision\x18\x03 \x01(\tR\bdecision\"k\n" +
+	"\x1fResolveDepositReorgHoldResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xb8\x01\n" +
+	"\x12ReviewTopupRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x19\n" +
+	"\border_id\x18\x02 \x01(\tR\aorderId\x12\x1a\n" +
+	"\bdecision\x18\x03 \x01(\tR\bdecision\x12!\n" +
+	"\fevidence_ref\x18\x04 \x01(\tR\vevidenceRef\"_\n" +
+	"\x13ReviewTopupResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x84\x01\n" +
+	"\x1bRevokeReferralRewardRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1b\n" +
+	"\treward_id\x18\x02 \x01(\tR\brewardId\"h\n" +
+	"\x1cRevokeReferralRewardResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xae\x01\n" +
+	"\x19ResolveDiscrepancyRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12%\n" +
+	"\x0ediscrepancy_id\x18\x02 \x01(\tR\rdiscrepancyId\x12 \n" +
+	"\vdisposition\x18\x03 \x01(\tR\vdisposition\"f\n" +
+	"\x1aResolveDiscrepancyResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x86\x01\n" +
+	"\x1bRefundSettledRequestRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"h\n" +
+	"\x1cRefundSettledRequestResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xee\x01\n" +
+	"\x17UpsertFundedTermRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12?\n" +
+	"\x04term\x18\x02 \x01(\v2+.maxshot.contract_grant.v1.FundedTermConfigR\x04term\x121\n" +
+	"\x12refund_reserve_bps\x18\x03 \x01(\rH\x00R\x10refundReserveBps\x88\x01\x01B\x15\n" +
+	"\x13_refund_reserve_bps\"d\n" +
+	"\x18UpsertFundedTermResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xb0\x01\n" +
+	"\x15LockFundedTermRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x17\n" +
+	"\aterm_id\x18\x02 \x01(\tR\x06termId\x124\n" +
+	"\x16funding_reservation_id\x18\x03 \x01(\tR\x14fundingReservationId\"b\n" +
+	"\x16LockFundedTermResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xba\x01\n" +
+	" SetCoverageThrottlePolicyRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12L\n" +
+	"\x06policy\x18\x02 \x01(\v24.maxshot.contract_grant.v1.AitCoverageThrottlePolicyR\x06policy\"m\n" +
+	"!SetCoverageThrottlePolicyResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xa6\x01\n" +
+	"\x1aUpdateSystemSettingRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1f\n" +
+	"\vsetting_key\x18\x02 \x01(\tR\n" +
+	"settingKey\x12\x1d\n" +
+	"\n" +
+	"value_json\x18\x03 \x01(\fR\tvalueJson\"g\n" +
+	"\x1bUpdateSystemSettingResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x91\x02\n" +
+	"!UpdateFreeModelQuotaPolicyRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x19\n" +
+	"\bmodel_id\x18\x02 \x01(\tR\amodelId\x129\n" +
+	"\x19daily_free_requests_limit\x18\x03 \x01(\x03R\x16dailyFreeRequestsLimit\x12L\n" +
+	"#daily_free_equivalent_credits_limit\x18\x04 \x01(\x03R\x1fdailyFreeEquivalentCreditsLimit\"n\n" +
+	"\"UpdateFreeModelQuotaPolicyResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x8c\x03\n" +
+	"\x1aResolveUncertainJobRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12!\n" +
+	"\foperation_id\x18\x02 \x01(\tR\voperationId\x12N\n" +
+	"\x06action\x18\x03 \x01(\x0e26.maxshot.gateway_internal.v1.UncertainResolutionActionR\x06action\x12a\n" +
+	"\x10verified_outputs\x18\x04 \x03(\v26.maxshot.gateway_internal.v1.MediaOutputSettlementItemR\x0fverifiedOutputs\x12N\n" +
+	"\x0everified_usage\x18\x05 \x01(\v2'.maxshot.gateway_internal.v1.UsageBoundR\rverifiedUsage\"g\n" +
+	"\x1bResolveUncertainJobResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\xa0\x01\n" +
+	"\x17ModerateMaterialRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1f\n" +
+	"\vmaterial_id\x18\x02 \x01(\tR\n" +
+	"materialId\x12\x1a\n" +
+	"\bdecision\x18\x03 \x01(\tR\bdecision\"d\n" +
+	"\x18ModerateMaterialResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result\"\x99\x01\n" +
+	"\x14ResolveAppealRequest\x12H\n" +
+	"\boperator\x18\x01 \x01(\v2,.maxshot.gateway_internal.v1.OperatorContextR\boperator\x12\x1b\n" +
+	"\tappeal_id\x18\x02 \x01(\tR\bappealId\x12\x1a\n" +
+	"\bdecision\x18\x03 \x01(\tR\bdecision\"a\n" +
+	"\x15ResolveAppealResponse\x12H\n" +
+	"\x06result\x18\x01 \x01(\v20.maxshot.gateway_internal.v1.AdminMutationResultR\x06result*\x8e\x01\n" +
 	"\x10ExecutionChannel\x12!\n" +
 	"\x1dEXECUTION_CHANNEL_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15EXECUTION_CHANNEL_API\x10\x01\x12\x1e\n" +
@@ -4311,12 +12459,36 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\"ATTEMPT_ERROR_CLASS_USER_INPUT_4XX\x10\b\x12&\n" +
 	"\"ATTEMPT_ERROR_CLASS_CONTENT_POLICY\x10\t\x12(\n" +
 	"$ATTEMPT_ERROR_CLASS_CLIENT_CANCELLED\x10\n" +
-	"*\xda\x01\n" +
+	"*\x9a\x02\n" +
 	"\x19UncertainResolutionAction\x12+\n" +
 	"'UNCERTAIN_RESOLUTION_ACTION_UNSPECIFIED\x10\x00\x120\n" +
 	",UNCERTAIN_RESOLUTION_ACTION_SETTLE_DELIVERED\x10\x01\x12,\n" +
-	"(UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST\x10\x02\x120\n" +
-	",UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H\x10\x032\x96\t\n" +
+	"(UNCERTAIN_RESOLUTION_ACTION_RELEASE_LOST\x10\x02\x124\n" +
+	",UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_24H\x10\x03\x1a\x02\b\x01\x12:\n" +
+	"6UNCERTAIN_RESOLUTION_ACTION_AUTO_RELEASE_CUSTOMER_HOLD\x10\x04*\xae\x02\n" +
+	"\x14AttemptDispatchState\x12&\n" +
+	"\"ATTEMPT_DISPATCH_STATE_UNSPECIFIED\x10\x00\x12*\n" +
+	"&ATTEMPT_DISPATCH_STATE_INTENT_RECORDED\x10\x01\x12'\n" +
+	"#ATTEMPT_DISPATCH_STATE_NOT_ACCEPTED\x10\x02\x12*\n" +
+	"&ATTEMPT_DISPATCH_STATE_FAILED_TERMINAL\x10\x03\x12#\n" +
+	"\x1fATTEMPT_DISPATCH_STATE_ACCEPTED\x10\x04\x12\"\n" +
+	"\x1eATTEMPT_DISPATCH_STATE_UNKNOWN\x10\x05\x12$\n" +
+	" ATTEMPT_DISPATCH_STATE_COMPLETED\x10\x06*\x9c\x02\n" +
+	"\x15SettlementDisposition\x12&\n" +
+	"\"SETTLEMENT_DISPOSITION_UNSPECIFIED\x10\x00\x12\"\n" +
+	"\x1eSETTLEMENT_DISPOSITION_APPLIED\x10\x01\x12*\n" +
+	"&SETTLEMENT_DISPOSITION_ALREADY_APPLIED\x10\x02\x121\n" +
+	"-SETTLEMENT_DISPOSITION_PENDING_RECONCILIATION\x10\x03\x121\n" +
+	"-SETTLEMENT_DISPOSITION_AFTER_CUSTOMER_RELEASE\x10\x04\x12%\n" +
+	"!SETTLEMENT_DISPOSITION_LEASE_LOST\x10\x05*\x89\x01\n" +
+	"\rFundingNotice\x12\x1e\n" +
+	"\x1aFUNDING_NOTICE_UNSPECIFIED\x10\x00\x12-\n" +
+	")FUNDING_NOTICE_FREE_MODEL_QUOTA_EXHAUSTED\x10\x01\x12)\n" +
+	"%FUNDING_NOTICE_AIT_COVERAGE_THROTTLED\x10\x02*\xac\x01\n" +
+	"\x1cOperatorAuthenticationMethod\x12.\n" +
+	"*OPERATOR_AUTHENTICATION_METHOD_UNSPECIFIED\x10\x00\x12'\n" +
+	"#OPERATOR_AUTHENTICATION_METHOD_TOTP\x10\x01\x123\n" +
+	"/OPERATOR_AUTHENTICATION_METHOD_WALLET_SIGNATURE\x10\x022\xd8\f\n" +
 	"\x17BillingExecutionService\x12\x8e\x01\n" +
 	"\x15ResolvePrincipalScope\x129.maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest\x1a:.maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse\x12\x97\x01\n" +
 	"\x18EvaluateCatalogDiscovery\x12<.maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest\x1a=.maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse\x12s\n" +
@@ -4326,7 +12498,67 @@ const file_maxshot_gateway_internal_v1_execution_proto_rawDesc = "" +
 	"\x14ExtendExecutionLease\x128.maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest\x1a9.maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse\x12a\n" +
 	"\x06Settle\x12*.maxshot.gateway_internal.v1.SettleRequest\x1a+.maxshot.gateway_internal.v1.SettleResponse\x12v\n" +
 	"\rMarkUncertain\x121.maxshot.gateway_internal.v1.MarkUncertainRequest\x1a2.maxshot.gateway_internal.v1.MarkUncertainResponse\x12\x7f\n" +
-	"\x10ResolveUncertain\x124.maxshot.gateway_internal.v1.ResolveUncertainRequest\x1a5.maxshot.gateway_internal.v1.ResolveUncertainResponseBZZXgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1;gatewayinternalv1b\x06proto3"
+	"\x10ResolveUncertain\x124.maxshot.gateway_internal.v1.ResolveUncertainRequest\x1a5.maxshot.gateway_internal.v1.ResolveUncertainResponse\x12\x97\x01\n" +
+	"\x18RecordAttemptObservation\x12<.maxshot.gateway_internal.v1.RecordAttemptObservationRequest\x1a=.maxshot.gateway_internal.v1.RecordAttemptObservationResponse\x12\x91\x01\n" +
+	"\x16ClaimExecutionRecovery\x12:.maxshot.gateway_internal.v1.ClaimExecutionRecoveryRequest\x1a;.maxshot.gateway_internal.v1.ClaimExecutionRecoveryResponse\x12\x91\x01\n" +
+	"\x16GetBillingCatalogState\x12:.maxshot.gateway_internal.v1.GetBillingCatalogStateRequest\x1a;.maxshot.gateway_internal.v1.GetBillingCatalogStateResponse2\xaa\x1f\n" +
+	"\x18AccountManagementService\x12|\n" +
+	"\x0fRegisterAccount\x123.maxshot.gateway_internal.v1.RegisterAccountRequest\x1a4.maxshot.gateway_internal.v1.RegisterAccountResponse\x12s\n" +
+	"\fCreateApiKey\x120.maxshot.gateway_internal.v1.CreateApiKeyRequest\x1a1.maxshot.gateway_internal.v1.CreateApiKeyResponse\x12s\n" +
+	"\fUpdateApiKey\x120.maxshot.gateway_internal.v1.UpdateApiKeyRequest\x1a1.maxshot.gateway_internal.v1.UpdateApiKeyResponse\x12s\n" +
+	"\fRevokeApiKey\x120.maxshot.gateway_internal.v1.RevokeApiKeyRequest\x1a1.maxshot.gateway_internal.v1.RevokeApiKeyResponse\x12p\n" +
+	"\vListApiKeys\x12/.maxshot.gateway_internal.v1.ListApiKeysRequest\x1a0.maxshot.gateway_internal.v1.ListApiKeysResponse\x12\x82\x01\n" +
+	"\x11GetAccountFunding\x125.maxshot.gateway_internal.v1.GetAccountFundingRequest\x1a6.maxshot.gateway_internal.v1.GetAccountFundingResponse\x12\x8e\x01\n" +
+	"\x15UpdateAccountSettings\x129.maxshot.gateway_internal.v1.UpdateAccountSettingsRequest\x1a:.maxshot.gateway_internal.v1.UpdateAccountSettingsResponse\x12\x8e\x01\n" +
+	"\x15ListSubscriptionPlans\x129.maxshot.gateway_internal.v1.ListSubscriptionPlansRequest\x1a:.maxshot.gateway_internal.v1.ListSubscriptionPlansResponse\x12|\n" +
+	"\x0fGetSubscription\x123.maxshot.gateway_internal.v1.GetSubscriptionRequest\x1a4.maxshot.gateway_internal.v1.GetSubscriptionResponse\x12\x8b\x01\n" +
+	"\x14PurchaseSubscription\x128.maxshot.gateway_internal.v1.PurchaseSubscriptionRequest\x1a9.maxshot.gateway_internal.v1.PurchaseSubscriptionResponse\x12\x82\x01\n" +
+	"\x11RenewSubscription\x125.maxshot.gateway_internal.v1.RenewSubscriptionRequest\x1a6.maxshot.gateway_internal.v1.RenewSubscriptionResponse\x12\x85\x01\n" +
+	"\x12CancelSubscription\x126.maxshot.gateway_internal.v1.CancelSubscriptionRequest\x1a7.maxshot.gateway_internal.v1.CancelSubscriptionResponse\x12\x85\x01\n" +
+	"\x12SchedulePlanChange\x126.maxshot.gateway_internal.v1.SchedulePlanChangeRequest\x1a7.maxshot.gateway_internal.v1.SchedulePlanChangeResponse\x12s\n" +
+	"\fListInvoices\x120.maxshot.gateway_internal.v1.ListInvoicesRequest\x1a1.maxshot.gateway_internal.v1.ListInvoicesResponse\x12m\n" +
+	"\n" +
+	"GetInvoice\x12..maxshot.gateway_internal.v1.GetInvoiceRequest\x1a/.maxshot.gateway_internal.v1.GetInvoiceResponse\x12\x82\x01\n" +
+	"\x11GetDepositAddress\x125.maxshot.gateway_internal.v1.GetDepositAddressRequest\x1a6.maxshot.gateway_internal.v1.GetDepositAddressResponse\x12\x7f\n" +
+	"\x10CreateTopupOrder\x124.maxshot.gateway_internal.v1.CreateTopupOrderRequest\x1a5.maxshot.gateway_internal.v1.CreateTopupOrderResponse\x12\x88\x01\n" +
+	"\x13RecordStripePayment\x127.maxshot.gateway_internal.v1.RecordStripePaymentRequest\x1a8.maxshot.gateway_internal.v1.RecordStripePaymentResponse\x12m\n" +
+	"\n" +
+	"ListTopups\x12..maxshot.gateway_internal.v1.ListTopupsRequest\x1a/.maxshot.gateway_internal.v1.ListTopupsResponse\x12m\n" +
+	"\n" +
+	"LinkWallet\x12..maxshot.gateway_internal.v1.LinkWalletRequest\x1a/.maxshot.gateway_internal.v1.LinkWalletResponse\x12v\n" +
+	"\rGetWalletLink\x121.maxshot.gateway_internal.v1.GetWalletLinkRequest\x1a2.maxshot.gateway_internal.v1.GetWalletLinkResponse\x12\x7f\n" +
+	"\x10AcceptFundedTerm\x124.maxshot.gateway_internal.v1.AcceptFundedTermRequest\x1a5.maxshot.gateway_internal.v1.AcceptFundedTermResponse\x12\x8b\x01\n" +
+	"\x14GetCurrentFundedTerm\x128.maxshot.gateway_internal.v1.GetCurrentFundedTermRequest\x1a9.maxshot.gateway_internal.v1.GetCurrentFundedTermResponse\x12\x88\x01\n" +
+	"\x13PrepareAccountMerge\x127.maxshot.gateway_internal.v1.PrepareAccountMergeRequest\x1a8.maxshot.gateway_internal.v1.PrepareAccountMergeResponse\x12\x85\x01\n" +
+	"\x12CommitAccountMerge\x126.maxshot.gateway_internal.v1.CommitAccountMergeRequest\x1a7.maxshot.gateway_internal.v1.CommitAccountMergeResponse\x12j\n" +
+	"\tListUsage\x12-.maxshot.gateway_internal.v1.ListUsageRequest\x1a..maxshot.gateway_internal.v1.ListUsageResponse\x12y\n" +
+	"\x0eGetUsageDetail\x122.maxshot.gateway_internal.v1.GetUsageDetailRequest\x1a3.maxshot.gateway_internal.v1.GetUsageDetailResponse\x12\x85\x01\n" +
+	"\x12ListAccountNotices\x126.maxshot.gateway_internal.v1.ListAccountNoticesRequest\x1a7.maxshot.gateway_internal.v1.ListAccountNoticesResponse\x12\x7f\n" +
+	"\x10AckAccountNotice\x124.maxshot.gateway_internal.v1.AckAccountNoticeRequest\x1a5.maxshot.gateway_internal.v1.AckAccountNoticeResponse\x12\x85\x01\n" +
+	"\x12GetReferralSummary\x126.maxshot.gateway_internal.v1.GetReferralSummaryRequest\x1a7.maxshot.gateway_internal.v1.GetReferralSummaryResponse\x12\x91\x01\n" +
+	"\x16SetReferralAttribution\x12:.maxshot.gateway_internal.v1.SetReferralAttributionRequest\x1a;.maxshot.gateway_internal.v1.SetReferralAttributionResponse2\xb6\x12\n" +
+	"\x13BillingAdminService\x12|\n" +
+	"\x0fCreatePlanDraft\x123.maxshot.gateway_internal.v1.CreatePlanDraftRequest\x1a4.maxshot.gateway_internal.v1.CreatePlanDraftResponse\x12\x88\x01\n" +
+	"\x13ValidatePlanVersion\x127.maxshot.gateway_internal.v1.ValidatePlanVersionRequest\x1a8.maxshot.gateway_internal.v1.ValidatePlanVersionResponse\x12\x82\x01\n" +
+	"\x11PreviewPlanImpact\x125.maxshot.gateway_internal.v1.PreviewPlanImpactRequest\x1a6.maxshot.gateway_internal.v1.PreviewPlanImpactResponse\x12\x85\x01\n" +
+	"\x12PublishPlanVersion\x126.maxshot.gateway_internal.v1.PublishPlanVersionRequest\x1a7.maxshot.gateway_internal.v1.PublishPlanVersionResponse\x12\x85\x01\n" +
+	"\x12SetPlanSalesStatus\x126.maxshot.gateway_internal.v1.SetPlanSalesStatusRequest\x1a7.maxshot.gateway_internal.v1.SetPlanSalesStatusResponse\x12|\n" +
+	"\x0fSetSpendingLock\x123.maxshot.gateway_internal.v1.SetSpendingLockRequest\x1a4.maxshot.gateway_internal.v1.SetSpendingLockResponse\x12\x91\x01\n" +
+	"\x16ManualLedgerAdjustment\x12:.maxshot.gateway_internal.v1.ManualLedgerAdjustmentRequest\x1a;.maxshot.gateway_internal.v1.ManualLedgerAdjustmentResponse\x12\x94\x01\n" +
+	"\x17ResolveDepositReorgHold\x12;.maxshot.gateway_internal.v1.ResolveDepositReorgHoldRequest\x1a<.maxshot.gateway_internal.v1.ResolveDepositReorgHoldResponse\x12p\n" +
+	"\vReviewTopup\x12/.maxshot.gateway_internal.v1.ReviewTopupRequest\x1a0.maxshot.gateway_internal.v1.ReviewTopupResponse\x12\x8b\x01\n" +
+	"\x14RevokeReferralReward\x128.maxshot.gateway_internal.v1.RevokeReferralRewardRequest\x1a9.maxshot.gateway_internal.v1.RevokeReferralRewardResponse\x12\x85\x01\n" +
+	"\x12ResolveDiscrepancy\x126.maxshot.gateway_internal.v1.ResolveDiscrepancyRequest\x1a7.maxshot.gateway_internal.v1.ResolveDiscrepancyResponse\x12\x8b\x01\n" +
+	"\x14RefundSettledRequest\x128.maxshot.gateway_internal.v1.RefundSettledRequestRequest\x1a9.maxshot.gateway_internal.v1.RefundSettledRequestResponse\x12\x7f\n" +
+	"\x10UpsertFundedTerm\x124.maxshot.gateway_internal.v1.UpsertFundedTermRequest\x1a5.maxshot.gateway_internal.v1.UpsertFundedTermResponse\x12y\n" +
+	"\x0eLockFundedTerm\x122.maxshot.gateway_internal.v1.LockFundedTermRequest\x1a3.maxshot.gateway_internal.v1.LockFundedTermResponse\x12\x9a\x01\n" +
+	"\x19SetCoverageThrottlePolicy\x12=.maxshot.gateway_internal.v1.SetCoverageThrottlePolicyRequest\x1a>.maxshot.gateway_internal.v1.SetCoverageThrottlePolicyResponse\x12\x88\x01\n" +
+	"\x13UpdateSystemSetting\x127.maxshot.gateway_internal.v1.UpdateSystemSettingRequest\x1a8.maxshot.gateway_internal.v1.UpdateSystemSettingResponse\x12\x9d\x01\n" +
+	"\x1aUpdateFreeModelQuotaPolicy\x12>.maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyRequest\x1a?.maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyResponse2\x98\x03\n" +
+	"\x12StudioAdminService\x12\x88\x01\n" +
+	"\x13ResolveUncertainJob\x127.maxshot.gateway_internal.v1.ResolveUncertainJobRequest\x1a8.maxshot.gateway_internal.v1.ResolveUncertainJobResponse\x12\x7f\n" +
+	"\x10ModerateMaterial\x124.maxshot.gateway_internal.v1.ModerateMaterialRequest\x1a5.maxshot.gateway_internal.v1.ModerateMaterialResponse\x12v\n" +
+	"\rResolveAppeal\x121.maxshot.gateway_internal.v1.ResolveAppealRequest\x1a2.maxshot.gateway_internal.v1.ResolveAppealResponseBZZXgithub.com/MaxShotLab/maxshot-proto/gen/go/maxshot/gateway_internal/v1;gatewayinternalv1b\x06proto3"
 
 var (
 	file_maxshot_gateway_internal_v1_execution_proto_rawDescOnce sync.Once
@@ -4340,135 +12572,491 @@ func file_maxshot_gateway_internal_v1_execution_proto_rawDescGZIP() []byte {
 	return file_maxshot_gateway_internal_v1_execution_proto_rawDescData
 }
 
-var file_maxshot_gateway_internal_v1_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_maxshot_gateway_internal_v1_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_maxshot_gateway_internal_v1_execution_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_maxshot_gateway_internal_v1_execution_proto_msgTypes = make([]protoimpl.MessageInfo, 155)
 var file_maxshot_gateway_internal_v1_execution_proto_goTypes = []any{
-	(ExecutionChannel)(0),                    // 0: maxshot.gateway_internal.v1.ExecutionChannel
-	(RouteSelectionMode)(0),                  // 1: maxshot.gateway_internal.v1.RouteSelectionMode
-	(HoldDecisionStatus)(0),                  // 2: maxshot.gateway_internal.v1.HoldDecisionStatus
-	(SettlementOutcome)(0),                   // 3: maxshot.gateway_internal.v1.SettlementOutcome
-	(AttemptErrorClass)(0),                   // 4: maxshot.gateway_internal.v1.AttemptErrorClass
-	(UncertainResolutionAction)(0),           // 5: maxshot.gateway_internal.v1.UncertainResolutionAction
-	(*MediaPricingDimensions)(nil),           // 6: maxshot.gateway_internal.v1.MediaPricingDimensions
-	(*UsageBound)(nil),                       // 7: maxshot.gateway_internal.v1.UsageBound
-	(*QuoteComponentLine)(nil),               // 8: maxshot.gateway_internal.v1.QuoteComponentLine
-	(*BucketAllocationLine)(nil),             // 9: maxshot.gateway_internal.v1.BucketAllocationLine
-	(*SpendingLimitDiagnostic)(nil),          // 10: maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	(*CreditShortfallDiagnostic)(nil),        // 11: maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	(*ThresholdWarning)(nil),                 // 12: maxshot.gateway_internal.v1.ThresholdWarning
-	(*LockedVersionSet)(nil),                 // 13: maxshot.gateway_internal.v1.LockedVersionSet
-	(*BucketBalanceView)(nil),                // 14: maxshot.gateway_internal.v1.BucketBalanceView
-	(*FundingWindowStatus)(nil),              // 15: maxshot.gateway_internal.v1.FundingWindowStatus
-	(*KeyGrossWindowStatus)(nil),             // 16: maxshot.gateway_internal.v1.KeyGrossWindowStatus
-	(*ResolvePrincipalScopeRequest)(nil),     // 17: maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
-	(*ResolvePrincipalScopeResponse)(nil),    // 18: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
-	(*EvaluateCatalogDiscoveryRequest)(nil),  // 19: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
-	(*ModelDiscoveryEvaluation)(nil),         // 20: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
-	(*EvaluateCatalogDiscoveryResponse)(nil), // 21: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
-	(*PreviewQuoteRequest)(nil),              // 22: maxshot.gateway_internal.v1.PreviewQuoteRequest
-	(*PreviewQuoteResponse)(nil),             // 23: maxshot.gateway_internal.v1.PreviewQuoteResponse
-	(*AuthorizeAndHoldRequest)(nil),          // 24: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
-	(*AuthorizeAndHoldResponse)(nil),         // 25: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
-	(*MarkSendingRequest)(nil),               // 26: maxshot.gateway_internal.v1.MarkSendingRequest
-	(*MarkSendingResponse)(nil),              // 27: maxshot.gateway_internal.v1.MarkSendingResponse
-	(*ExtendExecutionLeaseRequest)(nil),      // 28: maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
-	(*ExtendExecutionLeaseResponse)(nil),     // 29: maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
-	(*MediaOutputSettlementItem)(nil),        // 30: maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	(*AttemptCostRecord)(nil),                // 31: maxshot.gateway_internal.v1.AttemptCostRecord
-	(*SettleRequest)(nil),                    // 32: maxshot.gateway_internal.v1.SettleRequest
-	(*SettleResponse)(nil),                   // 33: maxshot.gateway_internal.v1.SettleResponse
-	(*MarkUncertainRequest)(nil),             // 34: maxshot.gateway_internal.v1.MarkUncertainRequest
-	(*MarkUncertainResponse)(nil),            // 35: maxshot.gateway_internal.v1.MarkUncertainResponse
-	(*ResolveUncertainRequest)(nil),          // 36: maxshot.gateway_internal.v1.ResolveUncertainRequest
-	(*ResolveUncertainResponse)(nil),         // 37: maxshot.gateway_internal.v1.ResolveUncertainResponse
-	(*v1.KeyValueAttribute)(nil),             // 38: maxshot.common.v1.KeyValueAttribute
-	(v1.FundingBucket)(0),                    // 39: maxshot.common.v1.FundingBucket
-	(v1.BudgetPeriodKind)(0),                 // 40: maxshot.common.v1.BudgetPeriodKind
-	(v1.RejectCode)(0),                       // 41: maxshot.common.v1.RejectCode
-	(v1.KeyFundingStrategy)(0),               // 42: maxshot.common.v1.KeyFundingStrategy
-	(v1.SearchPolicy)(0),                     // 43: maxshot.common.v1.SearchPolicy
-	(v1.Modality)(0),                         // 44: maxshot.common.v1.Modality
-	(v1.CustomerChargeMode)(0),               // 45: maxshot.common.v1.CustomerChargeMode
+	(ExecutionChannel)(0),                      // 0: maxshot.gateway_internal.v1.ExecutionChannel
+	(RouteSelectionMode)(0),                    // 1: maxshot.gateway_internal.v1.RouteSelectionMode
+	(HoldDecisionStatus)(0),                    // 2: maxshot.gateway_internal.v1.HoldDecisionStatus
+	(SettlementOutcome)(0),                     // 3: maxshot.gateway_internal.v1.SettlementOutcome
+	(AttemptErrorClass)(0),                     // 4: maxshot.gateway_internal.v1.AttemptErrorClass
+	(UncertainResolutionAction)(0),             // 5: maxshot.gateway_internal.v1.UncertainResolutionAction
+	(AttemptDispatchState)(0),                  // 6: maxshot.gateway_internal.v1.AttemptDispatchState
+	(SettlementDisposition)(0),                 // 7: maxshot.gateway_internal.v1.SettlementDisposition
+	(FundingNotice)(0),                         // 8: maxshot.gateway_internal.v1.FundingNotice
+	(OperatorAuthenticationMethod)(0),          // 9: maxshot.gateway_internal.v1.OperatorAuthenticationMethod
+	(*MediaPricingDimensions)(nil),             // 10: maxshot.gateway_internal.v1.MediaPricingDimensions
+	(*UsageBound)(nil),                         // 11: maxshot.gateway_internal.v1.UsageBound
+	(*QuoteComponentLine)(nil),                 // 12: maxshot.gateway_internal.v1.QuoteComponentLine
+	(*BucketAllocationLine)(nil),               // 13: maxshot.gateway_internal.v1.BucketAllocationLine
+	(*SpendingLimitDiagnostic)(nil),            // 14: maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	(*CreditShortfallDiagnostic)(nil),          // 15: maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	(*ThresholdWarning)(nil),                   // 16: maxshot.gateway_internal.v1.ThresholdWarning
+	(*LockedVersionSet)(nil),                   // 17: maxshot.gateway_internal.v1.LockedVersionSet
+	(*BucketBalanceView)(nil),                  // 18: maxshot.gateway_internal.v1.BucketBalanceView
+	(*FundingWindowStatus)(nil),                // 19: maxshot.gateway_internal.v1.FundingWindowStatus
+	(*KeyGrossWindowStatus)(nil),               // 20: maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	(*ResolvePrincipalScopeRequest)(nil),       // 21: maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
+	(*ResolvePrincipalScopeResponse)(nil),      // 22: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
+	(*EvaluateCatalogDiscoveryRequest)(nil),    // 23: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
+	(*ModelDiscoveryEvaluation)(nil),           // 24: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
+	(*EvaluateCatalogDiscoveryResponse)(nil),   // 25: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
+	(*PreviewQuoteRequest)(nil),                // 26: maxshot.gateway_internal.v1.PreviewQuoteRequest
+	(*PreviewQuoteResponse)(nil),               // 27: maxshot.gateway_internal.v1.PreviewQuoteResponse
+	(*AuthorizeAndHoldRequest)(nil),            // 28: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
+	(*AuthorizeAndHoldResponse)(nil),           // 29: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
+	(*MarkSendingRequest)(nil),                 // 30: maxshot.gateway_internal.v1.MarkSendingRequest
+	(*MarkSendingResponse)(nil),                // 31: maxshot.gateway_internal.v1.MarkSendingResponse
+	(*ExtendExecutionLeaseRequest)(nil),        // 32: maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
+	(*ExtendExecutionLeaseResponse)(nil),       // 33: maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
+	(*MediaOutputSettlementItem)(nil),          // 34: maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	(*AttemptCostRecord)(nil),                  // 35: maxshot.gateway_internal.v1.AttemptCostRecord
+	(*SettleRequest)(nil),                      // 36: maxshot.gateway_internal.v1.SettleRequest
+	(*SettleResponse)(nil),                     // 37: maxshot.gateway_internal.v1.SettleResponse
+	(*MarkUncertainRequest)(nil),               // 38: maxshot.gateway_internal.v1.MarkUncertainRequest
+	(*MarkUncertainResponse)(nil),              // 39: maxshot.gateway_internal.v1.MarkUncertainResponse
+	(*ResolveUncertainRequest)(nil),            // 40: maxshot.gateway_internal.v1.ResolveUncertainRequest
+	(*ResolveUncertainResponse)(nil),           // 41: maxshot.gateway_internal.v1.ResolveUncertainResponse
+	(*IdempotentHttpResponse)(nil),             // 42: maxshot.gateway_internal.v1.IdempotentHttpResponse
+	(*RecordAttemptObservationRequest)(nil),    // 43: maxshot.gateway_internal.v1.RecordAttemptObservationRequest
+	(*RecordAttemptObservationResponse)(nil),   // 44: maxshot.gateway_internal.v1.RecordAttemptObservationResponse
+	(*ClaimExecutionRecoveryRequest)(nil),      // 45: maxshot.gateway_internal.v1.ClaimExecutionRecoveryRequest
+	(*ExecutionRecoveryClaim)(nil),             // 46: maxshot.gateway_internal.v1.ExecutionRecoveryClaim
+	(*ClaimExecutionRecoveryResponse)(nil),     // 47: maxshot.gateway_internal.v1.ClaimExecutionRecoveryResponse
+	(*GetBillingCatalogStateRequest)(nil),      // 48: maxshot.gateway_internal.v1.GetBillingCatalogStateRequest
+	(*GetBillingCatalogStateResponse)(nil),     // 49: maxshot.gateway_internal.v1.GetBillingCatalogStateResponse
+	(*RegisterAccountRequest)(nil),             // 50: maxshot.gateway_internal.v1.RegisterAccountRequest
+	(*RegisterAccountResponse)(nil),            // 51: maxshot.gateway_internal.v1.RegisterAccountResponse
+	(*ApiKeyPolicy)(nil),                       // 52: maxshot.gateway_internal.v1.ApiKeyPolicy
+	(*ManagedApiKey)(nil),                      // 53: maxshot.gateway_internal.v1.ManagedApiKey
+	(*CreateApiKeyRequest)(nil),                // 54: maxshot.gateway_internal.v1.CreateApiKeyRequest
+	(*CreateApiKeyResponse)(nil),               // 55: maxshot.gateway_internal.v1.CreateApiKeyResponse
+	(*UpdateApiKeyRequest)(nil),                // 56: maxshot.gateway_internal.v1.UpdateApiKeyRequest
+	(*UpdateApiKeyResponse)(nil),               // 57: maxshot.gateway_internal.v1.UpdateApiKeyResponse
+	(*RevokeApiKeyRequest)(nil),                // 58: maxshot.gateway_internal.v1.RevokeApiKeyRequest
+	(*RevokeApiKeyResponse)(nil),               // 59: maxshot.gateway_internal.v1.RevokeApiKeyResponse
+	(*ListApiKeysRequest)(nil),                 // 60: maxshot.gateway_internal.v1.ListApiKeysRequest
+	(*ListApiKeysResponse)(nil),                // 61: maxshot.gateway_internal.v1.ListApiKeysResponse
+	(*AccountFundingSettings)(nil),             // 62: maxshot.gateway_internal.v1.AccountFundingSettings
+	(*GetAccountFundingRequest)(nil),           // 63: maxshot.gateway_internal.v1.GetAccountFundingRequest
+	(*GetAccountFundingResponse)(nil),          // 64: maxshot.gateway_internal.v1.GetAccountFundingResponse
+	(*UpdateAccountSettingsRequest)(nil),       // 65: maxshot.gateway_internal.v1.UpdateAccountSettingsRequest
+	(*UpdateAccountSettingsResponse)(nil),      // 66: maxshot.gateway_internal.v1.UpdateAccountSettingsResponse
+	(*SubscriptionPlanVersion)(nil),            // 67: maxshot.gateway_internal.v1.SubscriptionPlanVersion
+	(*AccountSubscription)(nil),                // 68: maxshot.gateway_internal.v1.AccountSubscription
+	(*SubscriptionInvoice)(nil),                // 69: maxshot.gateway_internal.v1.SubscriptionInvoice
+	(*ListSubscriptionPlansRequest)(nil),       // 70: maxshot.gateway_internal.v1.ListSubscriptionPlansRequest
+	(*ListSubscriptionPlansResponse)(nil),      // 71: maxshot.gateway_internal.v1.ListSubscriptionPlansResponse
+	(*GetSubscriptionRequest)(nil),             // 72: maxshot.gateway_internal.v1.GetSubscriptionRequest
+	(*GetSubscriptionResponse)(nil),            // 73: maxshot.gateway_internal.v1.GetSubscriptionResponse
+	(*PurchaseSubscriptionRequest)(nil),        // 74: maxshot.gateway_internal.v1.PurchaseSubscriptionRequest
+	(*PurchaseSubscriptionResponse)(nil),       // 75: maxshot.gateway_internal.v1.PurchaseSubscriptionResponse
+	(*RenewSubscriptionRequest)(nil),           // 76: maxshot.gateway_internal.v1.RenewSubscriptionRequest
+	(*RenewSubscriptionResponse)(nil),          // 77: maxshot.gateway_internal.v1.RenewSubscriptionResponse
+	(*CancelSubscriptionRequest)(nil),          // 78: maxshot.gateway_internal.v1.CancelSubscriptionRequest
+	(*CancelSubscriptionResponse)(nil),         // 79: maxshot.gateway_internal.v1.CancelSubscriptionResponse
+	(*SchedulePlanChangeRequest)(nil),          // 80: maxshot.gateway_internal.v1.SchedulePlanChangeRequest
+	(*SchedulePlanChangeResponse)(nil),         // 81: maxshot.gateway_internal.v1.SchedulePlanChangeResponse
+	(*ListInvoicesRequest)(nil),                // 82: maxshot.gateway_internal.v1.ListInvoicesRequest
+	(*ListInvoicesResponse)(nil),               // 83: maxshot.gateway_internal.v1.ListInvoicesResponse
+	(*GetInvoiceRequest)(nil),                  // 84: maxshot.gateway_internal.v1.GetInvoiceRequest
+	(*GetInvoiceResponse)(nil),                 // 85: maxshot.gateway_internal.v1.GetInvoiceResponse
+	(*GetDepositAddressRequest)(nil),           // 86: maxshot.gateway_internal.v1.GetDepositAddressRequest
+	(*GetDepositAddressResponse)(nil),          // 87: maxshot.gateway_internal.v1.GetDepositAddressResponse
+	(*TopupOrder)(nil),                         // 88: maxshot.gateway_internal.v1.TopupOrder
+	(*CreateTopupOrderRequest)(nil),            // 89: maxshot.gateway_internal.v1.CreateTopupOrderRequest
+	(*CreateTopupOrderResponse)(nil),           // 90: maxshot.gateway_internal.v1.CreateTopupOrderResponse
+	(*RecordStripePaymentRequest)(nil),         // 91: maxshot.gateway_internal.v1.RecordStripePaymentRequest
+	(*RecordStripePaymentResponse)(nil),        // 92: maxshot.gateway_internal.v1.RecordStripePaymentResponse
+	(*ListTopupsRequest)(nil),                  // 93: maxshot.gateway_internal.v1.ListTopupsRequest
+	(*ListTopupsResponse)(nil),                 // 94: maxshot.gateway_internal.v1.ListTopupsResponse
+	(*LinkedWallet)(nil),                       // 95: maxshot.gateway_internal.v1.LinkedWallet
+	(*LinkWalletRequest)(nil),                  // 96: maxshot.gateway_internal.v1.LinkWalletRequest
+	(*LinkWalletResponse)(nil),                 // 97: maxshot.gateway_internal.v1.LinkWalletResponse
+	(*GetWalletLinkRequest)(nil),               // 98: maxshot.gateway_internal.v1.GetWalletLinkRequest
+	(*GetWalletLinkResponse)(nil),              // 99: maxshot.gateway_internal.v1.GetWalletLinkResponse
+	(*AcceptFundedTermRequest)(nil),            // 100: maxshot.gateway_internal.v1.AcceptFundedTermRequest
+	(*AcceptFundedTermResponse)(nil),           // 101: maxshot.gateway_internal.v1.AcceptFundedTermResponse
+	(*GetCurrentFundedTermRequest)(nil),        // 102: maxshot.gateway_internal.v1.GetCurrentFundedTermRequest
+	(*GetCurrentFundedTermResponse)(nil),       // 103: maxshot.gateway_internal.v1.GetCurrentFundedTermResponse
+	(*PrepareAccountMergeRequest)(nil),         // 104: maxshot.gateway_internal.v1.PrepareAccountMergeRequest
+	(*PrepareAccountMergeResponse)(nil),        // 105: maxshot.gateway_internal.v1.PrepareAccountMergeResponse
+	(*CommitAccountMergeRequest)(nil),          // 106: maxshot.gateway_internal.v1.CommitAccountMergeRequest
+	(*CommitAccountMergeResponse)(nil),         // 107: maxshot.gateway_internal.v1.CommitAccountMergeResponse
+	(*AccountUsage)(nil),                       // 108: maxshot.gateway_internal.v1.AccountUsage
+	(*ListUsageRequest)(nil),                   // 109: maxshot.gateway_internal.v1.ListUsageRequest
+	(*ListUsageResponse)(nil),                  // 110: maxshot.gateway_internal.v1.ListUsageResponse
+	(*GetUsageDetailRequest)(nil),              // 111: maxshot.gateway_internal.v1.GetUsageDetailRequest
+	(*GetUsageDetailResponse)(nil),             // 112: maxshot.gateway_internal.v1.GetUsageDetailResponse
+	(*AccountNotice)(nil),                      // 113: maxshot.gateway_internal.v1.AccountNotice
+	(*ListAccountNoticesRequest)(nil),          // 114: maxshot.gateway_internal.v1.ListAccountNoticesRequest
+	(*ListAccountNoticesResponse)(nil),         // 115: maxshot.gateway_internal.v1.ListAccountNoticesResponse
+	(*AckAccountNoticeRequest)(nil),            // 116: maxshot.gateway_internal.v1.AckAccountNoticeRequest
+	(*AckAccountNoticeResponse)(nil),           // 117: maxshot.gateway_internal.v1.AckAccountNoticeResponse
+	(*GetReferralSummaryRequest)(nil),          // 118: maxshot.gateway_internal.v1.GetReferralSummaryRequest
+	(*GetReferralSummaryResponse)(nil),         // 119: maxshot.gateway_internal.v1.GetReferralSummaryResponse
+	(*SetReferralAttributionRequest)(nil),      // 120: maxshot.gateway_internal.v1.SetReferralAttributionRequest
+	(*SetReferralAttributionResponse)(nil),     // 121: maxshot.gateway_internal.v1.SetReferralAttributionResponse
+	(*OperatorContext)(nil),                    // 122: maxshot.gateway_internal.v1.OperatorContext
+	(*AdminMutationResult)(nil),                // 123: maxshot.gateway_internal.v1.AdminMutationResult
+	(*PlanCostValidation)(nil),                 // 124: maxshot.gateway_internal.v1.PlanCostValidation
+	(*CreatePlanDraftRequest)(nil),             // 125: maxshot.gateway_internal.v1.CreatePlanDraftRequest
+	(*CreatePlanDraftResponse)(nil),            // 126: maxshot.gateway_internal.v1.CreatePlanDraftResponse
+	(*ValidatePlanVersionRequest)(nil),         // 127: maxshot.gateway_internal.v1.ValidatePlanVersionRequest
+	(*ValidatePlanVersionResponse)(nil),        // 128: maxshot.gateway_internal.v1.ValidatePlanVersionResponse
+	(*PreviewPlanImpactRequest)(nil),           // 129: maxshot.gateway_internal.v1.PreviewPlanImpactRequest
+	(*PreviewPlanImpactResponse)(nil),          // 130: maxshot.gateway_internal.v1.PreviewPlanImpactResponse
+	(*PublishPlanVersionRequest)(nil),          // 131: maxshot.gateway_internal.v1.PublishPlanVersionRequest
+	(*PublishPlanVersionResponse)(nil),         // 132: maxshot.gateway_internal.v1.PublishPlanVersionResponse
+	(*SetPlanSalesStatusRequest)(nil),          // 133: maxshot.gateway_internal.v1.SetPlanSalesStatusRequest
+	(*SetPlanSalesStatusResponse)(nil),         // 134: maxshot.gateway_internal.v1.SetPlanSalesStatusResponse
+	(*SetSpendingLockRequest)(nil),             // 135: maxshot.gateway_internal.v1.SetSpendingLockRequest
+	(*SetSpendingLockResponse)(nil),            // 136: maxshot.gateway_internal.v1.SetSpendingLockResponse
+	(*ManualLedgerAdjustmentRequest)(nil),      // 137: maxshot.gateway_internal.v1.ManualLedgerAdjustmentRequest
+	(*ManualLedgerAdjustmentResponse)(nil),     // 138: maxshot.gateway_internal.v1.ManualLedgerAdjustmentResponse
+	(*ResolveDepositReorgHoldRequest)(nil),     // 139: maxshot.gateway_internal.v1.ResolveDepositReorgHoldRequest
+	(*ResolveDepositReorgHoldResponse)(nil),    // 140: maxshot.gateway_internal.v1.ResolveDepositReorgHoldResponse
+	(*ReviewTopupRequest)(nil),                 // 141: maxshot.gateway_internal.v1.ReviewTopupRequest
+	(*ReviewTopupResponse)(nil),                // 142: maxshot.gateway_internal.v1.ReviewTopupResponse
+	(*RevokeReferralRewardRequest)(nil),        // 143: maxshot.gateway_internal.v1.RevokeReferralRewardRequest
+	(*RevokeReferralRewardResponse)(nil),       // 144: maxshot.gateway_internal.v1.RevokeReferralRewardResponse
+	(*ResolveDiscrepancyRequest)(nil),          // 145: maxshot.gateway_internal.v1.ResolveDiscrepancyRequest
+	(*ResolveDiscrepancyResponse)(nil),         // 146: maxshot.gateway_internal.v1.ResolveDiscrepancyResponse
+	(*RefundSettledRequestRequest)(nil),        // 147: maxshot.gateway_internal.v1.RefundSettledRequestRequest
+	(*RefundSettledRequestResponse)(nil),       // 148: maxshot.gateway_internal.v1.RefundSettledRequestResponse
+	(*UpsertFundedTermRequest)(nil),            // 149: maxshot.gateway_internal.v1.UpsertFundedTermRequest
+	(*UpsertFundedTermResponse)(nil),           // 150: maxshot.gateway_internal.v1.UpsertFundedTermResponse
+	(*LockFundedTermRequest)(nil),              // 151: maxshot.gateway_internal.v1.LockFundedTermRequest
+	(*LockFundedTermResponse)(nil),             // 152: maxshot.gateway_internal.v1.LockFundedTermResponse
+	(*SetCoverageThrottlePolicyRequest)(nil),   // 153: maxshot.gateway_internal.v1.SetCoverageThrottlePolicyRequest
+	(*SetCoverageThrottlePolicyResponse)(nil),  // 154: maxshot.gateway_internal.v1.SetCoverageThrottlePolicyResponse
+	(*UpdateSystemSettingRequest)(nil),         // 155: maxshot.gateway_internal.v1.UpdateSystemSettingRequest
+	(*UpdateSystemSettingResponse)(nil),        // 156: maxshot.gateway_internal.v1.UpdateSystemSettingResponse
+	(*UpdateFreeModelQuotaPolicyRequest)(nil),  // 157: maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyRequest
+	(*UpdateFreeModelQuotaPolicyResponse)(nil), // 158: maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyResponse
+	(*ResolveUncertainJobRequest)(nil),         // 159: maxshot.gateway_internal.v1.ResolveUncertainJobRequest
+	(*ResolveUncertainJobResponse)(nil),        // 160: maxshot.gateway_internal.v1.ResolveUncertainJobResponse
+	(*ModerateMaterialRequest)(nil),            // 161: maxshot.gateway_internal.v1.ModerateMaterialRequest
+	(*ModerateMaterialResponse)(nil),           // 162: maxshot.gateway_internal.v1.ModerateMaterialResponse
+	(*ResolveAppealRequest)(nil),               // 163: maxshot.gateway_internal.v1.ResolveAppealRequest
+	(*ResolveAppealResponse)(nil),              // 164: maxshot.gateway_internal.v1.ResolveAppealResponse
+	(*v1.KeyValueAttribute)(nil),               // 165: maxshot.common.v1.KeyValueAttribute
+	(v1.FundingBucket)(0),                      // 166: maxshot.common.v1.FundingBucket
+	(v1.BudgetPeriodKind)(0),                   // 167: maxshot.common.v1.BudgetPeriodKind
+	(v1.RejectCode)(0),                         // 168: maxshot.common.v1.RejectCode
+	(v1.KeyFundingStrategy)(0),                 // 169: maxshot.common.v1.KeyFundingStrategy
+	(v1.SearchPolicy)(0),                       // 170: maxshot.common.v1.SearchPolicy
+	(v1.Modality)(0),                           // 171: maxshot.common.v1.Modality
+	(v1.CustomerChargeMode)(0),                 // 172: maxshot.common.v1.CustomerChargeMode
+	(*v1.BudgetPeriodRule)(nil),                // 173: maxshot.common.v1.BudgetPeriodRule
+	(*v1.CursorPageRequest)(nil),               // 174: maxshot.common.v1.CursorPageRequest
+	(*v1.CursorPageResponse)(nil),              // 175: maxshot.common.v1.CursorPageResponse
+	(*v11.TermAcceptance)(nil),                 // 176: maxshot.contract_grant.v1.TermAcceptance
+	(*v11.FundedTermConfig)(nil),               // 177: maxshot.contract_grant.v1.FundedTermConfig
+	(*v11.AitCoverageThrottlePolicy)(nil),      // 178: maxshot.contract_grant.v1.AitCoverageThrottlePolicy
 }
 var file_maxshot_gateway_internal_v1_execution_proto_depIdxs = []int32{
-	38, // 0: maxshot.gateway_internal.v1.UsageBound.media_attributes:type_name -> maxshot.common.v1.KeyValueAttribute
-	6,  // 1: maxshot.gateway_internal.v1.UsageBound.media_dimensions:type_name -> maxshot.gateway_internal.v1.MediaPricingDimensions
-	39, // 2: maxshot.gateway_internal.v1.BucketAllocationLine.bucket:type_name -> maxshot.common.v1.FundingBucket
-	40, // 3: maxshot.gateway_internal.v1.SpendingLimitDiagnostic.period:type_name -> maxshot.common.v1.BudgetPeriodKind
-	39, // 4: maxshot.gateway_internal.v1.BucketBalanceView.bucket:type_name -> maxshot.common.v1.FundingBucket
-	41, // 5: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	42, // 6: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.key_funding_strategy:type_name -> maxshot.common.v1.KeyFundingStrategy
-	43, // 7: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.search_policy:type_name -> maxshot.common.v1.SearchPolicy
-	0,  // 8: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
-	39, // 9: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.spendable_buckets:type_name -> maxshot.common.v1.FundingBucket
-	41, // 10: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.block_reason:type_name -> maxshot.common.v1.RejectCode
-	14, // 11: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
-	15, // 12: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
-	16, // 13: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
-	20, // 14: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.models:type_name -> maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
-	0,  // 15: maxshot.gateway_internal.v1.PreviewQuoteRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
-	44, // 16: maxshot.gateway_internal.v1.PreviewQuoteRequest.modality:type_name -> maxshot.common.v1.Modality
-	1,  // 17: maxshot.gateway_internal.v1.PreviewQuoteRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
-	7,  // 18: maxshot.gateway_internal.v1.PreviewQuoteRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	7,  // 19: maxshot.gateway_internal.v1.PreviewQuoteRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	41, // 20: maxshot.gateway_internal.v1.PreviewQuoteResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	8,  // 21: maxshot.gateway_internal.v1.PreviewQuoteResponse.breakdown:type_name -> maxshot.gateway_internal.v1.QuoteComponentLine
-	9,  // 22: maxshot.gateway_internal.v1.PreviewQuoteResponse.projected_hold_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	10, // 23: maxshot.gateway_internal.v1.PreviewQuoteResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	11, // 24: maxshot.gateway_internal.v1.PreviewQuoteResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	14, // 25: maxshot.gateway_internal.v1.PreviewQuoteResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
-	15, // 26: maxshot.gateway_internal.v1.PreviewQuoteResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
-	16, // 27: maxshot.gateway_internal.v1.PreviewQuoteResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
-	0,  // 28: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
-	44, // 29: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.modality:type_name -> maxshot.common.v1.Modality
-	1,  // 30: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
-	7,  // 31: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	7,  // 32: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
-	45, // 33: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.customer_charge_mode_override:type_name -> maxshot.common.v1.CustomerChargeMode
-	2,  // 34: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.status:type_name -> maxshot.gateway_internal.v1.HoldDecisionStatus
-	41, // 35: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
-	13, // 36: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.locked_versions:type_name -> maxshot.gateway_internal.v1.LockedVersionSet
-	9,  // 37: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.held_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	12, // 38: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.threshold_warnings:type_name -> maxshot.gateway_internal.v1.ThresholdWarning
-	10, // 39: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
-	11, // 40: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
-	33, // 41: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.cached_settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
-	4,  // 42: maxshot.gateway_internal.v1.AttemptCostRecord.error_class:type_name -> maxshot.gateway_internal.v1.AttemptErrorClass
-	7,  // 43: maxshot.gateway_internal.v1.AttemptCostRecord.usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	3,  // 44: maxshot.gateway_internal.v1.SettleRequest.outcome:type_name -> maxshot.gateway_internal.v1.SettlementOutcome
-	7,  // 45: maxshot.gateway_internal.v1.SettleRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	30, // 46: maxshot.gateway_internal.v1.SettleRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	31, // 47: maxshot.gateway_internal.v1.SettleRequest.attempts:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
-	45, // 48: maxshot.gateway_internal.v1.SettleRequest.customer_charge_mode:type_name -> maxshot.common.v1.CustomerChargeMode
-	9,  // 49: maxshot.gateway_internal.v1.SettleResponse.settled_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	9,  // 50: maxshot.gateway_internal.v1.SettleResponse.released_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
-	5,  // 51: maxshot.gateway_internal.v1.ResolveUncertainRequest.action:type_name -> maxshot.gateway_internal.v1.UncertainResolutionAction
-	7,  // 52: maxshot.gateway_internal.v1.ResolveUncertainRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
-	30, // 53: maxshot.gateway_internal.v1.ResolveUncertainRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
-	33, // 54: maxshot.gateway_internal.v1.ResolveUncertainResponse.settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
-	17, // 55: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:input_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
-	19, // 56: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:input_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
-	22, // 57: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:input_type -> maxshot.gateway_internal.v1.PreviewQuoteRequest
-	24, // 58: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:input_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
-	26, // 59: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:input_type -> maxshot.gateway_internal.v1.MarkSendingRequest
-	28, // 60: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:input_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
-	32, // 61: maxshot.gateway_internal.v1.BillingExecutionService.Settle:input_type -> maxshot.gateway_internal.v1.SettleRequest
-	34, // 62: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:input_type -> maxshot.gateway_internal.v1.MarkUncertainRequest
-	36, // 63: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:input_type -> maxshot.gateway_internal.v1.ResolveUncertainRequest
-	18, // 64: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:output_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
-	21, // 65: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:output_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
-	23, // 66: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:output_type -> maxshot.gateway_internal.v1.PreviewQuoteResponse
-	25, // 67: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:output_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
-	27, // 68: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:output_type -> maxshot.gateway_internal.v1.MarkSendingResponse
-	29, // 69: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:output_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
-	33, // 70: maxshot.gateway_internal.v1.BillingExecutionService.Settle:output_type -> maxshot.gateway_internal.v1.SettleResponse
-	35, // 71: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:output_type -> maxshot.gateway_internal.v1.MarkUncertainResponse
-	37, // 72: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:output_type -> maxshot.gateway_internal.v1.ResolveUncertainResponse
-	64, // [64:73] is the sub-list for method output_type
-	55, // [55:64] is the sub-list for method input_type
-	55, // [55:55] is the sub-list for extension type_name
-	55, // [55:55] is the sub-list for extension extendee
-	0,  // [0:55] is the sub-list for field type_name
+	165, // 0: maxshot.gateway_internal.v1.UsageBound.media_attributes:type_name -> maxshot.common.v1.KeyValueAttribute
+	10,  // 1: maxshot.gateway_internal.v1.UsageBound.media_dimensions:type_name -> maxshot.gateway_internal.v1.MediaPricingDimensions
+	166, // 2: maxshot.gateway_internal.v1.BucketAllocationLine.bucket:type_name -> maxshot.common.v1.FundingBucket
+	167, // 3: maxshot.gateway_internal.v1.SpendingLimitDiagnostic.period:type_name -> maxshot.common.v1.BudgetPeriodKind
+	166, // 4: maxshot.gateway_internal.v1.BucketBalanceView.bucket:type_name -> maxshot.common.v1.FundingBucket
+	168, // 5: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	169, // 6: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.key_funding_strategy:type_name -> maxshot.common.v1.KeyFundingStrategy
+	170, // 7: maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse.search_policy:type_name -> maxshot.common.v1.SearchPolicy
+	0,   // 8: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	166, // 9: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.spendable_buckets:type_name -> maxshot.common.v1.FundingBucket
+	168, // 10: maxshot.gateway_internal.v1.ModelDiscoveryEvaluation.block_reason:type_name -> maxshot.common.v1.RejectCode
+	18,  // 11: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	19,  // 12: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	20,  // 13: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	24,  // 14: maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse.models:type_name -> maxshot.gateway_internal.v1.ModelDiscoveryEvaluation
+	0,   // 15: maxshot.gateway_internal.v1.PreviewQuoteRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	171, // 16: maxshot.gateway_internal.v1.PreviewQuoteRequest.modality:type_name -> maxshot.common.v1.Modality
+	1,   // 17: maxshot.gateway_internal.v1.PreviewQuoteRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
+	11,  // 18: maxshot.gateway_internal.v1.PreviewQuoteRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	11,  // 19: maxshot.gateway_internal.v1.PreviewQuoteRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	168, // 20: maxshot.gateway_internal.v1.PreviewQuoteResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	12,  // 21: maxshot.gateway_internal.v1.PreviewQuoteResponse.breakdown:type_name -> maxshot.gateway_internal.v1.QuoteComponentLine
+	13,  // 22: maxshot.gateway_internal.v1.PreviewQuoteResponse.projected_hold_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	14,  // 23: maxshot.gateway_internal.v1.PreviewQuoteResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	15,  // 24: maxshot.gateway_internal.v1.PreviewQuoteResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	18,  // 25: maxshot.gateway_internal.v1.PreviewQuoteResponse.bucket_balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	19,  // 26: maxshot.gateway_internal.v1.PreviewQuoteResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	20,  // 27: maxshot.gateway_internal.v1.PreviewQuoteResponse.key_gross_window:type_name -> maxshot.gateway_internal.v1.KeyGrossWindowStatus
+	0,   // 28: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	171, // 29: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.modality:type_name -> maxshot.common.v1.Modality
+	1,   // 30: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.selection_mode:type_name -> maxshot.gateway_internal.v1.RouteSelectionMode
+	11,  // 31: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.estimate_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	11,  // 32: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.hard_max_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	172, // 33: maxshot.gateway_internal.v1.AuthorizeAndHoldRequest.customer_charge_mode_override:type_name -> maxshot.common.v1.CustomerChargeMode
+	2,   // 34: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.status:type_name -> maxshot.gateway_internal.v1.HoldDecisionStatus
+	168, // 35: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.reject_code:type_name -> maxshot.common.v1.RejectCode
+	17,  // 36: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.locked_versions:type_name -> maxshot.gateway_internal.v1.LockedVersionSet
+	13,  // 37: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.held_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	16,  // 38: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.threshold_warnings:type_name -> maxshot.gateway_internal.v1.ThresholdWarning
+	14,  // 39: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.budget_diagnostic:type_name -> maxshot.gateway_internal.v1.SpendingLimitDiagnostic
+	15,  // 40: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.credit_diagnostic:type_name -> maxshot.gateway_internal.v1.CreditShortfallDiagnostic
+	37,  // 41: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.cached_settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
+	42,  // 42: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.cached_http_response:type_name -> maxshot.gateway_internal.v1.IdempotentHttpResponse
+	11,  // 43: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.effective_primary_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	11,  // 44: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.effective_backup_bound:type_name -> maxshot.gateway_internal.v1.UsageBound
+	27,  // 45: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.replacement_quote:type_name -> maxshot.gateway_internal.v1.PreviewQuoteResponse
+	8,   // 46: maxshot.gateway_internal.v1.AuthorizeAndHoldResponse.funding_notices:type_name -> maxshot.gateway_internal.v1.FundingNotice
+	4,   // 47: maxshot.gateway_internal.v1.AttemptCostRecord.error_class:type_name -> maxshot.gateway_internal.v1.AttemptErrorClass
+	11,  // 48: maxshot.gateway_internal.v1.AttemptCostRecord.usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	6,   // 49: maxshot.gateway_internal.v1.AttemptCostRecord.dispatch_state:type_name -> maxshot.gateway_internal.v1.AttemptDispatchState
+	3,   // 50: maxshot.gateway_internal.v1.SettleRequest.outcome:type_name -> maxshot.gateway_internal.v1.SettlementOutcome
+	11,  // 51: maxshot.gateway_internal.v1.SettleRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	34,  // 52: maxshot.gateway_internal.v1.SettleRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	35,  // 53: maxshot.gateway_internal.v1.SettleRequest.attempts:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
+	172, // 54: maxshot.gateway_internal.v1.SettleRequest.customer_charge_mode:type_name -> maxshot.common.v1.CustomerChargeMode
+	42,  // 55: maxshot.gateway_internal.v1.SettleRequest.http_response:type_name -> maxshot.gateway_internal.v1.IdempotentHttpResponse
+	13,  // 56: maxshot.gateway_internal.v1.SettleResponse.settled_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	13,  // 57: maxshot.gateway_internal.v1.SettleResponse.released_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	7,   // 58: maxshot.gateway_internal.v1.SettleResponse.disposition:type_name -> maxshot.gateway_internal.v1.SettlementDisposition
+	5,   // 59: maxshot.gateway_internal.v1.ResolveUncertainRequest.action:type_name -> maxshot.gateway_internal.v1.UncertainResolutionAction
+	11,  // 60: maxshot.gateway_internal.v1.ResolveUncertainRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	34,  // 61: maxshot.gateway_internal.v1.ResolveUncertainRequest.media_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	122, // 62: maxshot.gateway_internal.v1.ResolveUncertainRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	37,  // 63: maxshot.gateway_internal.v1.ResolveUncertainResponse.settlement:type_name -> maxshot.gateway_internal.v1.SettleResponse
+	165, // 64: maxshot.gateway_internal.v1.IdempotentHttpResponse.headers:type_name -> maxshot.common.v1.KeyValueAttribute
+	35,  // 65: maxshot.gateway_internal.v1.RecordAttemptObservationRequest.attempt:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
+	6,   // 66: maxshot.gateway_internal.v1.RecordAttemptObservationResponse.dispatch_state:type_name -> maxshot.gateway_internal.v1.AttemptDispatchState
+	0,   // 67: maxshot.gateway_internal.v1.ExecutionRecoveryClaim.channel:type_name -> maxshot.gateway_internal.v1.ExecutionChannel
+	35,  // 68: maxshot.gateway_internal.v1.ExecutionRecoveryClaim.attempts:type_name -> maxshot.gateway_internal.v1.AttemptCostRecord
+	172, // 69: maxshot.gateway_internal.v1.ExecutionRecoveryClaim.customer_charge_mode:type_name -> maxshot.common.v1.CustomerChargeMode
+	46,  // 70: maxshot.gateway_internal.v1.ClaimExecutionRecoveryResponse.claims:type_name -> maxshot.gateway_internal.v1.ExecutionRecoveryClaim
+	169, // 71: maxshot.gateway_internal.v1.ApiKeyPolicy.funding_strategy:type_name -> maxshot.common.v1.KeyFundingStrategy
+	173, // 72: maxshot.gateway_internal.v1.ApiKeyPolicy.spending_limits:type_name -> maxshot.common.v1.BudgetPeriodRule
+	170, // 73: maxshot.gateway_internal.v1.ApiKeyPolicy.search_policy:type_name -> maxshot.common.v1.SearchPolicy
+	52,  // 74: maxshot.gateway_internal.v1.ManagedApiKey.policy:type_name -> maxshot.gateway_internal.v1.ApiKeyPolicy
+	52,  // 75: maxshot.gateway_internal.v1.CreateApiKeyRequest.policy:type_name -> maxshot.gateway_internal.v1.ApiKeyPolicy
+	53,  // 76: maxshot.gateway_internal.v1.CreateApiKeyResponse.key:type_name -> maxshot.gateway_internal.v1.ManagedApiKey
+	52,  // 77: maxshot.gateway_internal.v1.UpdateApiKeyRequest.policy:type_name -> maxshot.gateway_internal.v1.ApiKeyPolicy
+	53,  // 78: maxshot.gateway_internal.v1.UpdateApiKeyResponse.key:type_name -> maxshot.gateway_internal.v1.ManagedApiKey
+	53,  // 79: maxshot.gateway_internal.v1.RevokeApiKeyResponse.key:type_name -> maxshot.gateway_internal.v1.ManagedApiKey
+	174, // 80: maxshot.gateway_internal.v1.ListApiKeysRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	53,  // 81: maxshot.gateway_internal.v1.ListApiKeysResponse.keys:type_name -> maxshot.gateway_internal.v1.ManagedApiKey
+	175, // 82: maxshot.gateway_internal.v1.ListApiKeysResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	173, // 83: maxshot.gateway_internal.v1.AccountFundingSettings.spending_limits:type_name -> maxshot.common.v1.BudgetPeriodRule
+	62,  // 84: maxshot.gateway_internal.v1.GetAccountFundingResponse.settings:type_name -> maxshot.gateway_internal.v1.AccountFundingSettings
+	18,  // 85: maxshot.gateway_internal.v1.GetAccountFundingResponse.balances:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	19,  // 86: maxshot.gateway_internal.v1.GetAccountFundingResponse.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	62,  // 87: maxshot.gateway_internal.v1.UpdateAccountSettingsRequest.settings:type_name -> maxshot.gateway_internal.v1.AccountFundingSettings
+	62,  // 88: maxshot.gateway_internal.v1.UpdateAccountSettingsResponse.settings:type_name -> maxshot.gateway_internal.v1.AccountFundingSettings
+	67,  // 89: maxshot.gateway_internal.v1.AccountSubscription.current_plan:type_name -> maxshot.gateway_internal.v1.SubscriptionPlanVersion
+	18,  // 90: maxshot.gateway_internal.v1.AccountSubscription.remaining_pools:type_name -> maxshot.gateway_internal.v1.BucketBalanceView
+	19,  // 91: maxshot.gateway_internal.v1.AccountSubscription.windows:type_name -> maxshot.gateway_internal.v1.FundingWindowStatus
+	67,  // 92: maxshot.gateway_internal.v1.ListSubscriptionPlansResponse.plans:type_name -> maxshot.gateway_internal.v1.SubscriptionPlanVersion
+	68,  // 93: maxshot.gateway_internal.v1.GetSubscriptionResponse.subscription:type_name -> maxshot.gateway_internal.v1.AccountSubscription
+	68,  // 94: maxshot.gateway_internal.v1.PurchaseSubscriptionResponse.subscription:type_name -> maxshot.gateway_internal.v1.AccountSubscription
+	69,  // 95: maxshot.gateway_internal.v1.PurchaseSubscriptionResponse.invoice:type_name -> maxshot.gateway_internal.v1.SubscriptionInvoice
+	68,  // 96: maxshot.gateway_internal.v1.RenewSubscriptionResponse.subscription:type_name -> maxshot.gateway_internal.v1.AccountSubscription
+	69,  // 97: maxshot.gateway_internal.v1.RenewSubscriptionResponse.invoice:type_name -> maxshot.gateway_internal.v1.SubscriptionInvoice
+	68,  // 98: maxshot.gateway_internal.v1.CancelSubscriptionResponse.subscription:type_name -> maxshot.gateway_internal.v1.AccountSubscription
+	68,  // 99: maxshot.gateway_internal.v1.SchedulePlanChangeResponse.subscription:type_name -> maxshot.gateway_internal.v1.AccountSubscription
+	174, // 100: maxshot.gateway_internal.v1.ListInvoicesRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	69,  // 101: maxshot.gateway_internal.v1.ListInvoicesResponse.invoices:type_name -> maxshot.gateway_internal.v1.SubscriptionInvoice
+	175, // 102: maxshot.gateway_internal.v1.ListInvoicesResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	69,  // 103: maxshot.gateway_internal.v1.GetInvoiceResponse.invoice:type_name -> maxshot.gateway_internal.v1.SubscriptionInvoice
+	88,  // 104: maxshot.gateway_internal.v1.CreateTopupOrderResponse.order:type_name -> maxshot.gateway_internal.v1.TopupOrder
+	88,  // 105: maxshot.gateway_internal.v1.RecordStripePaymentResponse.order:type_name -> maxshot.gateway_internal.v1.TopupOrder
+	174, // 106: maxshot.gateway_internal.v1.ListTopupsRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	88,  // 107: maxshot.gateway_internal.v1.ListTopupsResponse.topups:type_name -> maxshot.gateway_internal.v1.TopupOrder
+	175, // 108: maxshot.gateway_internal.v1.ListTopupsResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	95,  // 109: maxshot.gateway_internal.v1.LinkWalletResponse.link:type_name -> maxshot.gateway_internal.v1.LinkedWallet
+	95,  // 110: maxshot.gateway_internal.v1.GetWalletLinkResponse.link:type_name -> maxshot.gateway_internal.v1.LinkedWallet
+	176, // 111: maxshot.gateway_internal.v1.AcceptFundedTermResponse.acceptance:type_name -> maxshot.contract_grant.v1.TermAcceptance
+	177, // 112: maxshot.gateway_internal.v1.GetCurrentFundedTermResponse.current_term:type_name -> maxshot.contract_grant.v1.FundedTermConfig
+	176, // 113: maxshot.gateway_internal.v1.GetCurrentFundedTermResponse.acceptance:type_name -> maxshot.contract_grant.v1.TermAcceptance
+	13,  // 114: maxshot.gateway_internal.v1.AccountUsage.settled_buckets:type_name -> maxshot.gateway_internal.v1.BucketAllocationLine
+	11,  // 115: maxshot.gateway_internal.v1.AccountUsage.usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	174, // 116: maxshot.gateway_internal.v1.ListUsageRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	108, // 117: maxshot.gateway_internal.v1.ListUsageResponse.records:type_name -> maxshot.gateway_internal.v1.AccountUsage
+	175, // 118: maxshot.gateway_internal.v1.ListUsageResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	108, // 119: maxshot.gateway_internal.v1.GetUsageDetailResponse.usage:type_name -> maxshot.gateway_internal.v1.AccountUsage
+	174, // 120: maxshot.gateway_internal.v1.ListAccountNoticesRequest.page:type_name -> maxshot.common.v1.CursorPageRequest
+	113, // 121: maxshot.gateway_internal.v1.ListAccountNoticesResponse.notices:type_name -> maxshot.gateway_internal.v1.AccountNotice
+	175, // 122: maxshot.gateway_internal.v1.ListAccountNoticesResponse.page:type_name -> maxshot.common.v1.CursorPageResponse
+	113, // 123: maxshot.gateway_internal.v1.AckAccountNoticeResponse.notice:type_name -> maxshot.gateway_internal.v1.AccountNotice
+	9,   // 124: maxshot.gateway_internal.v1.OperatorContext.authentication_method:type_name -> maxshot.gateway_internal.v1.OperatorAuthenticationMethod
+	122, // 125: maxshot.gateway_internal.v1.CreatePlanDraftRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	67,  // 126: maxshot.gateway_internal.v1.CreatePlanDraftRequest.plan:type_name -> maxshot.gateway_internal.v1.SubscriptionPlanVersion
+	123, // 127: maxshot.gateway_internal.v1.CreatePlanDraftResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	124, // 128: maxshot.gateway_internal.v1.ValidatePlanVersionResponse.validation:type_name -> maxshot.gateway_internal.v1.PlanCostValidation
+	124, // 129: maxshot.gateway_internal.v1.PreviewPlanImpactResponse.validation:type_name -> maxshot.gateway_internal.v1.PlanCostValidation
+	122, // 130: maxshot.gateway_internal.v1.PublishPlanVersionRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 131: maxshot.gateway_internal.v1.PublishPlanVersionResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 132: maxshot.gateway_internal.v1.SetPlanSalesStatusRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 133: maxshot.gateway_internal.v1.SetPlanSalesStatusResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 134: maxshot.gateway_internal.v1.SetSpendingLockRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 135: maxshot.gateway_internal.v1.SetSpendingLockResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 136: maxshot.gateway_internal.v1.ManualLedgerAdjustmentRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	166, // 137: maxshot.gateway_internal.v1.ManualLedgerAdjustmentRequest.funding_bucket:type_name -> maxshot.common.v1.FundingBucket
+	123, // 138: maxshot.gateway_internal.v1.ManualLedgerAdjustmentResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 139: maxshot.gateway_internal.v1.ResolveDepositReorgHoldRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 140: maxshot.gateway_internal.v1.ResolveDepositReorgHoldResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 141: maxshot.gateway_internal.v1.ReviewTopupRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 142: maxshot.gateway_internal.v1.ReviewTopupResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 143: maxshot.gateway_internal.v1.RevokeReferralRewardRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 144: maxshot.gateway_internal.v1.RevokeReferralRewardResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 145: maxshot.gateway_internal.v1.ResolveDiscrepancyRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 146: maxshot.gateway_internal.v1.ResolveDiscrepancyResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 147: maxshot.gateway_internal.v1.RefundSettledRequestRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 148: maxshot.gateway_internal.v1.RefundSettledRequestResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 149: maxshot.gateway_internal.v1.UpsertFundedTermRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	177, // 150: maxshot.gateway_internal.v1.UpsertFundedTermRequest.term:type_name -> maxshot.contract_grant.v1.FundedTermConfig
+	123, // 151: maxshot.gateway_internal.v1.UpsertFundedTermResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 152: maxshot.gateway_internal.v1.LockFundedTermRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 153: maxshot.gateway_internal.v1.LockFundedTermResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 154: maxshot.gateway_internal.v1.SetCoverageThrottlePolicyRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	178, // 155: maxshot.gateway_internal.v1.SetCoverageThrottlePolicyRequest.policy:type_name -> maxshot.contract_grant.v1.AitCoverageThrottlePolicy
+	123, // 156: maxshot.gateway_internal.v1.SetCoverageThrottlePolicyResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 157: maxshot.gateway_internal.v1.UpdateSystemSettingRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 158: maxshot.gateway_internal.v1.UpdateSystemSettingResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 159: maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 160: maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 161: maxshot.gateway_internal.v1.ResolveUncertainJobRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	5,   // 162: maxshot.gateway_internal.v1.ResolveUncertainJobRequest.action:type_name -> maxshot.gateway_internal.v1.UncertainResolutionAction
+	34,  // 163: maxshot.gateway_internal.v1.ResolveUncertainJobRequest.verified_outputs:type_name -> maxshot.gateway_internal.v1.MediaOutputSettlementItem
+	11,  // 164: maxshot.gateway_internal.v1.ResolveUncertainJobRequest.verified_usage:type_name -> maxshot.gateway_internal.v1.UsageBound
+	123, // 165: maxshot.gateway_internal.v1.ResolveUncertainJobResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 166: maxshot.gateway_internal.v1.ModerateMaterialRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 167: maxshot.gateway_internal.v1.ModerateMaterialResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	122, // 168: maxshot.gateway_internal.v1.ResolveAppealRequest.operator:type_name -> maxshot.gateway_internal.v1.OperatorContext
+	123, // 169: maxshot.gateway_internal.v1.ResolveAppealResponse.result:type_name -> maxshot.gateway_internal.v1.AdminMutationResult
+	21,  // 170: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:input_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeRequest
+	23,  // 171: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:input_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryRequest
+	26,  // 172: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:input_type -> maxshot.gateway_internal.v1.PreviewQuoteRequest
+	28,  // 173: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:input_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldRequest
+	30,  // 174: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:input_type -> maxshot.gateway_internal.v1.MarkSendingRequest
+	32,  // 175: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:input_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseRequest
+	36,  // 176: maxshot.gateway_internal.v1.BillingExecutionService.Settle:input_type -> maxshot.gateway_internal.v1.SettleRequest
+	38,  // 177: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:input_type -> maxshot.gateway_internal.v1.MarkUncertainRequest
+	40,  // 178: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:input_type -> maxshot.gateway_internal.v1.ResolveUncertainRequest
+	43,  // 179: maxshot.gateway_internal.v1.BillingExecutionService.RecordAttemptObservation:input_type -> maxshot.gateway_internal.v1.RecordAttemptObservationRequest
+	45,  // 180: maxshot.gateway_internal.v1.BillingExecutionService.ClaimExecutionRecovery:input_type -> maxshot.gateway_internal.v1.ClaimExecutionRecoveryRequest
+	48,  // 181: maxshot.gateway_internal.v1.BillingExecutionService.GetBillingCatalogState:input_type -> maxshot.gateway_internal.v1.GetBillingCatalogStateRequest
+	50,  // 182: maxshot.gateway_internal.v1.AccountManagementService.RegisterAccount:input_type -> maxshot.gateway_internal.v1.RegisterAccountRequest
+	54,  // 183: maxshot.gateway_internal.v1.AccountManagementService.CreateApiKey:input_type -> maxshot.gateway_internal.v1.CreateApiKeyRequest
+	56,  // 184: maxshot.gateway_internal.v1.AccountManagementService.UpdateApiKey:input_type -> maxshot.gateway_internal.v1.UpdateApiKeyRequest
+	58,  // 185: maxshot.gateway_internal.v1.AccountManagementService.RevokeApiKey:input_type -> maxshot.gateway_internal.v1.RevokeApiKeyRequest
+	60,  // 186: maxshot.gateway_internal.v1.AccountManagementService.ListApiKeys:input_type -> maxshot.gateway_internal.v1.ListApiKeysRequest
+	63,  // 187: maxshot.gateway_internal.v1.AccountManagementService.GetAccountFunding:input_type -> maxshot.gateway_internal.v1.GetAccountFundingRequest
+	65,  // 188: maxshot.gateway_internal.v1.AccountManagementService.UpdateAccountSettings:input_type -> maxshot.gateway_internal.v1.UpdateAccountSettingsRequest
+	70,  // 189: maxshot.gateway_internal.v1.AccountManagementService.ListSubscriptionPlans:input_type -> maxshot.gateway_internal.v1.ListSubscriptionPlansRequest
+	72,  // 190: maxshot.gateway_internal.v1.AccountManagementService.GetSubscription:input_type -> maxshot.gateway_internal.v1.GetSubscriptionRequest
+	74,  // 191: maxshot.gateway_internal.v1.AccountManagementService.PurchaseSubscription:input_type -> maxshot.gateway_internal.v1.PurchaseSubscriptionRequest
+	76,  // 192: maxshot.gateway_internal.v1.AccountManagementService.RenewSubscription:input_type -> maxshot.gateway_internal.v1.RenewSubscriptionRequest
+	78,  // 193: maxshot.gateway_internal.v1.AccountManagementService.CancelSubscription:input_type -> maxshot.gateway_internal.v1.CancelSubscriptionRequest
+	80,  // 194: maxshot.gateway_internal.v1.AccountManagementService.SchedulePlanChange:input_type -> maxshot.gateway_internal.v1.SchedulePlanChangeRequest
+	82,  // 195: maxshot.gateway_internal.v1.AccountManagementService.ListInvoices:input_type -> maxshot.gateway_internal.v1.ListInvoicesRequest
+	84,  // 196: maxshot.gateway_internal.v1.AccountManagementService.GetInvoice:input_type -> maxshot.gateway_internal.v1.GetInvoiceRequest
+	86,  // 197: maxshot.gateway_internal.v1.AccountManagementService.GetDepositAddress:input_type -> maxshot.gateway_internal.v1.GetDepositAddressRequest
+	89,  // 198: maxshot.gateway_internal.v1.AccountManagementService.CreateTopupOrder:input_type -> maxshot.gateway_internal.v1.CreateTopupOrderRequest
+	91,  // 199: maxshot.gateway_internal.v1.AccountManagementService.RecordStripePayment:input_type -> maxshot.gateway_internal.v1.RecordStripePaymentRequest
+	93,  // 200: maxshot.gateway_internal.v1.AccountManagementService.ListTopups:input_type -> maxshot.gateway_internal.v1.ListTopupsRequest
+	96,  // 201: maxshot.gateway_internal.v1.AccountManagementService.LinkWallet:input_type -> maxshot.gateway_internal.v1.LinkWalletRequest
+	98,  // 202: maxshot.gateway_internal.v1.AccountManagementService.GetWalletLink:input_type -> maxshot.gateway_internal.v1.GetWalletLinkRequest
+	100, // 203: maxshot.gateway_internal.v1.AccountManagementService.AcceptFundedTerm:input_type -> maxshot.gateway_internal.v1.AcceptFundedTermRequest
+	102, // 204: maxshot.gateway_internal.v1.AccountManagementService.GetCurrentFundedTerm:input_type -> maxshot.gateway_internal.v1.GetCurrentFundedTermRequest
+	104, // 205: maxshot.gateway_internal.v1.AccountManagementService.PrepareAccountMerge:input_type -> maxshot.gateway_internal.v1.PrepareAccountMergeRequest
+	106, // 206: maxshot.gateway_internal.v1.AccountManagementService.CommitAccountMerge:input_type -> maxshot.gateway_internal.v1.CommitAccountMergeRequest
+	109, // 207: maxshot.gateway_internal.v1.AccountManagementService.ListUsage:input_type -> maxshot.gateway_internal.v1.ListUsageRequest
+	111, // 208: maxshot.gateway_internal.v1.AccountManagementService.GetUsageDetail:input_type -> maxshot.gateway_internal.v1.GetUsageDetailRequest
+	114, // 209: maxshot.gateway_internal.v1.AccountManagementService.ListAccountNotices:input_type -> maxshot.gateway_internal.v1.ListAccountNoticesRequest
+	116, // 210: maxshot.gateway_internal.v1.AccountManagementService.AckAccountNotice:input_type -> maxshot.gateway_internal.v1.AckAccountNoticeRequest
+	118, // 211: maxshot.gateway_internal.v1.AccountManagementService.GetReferralSummary:input_type -> maxshot.gateway_internal.v1.GetReferralSummaryRequest
+	120, // 212: maxshot.gateway_internal.v1.AccountManagementService.SetReferralAttribution:input_type -> maxshot.gateway_internal.v1.SetReferralAttributionRequest
+	125, // 213: maxshot.gateway_internal.v1.BillingAdminService.CreatePlanDraft:input_type -> maxshot.gateway_internal.v1.CreatePlanDraftRequest
+	127, // 214: maxshot.gateway_internal.v1.BillingAdminService.ValidatePlanVersion:input_type -> maxshot.gateway_internal.v1.ValidatePlanVersionRequest
+	129, // 215: maxshot.gateway_internal.v1.BillingAdminService.PreviewPlanImpact:input_type -> maxshot.gateway_internal.v1.PreviewPlanImpactRequest
+	131, // 216: maxshot.gateway_internal.v1.BillingAdminService.PublishPlanVersion:input_type -> maxshot.gateway_internal.v1.PublishPlanVersionRequest
+	133, // 217: maxshot.gateway_internal.v1.BillingAdminService.SetPlanSalesStatus:input_type -> maxshot.gateway_internal.v1.SetPlanSalesStatusRequest
+	135, // 218: maxshot.gateway_internal.v1.BillingAdminService.SetSpendingLock:input_type -> maxshot.gateway_internal.v1.SetSpendingLockRequest
+	137, // 219: maxshot.gateway_internal.v1.BillingAdminService.ManualLedgerAdjustment:input_type -> maxshot.gateway_internal.v1.ManualLedgerAdjustmentRequest
+	139, // 220: maxshot.gateway_internal.v1.BillingAdminService.ResolveDepositReorgHold:input_type -> maxshot.gateway_internal.v1.ResolveDepositReorgHoldRequest
+	141, // 221: maxshot.gateway_internal.v1.BillingAdminService.ReviewTopup:input_type -> maxshot.gateway_internal.v1.ReviewTopupRequest
+	143, // 222: maxshot.gateway_internal.v1.BillingAdminService.RevokeReferralReward:input_type -> maxshot.gateway_internal.v1.RevokeReferralRewardRequest
+	145, // 223: maxshot.gateway_internal.v1.BillingAdminService.ResolveDiscrepancy:input_type -> maxshot.gateway_internal.v1.ResolveDiscrepancyRequest
+	147, // 224: maxshot.gateway_internal.v1.BillingAdminService.RefundSettledRequest:input_type -> maxshot.gateway_internal.v1.RefundSettledRequestRequest
+	149, // 225: maxshot.gateway_internal.v1.BillingAdminService.UpsertFundedTerm:input_type -> maxshot.gateway_internal.v1.UpsertFundedTermRequest
+	151, // 226: maxshot.gateway_internal.v1.BillingAdminService.LockFundedTerm:input_type -> maxshot.gateway_internal.v1.LockFundedTermRequest
+	153, // 227: maxshot.gateway_internal.v1.BillingAdminService.SetCoverageThrottlePolicy:input_type -> maxshot.gateway_internal.v1.SetCoverageThrottlePolicyRequest
+	155, // 228: maxshot.gateway_internal.v1.BillingAdminService.UpdateSystemSetting:input_type -> maxshot.gateway_internal.v1.UpdateSystemSettingRequest
+	157, // 229: maxshot.gateway_internal.v1.BillingAdminService.UpdateFreeModelQuotaPolicy:input_type -> maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyRequest
+	159, // 230: maxshot.gateway_internal.v1.StudioAdminService.ResolveUncertainJob:input_type -> maxshot.gateway_internal.v1.ResolveUncertainJobRequest
+	161, // 231: maxshot.gateway_internal.v1.StudioAdminService.ModerateMaterial:input_type -> maxshot.gateway_internal.v1.ModerateMaterialRequest
+	163, // 232: maxshot.gateway_internal.v1.StudioAdminService.ResolveAppeal:input_type -> maxshot.gateway_internal.v1.ResolveAppealRequest
+	22,  // 233: maxshot.gateway_internal.v1.BillingExecutionService.ResolvePrincipalScope:output_type -> maxshot.gateway_internal.v1.ResolvePrincipalScopeResponse
+	25,  // 234: maxshot.gateway_internal.v1.BillingExecutionService.EvaluateCatalogDiscovery:output_type -> maxshot.gateway_internal.v1.EvaluateCatalogDiscoveryResponse
+	27,  // 235: maxshot.gateway_internal.v1.BillingExecutionService.PreviewQuote:output_type -> maxshot.gateway_internal.v1.PreviewQuoteResponse
+	29,  // 236: maxshot.gateway_internal.v1.BillingExecutionService.AuthorizeAndHold:output_type -> maxshot.gateway_internal.v1.AuthorizeAndHoldResponse
+	31,  // 237: maxshot.gateway_internal.v1.BillingExecutionService.MarkSending:output_type -> maxshot.gateway_internal.v1.MarkSendingResponse
+	33,  // 238: maxshot.gateway_internal.v1.BillingExecutionService.ExtendExecutionLease:output_type -> maxshot.gateway_internal.v1.ExtendExecutionLeaseResponse
+	37,  // 239: maxshot.gateway_internal.v1.BillingExecutionService.Settle:output_type -> maxshot.gateway_internal.v1.SettleResponse
+	39,  // 240: maxshot.gateway_internal.v1.BillingExecutionService.MarkUncertain:output_type -> maxshot.gateway_internal.v1.MarkUncertainResponse
+	41,  // 241: maxshot.gateway_internal.v1.BillingExecutionService.ResolveUncertain:output_type -> maxshot.gateway_internal.v1.ResolveUncertainResponse
+	44,  // 242: maxshot.gateway_internal.v1.BillingExecutionService.RecordAttemptObservation:output_type -> maxshot.gateway_internal.v1.RecordAttemptObservationResponse
+	47,  // 243: maxshot.gateway_internal.v1.BillingExecutionService.ClaimExecutionRecovery:output_type -> maxshot.gateway_internal.v1.ClaimExecutionRecoveryResponse
+	49,  // 244: maxshot.gateway_internal.v1.BillingExecutionService.GetBillingCatalogState:output_type -> maxshot.gateway_internal.v1.GetBillingCatalogStateResponse
+	51,  // 245: maxshot.gateway_internal.v1.AccountManagementService.RegisterAccount:output_type -> maxshot.gateway_internal.v1.RegisterAccountResponse
+	55,  // 246: maxshot.gateway_internal.v1.AccountManagementService.CreateApiKey:output_type -> maxshot.gateway_internal.v1.CreateApiKeyResponse
+	57,  // 247: maxshot.gateway_internal.v1.AccountManagementService.UpdateApiKey:output_type -> maxshot.gateway_internal.v1.UpdateApiKeyResponse
+	59,  // 248: maxshot.gateway_internal.v1.AccountManagementService.RevokeApiKey:output_type -> maxshot.gateway_internal.v1.RevokeApiKeyResponse
+	61,  // 249: maxshot.gateway_internal.v1.AccountManagementService.ListApiKeys:output_type -> maxshot.gateway_internal.v1.ListApiKeysResponse
+	64,  // 250: maxshot.gateway_internal.v1.AccountManagementService.GetAccountFunding:output_type -> maxshot.gateway_internal.v1.GetAccountFundingResponse
+	66,  // 251: maxshot.gateway_internal.v1.AccountManagementService.UpdateAccountSettings:output_type -> maxshot.gateway_internal.v1.UpdateAccountSettingsResponse
+	71,  // 252: maxshot.gateway_internal.v1.AccountManagementService.ListSubscriptionPlans:output_type -> maxshot.gateway_internal.v1.ListSubscriptionPlansResponse
+	73,  // 253: maxshot.gateway_internal.v1.AccountManagementService.GetSubscription:output_type -> maxshot.gateway_internal.v1.GetSubscriptionResponse
+	75,  // 254: maxshot.gateway_internal.v1.AccountManagementService.PurchaseSubscription:output_type -> maxshot.gateway_internal.v1.PurchaseSubscriptionResponse
+	77,  // 255: maxshot.gateway_internal.v1.AccountManagementService.RenewSubscription:output_type -> maxshot.gateway_internal.v1.RenewSubscriptionResponse
+	79,  // 256: maxshot.gateway_internal.v1.AccountManagementService.CancelSubscription:output_type -> maxshot.gateway_internal.v1.CancelSubscriptionResponse
+	81,  // 257: maxshot.gateway_internal.v1.AccountManagementService.SchedulePlanChange:output_type -> maxshot.gateway_internal.v1.SchedulePlanChangeResponse
+	83,  // 258: maxshot.gateway_internal.v1.AccountManagementService.ListInvoices:output_type -> maxshot.gateway_internal.v1.ListInvoicesResponse
+	85,  // 259: maxshot.gateway_internal.v1.AccountManagementService.GetInvoice:output_type -> maxshot.gateway_internal.v1.GetInvoiceResponse
+	87,  // 260: maxshot.gateway_internal.v1.AccountManagementService.GetDepositAddress:output_type -> maxshot.gateway_internal.v1.GetDepositAddressResponse
+	90,  // 261: maxshot.gateway_internal.v1.AccountManagementService.CreateTopupOrder:output_type -> maxshot.gateway_internal.v1.CreateTopupOrderResponse
+	92,  // 262: maxshot.gateway_internal.v1.AccountManagementService.RecordStripePayment:output_type -> maxshot.gateway_internal.v1.RecordStripePaymentResponse
+	94,  // 263: maxshot.gateway_internal.v1.AccountManagementService.ListTopups:output_type -> maxshot.gateway_internal.v1.ListTopupsResponse
+	97,  // 264: maxshot.gateway_internal.v1.AccountManagementService.LinkWallet:output_type -> maxshot.gateway_internal.v1.LinkWalletResponse
+	99,  // 265: maxshot.gateway_internal.v1.AccountManagementService.GetWalletLink:output_type -> maxshot.gateway_internal.v1.GetWalletLinkResponse
+	101, // 266: maxshot.gateway_internal.v1.AccountManagementService.AcceptFundedTerm:output_type -> maxshot.gateway_internal.v1.AcceptFundedTermResponse
+	103, // 267: maxshot.gateway_internal.v1.AccountManagementService.GetCurrentFundedTerm:output_type -> maxshot.gateway_internal.v1.GetCurrentFundedTermResponse
+	105, // 268: maxshot.gateway_internal.v1.AccountManagementService.PrepareAccountMerge:output_type -> maxshot.gateway_internal.v1.PrepareAccountMergeResponse
+	107, // 269: maxshot.gateway_internal.v1.AccountManagementService.CommitAccountMerge:output_type -> maxshot.gateway_internal.v1.CommitAccountMergeResponse
+	110, // 270: maxshot.gateway_internal.v1.AccountManagementService.ListUsage:output_type -> maxshot.gateway_internal.v1.ListUsageResponse
+	112, // 271: maxshot.gateway_internal.v1.AccountManagementService.GetUsageDetail:output_type -> maxshot.gateway_internal.v1.GetUsageDetailResponse
+	115, // 272: maxshot.gateway_internal.v1.AccountManagementService.ListAccountNotices:output_type -> maxshot.gateway_internal.v1.ListAccountNoticesResponse
+	117, // 273: maxshot.gateway_internal.v1.AccountManagementService.AckAccountNotice:output_type -> maxshot.gateway_internal.v1.AckAccountNoticeResponse
+	119, // 274: maxshot.gateway_internal.v1.AccountManagementService.GetReferralSummary:output_type -> maxshot.gateway_internal.v1.GetReferralSummaryResponse
+	121, // 275: maxshot.gateway_internal.v1.AccountManagementService.SetReferralAttribution:output_type -> maxshot.gateway_internal.v1.SetReferralAttributionResponse
+	126, // 276: maxshot.gateway_internal.v1.BillingAdminService.CreatePlanDraft:output_type -> maxshot.gateway_internal.v1.CreatePlanDraftResponse
+	128, // 277: maxshot.gateway_internal.v1.BillingAdminService.ValidatePlanVersion:output_type -> maxshot.gateway_internal.v1.ValidatePlanVersionResponse
+	130, // 278: maxshot.gateway_internal.v1.BillingAdminService.PreviewPlanImpact:output_type -> maxshot.gateway_internal.v1.PreviewPlanImpactResponse
+	132, // 279: maxshot.gateway_internal.v1.BillingAdminService.PublishPlanVersion:output_type -> maxshot.gateway_internal.v1.PublishPlanVersionResponse
+	134, // 280: maxshot.gateway_internal.v1.BillingAdminService.SetPlanSalesStatus:output_type -> maxshot.gateway_internal.v1.SetPlanSalesStatusResponse
+	136, // 281: maxshot.gateway_internal.v1.BillingAdminService.SetSpendingLock:output_type -> maxshot.gateway_internal.v1.SetSpendingLockResponse
+	138, // 282: maxshot.gateway_internal.v1.BillingAdminService.ManualLedgerAdjustment:output_type -> maxshot.gateway_internal.v1.ManualLedgerAdjustmentResponse
+	140, // 283: maxshot.gateway_internal.v1.BillingAdminService.ResolveDepositReorgHold:output_type -> maxshot.gateway_internal.v1.ResolveDepositReorgHoldResponse
+	142, // 284: maxshot.gateway_internal.v1.BillingAdminService.ReviewTopup:output_type -> maxshot.gateway_internal.v1.ReviewTopupResponse
+	144, // 285: maxshot.gateway_internal.v1.BillingAdminService.RevokeReferralReward:output_type -> maxshot.gateway_internal.v1.RevokeReferralRewardResponse
+	146, // 286: maxshot.gateway_internal.v1.BillingAdminService.ResolveDiscrepancy:output_type -> maxshot.gateway_internal.v1.ResolveDiscrepancyResponse
+	148, // 287: maxshot.gateway_internal.v1.BillingAdminService.RefundSettledRequest:output_type -> maxshot.gateway_internal.v1.RefundSettledRequestResponse
+	150, // 288: maxshot.gateway_internal.v1.BillingAdminService.UpsertFundedTerm:output_type -> maxshot.gateway_internal.v1.UpsertFundedTermResponse
+	152, // 289: maxshot.gateway_internal.v1.BillingAdminService.LockFundedTerm:output_type -> maxshot.gateway_internal.v1.LockFundedTermResponse
+	154, // 290: maxshot.gateway_internal.v1.BillingAdminService.SetCoverageThrottlePolicy:output_type -> maxshot.gateway_internal.v1.SetCoverageThrottlePolicyResponse
+	156, // 291: maxshot.gateway_internal.v1.BillingAdminService.UpdateSystemSetting:output_type -> maxshot.gateway_internal.v1.UpdateSystemSettingResponse
+	158, // 292: maxshot.gateway_internal.v1.BillingAdminService.UpdateFreeModelQuotaPolicy:output_type -> maxshot.gateway_internal.v1.UpdateFreeModelQuotaPolicyResponse
+	160, // 293: maxshot.gateway_internal.v1.StudioAdminService.ResolveUncertainJob:output_type -> maxshot.gateway_internal.v1.ResolveUncertainJobResponse
+	162, // 294: maxshot.gateway_internal.v1.StudioAdminService.ModerateMaterial:output_type -> maxshot.gateway_internal.v1.ModerateMaterialResponse
+	164, // 295: maxshot.gateway_internal.v1.StudioAdminService.ResolveAppeal:output_type -> maxshot.gateway_internal.v1.ResolveAppealResponse
+	233, // [233:296] is the sub-list for method output_type
+	170, // [170:233] is the sub-list for method input_type
+	170, // [170:170] is the sub-list for extension type_name
+	170, // [170:170] is the sub-list for extension extendee
+	0,   // [0:170] is the sub-list for field type_name
 }
 
 func init() { file_maxshot_gateway_internal_v1_execution_proto_init() }
@@ -4476,15 +13064,23 @@ func file_maxshot_gateway_internal_v1_execution_proto_init() {
 	if File_maxshot_gateway_internal_v1_execution_proto != nil {
 		return
 	}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[19].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[21].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[25].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[27].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[42].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[46].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[52].OneofWrappers = []any{}
+	file_maxshot_gateway_internal_v1_execution_proto_msgTypes[139].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_maxshot_gateway_internal_v1_execution_proto_rawDesc), len(file_maxshot_gateway_internal_v1_execution_proto_rawDesc)),
-			NumEnums:      6,
-			NumMessages:   32,
+			NumEnums:      10,
+			NumMessages:   155,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   4,
 		},
 		GoTypes:           file_maxshot_gateway_internal_v1_execution_proto_goTypes,
 		DependencyIndexes: file_maxshot_gateway_internal_v1_execution_proto_depIdxs,

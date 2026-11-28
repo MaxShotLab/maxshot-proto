@@ -31,10 +31,14 @@ service AitCreditGrantService {
   // PullWalletEligibilityUpdates lets Contract Backend catch up on wallet bindings and term acceptances by cursor.
   rpc PullWalletEligibilityUpdates(PullWalletEligibilityUpdatesRequest) returns (PullWalletEligibilityUpdatesResponse);
 
-  // IssueAitCreditGrants validates and posts 7-day expiring AIT Earned Credit staking grants (TOK-R24, TOK-R25, TOK-R31).
+  // IssueAitCreditGrants idempotently stages immutable batch submissions for a boundary.
+  // Credits become spendable only after all batches and Gateway independent chain verification pass.
   // Note: Settled-charge AIT refunds (BIL-R42) are issued locally inside Gateway Billing against its independent Refund Reserve
   // and never pass through this staking-grant endpoint or Tokenomics 12-week staking grant history.
   rpc IssueAitCreditGrants(IssueAitCreditGrantsRequest) returns (IssueAitCreditGrantsResponse);
+
+  // Poll the independently verified boundary and the final disposition of one submitted batch.
+  rpc GetGrantBoundaryStatus(GetGrantBoundaryStatusRequest) returns (GetGrantBoundaryStatusResponse);
 }
 
 enum FundedTermStatus {
@@ -55,6 +59,7 @@ enum GrantItemStatus {
   GRANT_ITEM_STATUS_REJECTED_RESERVE_EXCEEDED = 6;
   GRANT_ITEM_STATUS_REJECTED_EXCLUDED_WALLET = 7;
   GRANT_ITEM_STATUS_REJECTED_COVERAGE_BREACH = 8;
+  GRANT_ITEM_STATUS_STAGED = 9;
 }
 
 // AitCoverageThrottlePolicy implements TD-64 prospective high-cost model throttling during coverage breach
@@ -65,6 +70,7 @@ message AitCoverageThrottlePolicy {
   string max_allowed_model_rate_usd_dec = 3;
   string reason = 4;
   int64 updated_at_unix_sec = 5;
+  repeated string restricted_offering_ids = 6;
 }
 
 // FundedTermConfig is authored and reserve-locked in Gateway Billing (ADM-R19 / TOK-R23)
@@ -77,10 +83,10 @@ message FundedTermConfig {
   string terms_version = 4;
   int64 start_unix_sec = 5;
   int64 end_unix_sec = 6;
-  int64 annual_base_usd_num = 7;     // decided: 12 (TD-77)
-  int64 annual_base_usd_den = 8;     // decided: 1
-  int64 credits_per_usd_num = 9;     // decided: 1000000 (TD-53), issuance conversion only
-  int64 credits_per_usd_den = 10;    // decided: 1
+  int64 annual_base_usd_num = 7; // decided: 12 (TD-77)
+  int64 annual_base_usd_den = 8; // decided: 1
+  int64 credits_per_usd_num = 9; // decided: 1000000 (TD-53), issuance conversion only
+  int64 credits_per_usd_den = 10; // decided: 1
   repeated string allowed_catalog_ids = 11;
   int64 max_total_grant_credits = 12;
   FundedTermStatus status = 13;
@@ -114,7 +120,7 @@ message TermAcceptance {
 message WalletEligibilityRecord {
   string account_id = 1;
   string wallet_address = 2; // normalized lowercase 0x-prefixed Ethereum address
-  uint64 chain_id = 3;       // 1 (Ethereum mainnet)
+  uint64 chain_id = 3; // 1 (Ethereum mainnet)
   int64 linked_at_unix_sec = 4;
   string siwe_proof_ref = 5; // audit proof reference for ADM-R21
   bool is_contract_wallet_erc1271 = 6;
@@ -202,11 +208,14 @@ message BoundaryBatchSummary {
   int32 total_batches = 2;
   int64 boundary_total_grant_credits = 3;
   string boundary_total_eligible_ait_wei_seconds_dec = 4;
-  string onchain_total_staked_ait_wei_dec = 5; // feeds 7-day boundary read-only RPC invariant check (§3.3.4)
+  string onchain_total_staked_ait_wei_dec = 5; // informational only; never used as an independent upper bound
   uint64 finalized_block_number = 6;
   string finalized_block_hash = 7;
   int64 boundary_start_unix_sec = 8;
   int64 boundary_end_unix_sec = 9;
+  // Positive, monotonic submission revision within this boundary. A higher revision can supersede a
+  // deferred, uncredited revision; items are immutable within each revision. Absent means revision 1.
+  optional uint32 boundary_revision = 10;
 }
 
 message AitGrantItem {
@@ -247,4 +256,28 @@ message AitGrantItemResult {
 
 message IssueAitCreditGrantsResponse {
   repeated AitGrantItemResult results = 1;
+  optional GrantBoundaryStatus boundary_status = 2; // Must be present on a v0.2.0 server response.
+  optional uint32 boundary_revision = 3;
+}
+
+enum GrantBoundaryStatus {
+  GRANT_BOUNDARY_STATUS_UNSPECIFIED = 0;
+  GRANT_BOUNDARY_STATUS_AWAITING_BATCHES = 1;
+  GRANT_BOUNDARY_STATUS_PENDING_VERIFICATION = 2;
+  GRANT_BOUNDARY_STATUS_DEFERRED = 3;
+  GRANT_BOUNDARY_STATUS_CREDITED = 4;
+}
+
+message GetGrantBoundaryStatusRequest {
+  string term_id = 1;
+  int32 boundary_index = 2;
+  string batch_id = 3; // Optional; when supplied, return only this batch's results.
+  optional uint32 boundary_revision = 4; // Absent selects the latest known revision.
+}
+
+message GetGrantBoundaryStatusResponse {
+  GrantBoundaryStatus status = 1;
+  repeated AitGrantItemResult results = 2;
+  string reason_code = 3;
+  uint32 boundary_revision = 4;
 }
